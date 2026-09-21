@@ -5,7 +5,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-09-21T00:00:00Z
 - **Current Phase**: INCEPTION
-- **Current Stage**: User Stories (Part 2 - Generation complete; awaiting approval)
+- **Current Stage**: Workflow Planning (execution-plan.md generated; awaiting approval)
 
 ## Workspace State
 - **Existing Code**: No
@@ -30,16 +30,26 @@
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
-- [ ] Reverse Engineering (N/A - Greenfield)
+- [x] Reverse Engineering (SKIPPED - Greenfield)
 - [x] Requirements Analysis (approved 2026-09-21; Q29=A, Q30=A confirmed; O-01, O-02 closed)
-- [~] User Stories (stories.md + personas.md generated; awaiting user approval)
-- [ ] Workflow Planning
-- [ ] Application Design
-- [ ] Units Generation
+- [x] User Stories (approved 2026-09-21; 4 personas, 8 epics, 38 stories)
+- [~] Workflow Planning (execution-plan.md generated; awaiting user approval)
+- [ ] Application Design - EXECUTE
+- [ ] Units Generation - EXECUTE
 
-### 🟢 CONSTRUCTION PHASE
-- [ ] Per-Unit Design & Code Generation
-- [ ] Build and Test
+### 🟢 CONSTRUCTION PHASE (per unit)
+- [ ] Functional Design - EXECUTE
+- [ ] NFR Requirements - EXECUTE
+- [ ] NFR Design - EXECUTE
+- [ ] Infrastructure Design - EXECUTE
+- [ ] Code Generation - EXECUTE
+- [ ] Build and Test - EXECUTE
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations (placeholder)
+
+## Execution Plan Summary
+- **Stages to Execute**: Application Design, Units Generation, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation, Build and Test
+- **Stages Skipped**: Reverse Engineering (greenfield)
+- **Risk Level**: High (system-wide greenfield, integrations, guaranteed delivery, blocking Security/Resiliency/PBT)
+- **Next Stage**: Application Design
