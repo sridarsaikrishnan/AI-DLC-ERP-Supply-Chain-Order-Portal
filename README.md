@@ -57,3 +57,4 @@ Note: `test_validator.py`, `test_routing.py`, and `test_property_based.py` are D
 
 ## Security note (PoC)
 This MVP intentionally skips several safeguards (plaintext passwords, inline ERP credentials, no explicit parameterized-query mandate) per an explicit proof-of-concept decision. These are flagged as blocking items to resolve before any production use.
+--test
