@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP & Supply Chain Order Portal</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Top bar -->
+  <header id="topbar" class="hidden">
+    <div class="brand">ERP &amp; Supply Chain Order Portal</div>
+    <nav id="nav">
+      <button class="navbtn" data-view="orders" data-testid="nav-orders">Orders</button>
+      <button class="navbtn" data-view="place" data-testid="nav-place">New Order</button>
+      <button class="navbtn" data-view="catalog" data-testid="nav-catalog">Catalog</button>
+      <button class="navbtn admin-only" data-view="admin" data-testid="nav-admin">Admin</button>
+    </nav>
+    <div class="userbox">
+      <span id="whoami"></span>
+      <button id="logoutBtn" class="secondary" data-testid="logout-button">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- LOGIN -->
+    <section id="view-login" class="view">
+      <div class="card narrow">
+        <h2>Sign in</h2>
+        <form id="loginForm" autocomplete="off">
+          <label>Username
+            <input name="username" data-testid="login-username" value="client" required />
+          </label>
+          <label>Password
+            <input name="password" type="password" data-testid="login-password" value="client123" required />
+          </label>
+          <button type="submit" class="primary" data-testid="login-submit">Sign in</button>
+        </form>
+        <div id="mfaBlock" class="hidden">
+          <h3>Enter MFA code</h3>
+          <form id="mfaForm">
+            <label>TOTP code
+              <input name="code" data-testid="mfa-code" inputmode="numeric" />
+            </label>
+            <button type="submit" class="primary" data-testid="mfa-submit">Verify</button>
+          </form>
+        </div>
+        <p class="hint">Seeded: <code>admin/admin123</code> (admin) &middot; <code>client/client123</code> (client)</p>
+        <p id="loginMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <!-- ORDERS LIST -->
+    <section id="view-orders" class="view hidden">
+      <div class="row-between">
+        <h2>My Orders</h2>
+        <button id="refreshOrders" class="secondary" data-testid="orders-refresh">Refresh</button>
+      </div>
+      <table class="grid" data-testid="orders-table">
+        <thead><tr><th>Order</th><th>Reference</th><th>State</th><th>ERP Ref</th><th></th></tr></thead>
+        <tbody id="ordersBody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+      </table>
+
+      <div id="orderDetail" class="card hidden">
+        <div class="row-between">
+          <h3>Order Detail</h3>
+          <button id="closeDetail" class="secondary">Close</button>
+        </div>
+        <div id="detailBody"></div>
+        <h4>Status history</h4>
+        <ul id="historyList" class="history"></ul>
+        <div class="actions">
+          <button class="warn" data-action="cancel" data-testid="action-cancel">Cancel</button>
+          <button class="secondary" data-action="resubmit" data-testid="action-resubmit">Resubmit</button>
+          <button class="secondary" data-action="amend" data-testid="action-amend">Amend (reuse form)</button>
+        </div>
+        <p id="detailMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <!-- PLACE ORDER -->
+    <section id="view-place" class="view hidden">
+      <h2>Place / Amend Order</h2>
+      <div class="card">
+        <form id="orderForm">
+          <div class="grid2">
+            <label>Client reference<input name="client_reference" value="PO-1001" data-testid="order-ref" required /></label>
+            <label>Order date<input name="order_date" type="date" data-testid="order-date" required /></label>
+            <label>Currency<input name="currency" value="USD" maxlength="3" data-testid="order-currency" required /></label>
+            <label>Notes<input name="notes" placeholder="optional" data-testid="order-notes" /></label>
+          </div>
+          <fieldset>
+            <legend>Ship to</legend>
+            <div class="grid2">
+              <label>Name<input name="st_name" value="ACME Corp" required /></label>
+              <label>Address line<input name="st_line" value="1 Main St" required /></label>
+              <label>City<input name="st_city" value="Metro" required /></label>
+              <label>Region<input name="st_region" value="EU" /></label>
+              <label>Postal code<input name="st_postal" value="10001" /></label>
+              <label>Country<input name="st_country" value="US" required /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Line items</legend>
+            <table class="grid"><thead><tr><th>Product key</th><th>Qty</th><th>UoM</th><th></th></tr></thead>
+              <tbody id="linesBody"></tbody></table>
+            <button type="button" id="addLine" class="secondary" data-testid="add-line">+ Add line</button>
+          </fieldset>
+          <div class="actions">
+            <button type="submit" class="primary" data-testid="order-submit">Submit order</button>
+            <span id="amendNote" class="hint hidden"></span>
+          </div>
+          <p id="orderMsg" class="msg"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- CATALOG -->
+    <section id="view-catalog" class="view hidden">
+      <h2>Catalog &amp; Inventory</h2>
+      <div class="card">
+        <div class="row">
+          <input id="catalogSearch" placeholder="Search products..." data-testid="catalog-search" />
+          <button id="catalogSearchBtn" class="secondary">Search</button>
+        </div>
+        <table class="grid" data-testid="catalog-table">
+          <thead><tr><th>Product</th><th>Name</th><th>Description</th><th>Availability</th></tr></thead>
+          <tbody id="catalogBody"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="view-admin" class="view hidden">
+      <h2>Administration</h2>
+      <div class="admin-grid">
+        <div class="card">
+          <h3>Register ERP instance</h3>
+          <form id="instanceForm">
+            <label>ERP type
+              <select name="erp_type" data-testid="inst-type"><option>ERP_NEXT</option><option>ODOO</option></select>
+            </label>
+            <label>Display name<input name="display_name" value="ERPNext EU" required /></label>
+            <label>Connection ref<input name="connection_ref" value="stub" required /></label>
+            <button type="submit" class="primary" data-testid="inst-submit">Register</button>
+          </form>
+          <p id="instMsg" class="msg"></p>
+        </div>
+
+        <div class="card">
+          <h3>Define routing rule</h3>
+          <form id="ruleForm">
+            <label>Order index<input name="order_index" type="number" value="1" required /></label>
+            <div class="grid3">
+              <label>Field<input name="field" value="currency" /></label>
+              <label>Operator
+                <select name="operator"><option>EQUALS</option><option>NOT_EQUALS</option><option>IN</option><option>CONTAINS</option><option>GT</option><option>LT</option></select>
+              </label>
+              <label>Value<input name="value" value="USD" /></label>
+            </div>
+            <label>Target instance
+              <select name="target_instance_id" id="ruleInstanceSelect" data-testid="rule-target"></select>
+            </label>
+            <button type="submit" class="primary" data-testid="rule-submit">Add rule</button>
+          </form>
+          <p id="ruleMsg" class="msg"></p>
+        </div>
+
+        <div class="card">
+          <h3>Define mapping</h3>
+          <form id="mappingForm">
+            <label>Instance
+              <select name="instance_id" id="mapInstanceSelect"></select>
+            </label>
+            <div class="grid2">
+              <label>Data type
+                <select name="data_type"><option>SALES_ORDER</option><option>ORDER_STATUS</option><option>PRODUCT</option><option>INVENTORY</option></select>
+              </label>
+              <label>Direction
+                <select name="direction"><option>TO_ERP</option><option>FROM_ERP</option></select>
+              </label>
+            </div>
+            <label>Field entries (source:target, one per line)
+              <textarea name="entries" rows="4" data-testid="map-entries">client_reference:name
+currency:currency</textarea>
+            </label>
+            <button type="submit" class="primary" data-testid="map-submit">Save mapping</button>
+          </form>
+          <p id="mapMsg" class="msg"></p>
+        </div>
+
+        <div class="card wide">
+          <div class="row-between">
+            <h3>Current configuration</h3>
+            <button id="refreshConfig" class="secondary" data-testid="config-refresh">Refresh</button>
+          </div>
+          <div id="configBody"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

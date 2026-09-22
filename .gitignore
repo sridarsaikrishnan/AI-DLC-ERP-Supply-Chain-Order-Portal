@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.hypothesis/
+
+# Local database (SQLite PoC)
+portal_local.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Environment / secrets
+.env
+*.env
+
+# IDE / tooling
+.kiro/settings/
+.playwright-mcp/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.log
+smoke_results.txt
+smoke2.txt
+ui_smoke.txt
