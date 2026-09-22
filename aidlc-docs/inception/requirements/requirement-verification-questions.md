@@ -182,7 +182,7 @@ D) .NET (C#)
 
 X) Other / no preference — recommend one for me
 
-[Answer]: D
+[Answer]: X - Java with Spring Boot (changed 2026-09-21 by user decision; was D = .NET). Rationale: richest integration ecosystem (Spring for GraphQL, Spring Kafka, Apache Camel), Keycloak and Testcontainers are JVM-native, and jqwik covers property-based testing.
 
 ## Question 13
 If a web UI is needed, do you have a frontend preference?
@@ -333,7 +333,7 @@ These extend the letter answers above. Where a clarification is more specific th
 - **Customers already exist in the ERPs.** The platform does not create ERP customers in production. A dev/test seed script may create fictional customers, items and bindings, restricted to non-production targets.
 - **Deployment on AWS** (Q14 = A), not Azure.
 - **Fixed output payload.** Reseller-facing payloads (API responses, webhooks) have one canonical shape for every tenant. There are no per-tenant output templates and no template/transformation language such as JSONata. Mapping between each ERP's native format and the canonical model is still required inside the platform.
-- **Technology:** .NET (Q12 = D), Terraform for infrastructure as code, Apache Kafka as the message broker (Amazon MSK on AWS), Keycloak as the OAuth 2.0 / OIDC identity provider.
+- **Technology:** Java with Spring Boot (Q12 changed to X on 2026-09-21; was D = .NET), Terraform for infrastructure as code, Amazon SQS FIFO + SNS for async messaging (chosen 2026-09-21, was Apache Kafka/MSK), Amazon Cognito as the OAuth 2.0 / OIDC identity provider (chosen 2026-09-21, was Keycloak). AWS-native direction; Floci emulates AWS services for local development.
 - **Local development:** everything runs in containers, with a smooth single-command developer experience and no dependency on a cloud account for local work or tests.
 - **MVP scope:** no API gateway, WAF or CloudFront. An ALB fronts the containers and rate limiting lives in the API. Configuration comes from environment variables, not a secrets provider.
 
@@ -343,12 +343,12 @@ These extend the letter answers above. Where a clarification is more specific th
 - Reseller-facing surfaces (API, errors, webhooks, delivery log, UI) never expose ERP names, instances, or ERP record IDs. Use a separate public schema from the operator/admin schema and sanitize ERP errors into canonical codes.
 - Ensure one owner per item: detect the same item reported by two ERPs and flag it to the operator instead of publishing it.
 - Customers (Q2) are read and linked only. Creating or updating ERP customers is out of scope (Q3 applies to orders and items).
-- Run Keycloak as a container locally and on ECS in AWS (with its own PostgreSQL database), with realm configuration kept as code so environments match. The API validates standard OIDC JWTs. The operator admin flow creates each reseller OAuth client through the Keycloak Admin API, with the tenant identifier issued as a token claim.
-- Local stack with Docker Compose: PostgreSQL, Kafka (KRaft mode), OIDC provider, a mock ERP, and an optional profile with real Odoo and ERPNext. Use Testcontainers so integration tests start their own containers.
-- Kafka: partition by order ID for per-order ordering; publish through a transactional outbox in PostgreSQL; implement retry and backoff (Q7 = A) with retry topics and a dead-letter topic, since Kafka has no per-message redelivery.
-- Terraform layout with shared modules and one environment folder per stage, run through a container for reproducibility.
+- Use Amazon Cognito as the OIDC provider (user pool + app clients), emulated locally via Floci and real in AWS. The API validates standard OIDC JWTs (signature/JWKS, issuer, audience, expiry). The operator admin flow creates each reseller app client through the Cognito Identity Provider API, with the tenant identifier issued as a token claim. (Changed 2026-09-21, was Keycloak.)
+- Local stack with Docker Compose: real PostgreSQL, Floci (emulates Cognito/SQS/SNS), a mock ERP, and an optional profile with real Odoo and ERPNext. Use Testcontainers so integration tests start their own containers (Postgres real; AWS services via Floci). (Changed 2026-09-21, was Kafka/Keycloak containers.)
+- Messaging (Amazon SQS FIFO + SNS, changed 2026-09-21 from Kafka): MessageGroupId = order ID for per-order ordering; publish through a transactional outbox in PostgreSQL; SQS gives native per-message redelivery (visibility-timeout backoff) and a native dead-letter queue with redrive (Q7 = A); SNS fans out to a per-consumer SQS queue (ERP delivery, webhook dispatch, read-model projection).
+- Terraform layout with shared modules and one environment folder per stage, run through a container for reproducibility. Floci used for local Terraform/AWS smoke-tests.
 - Modular monolith: two deployables (API and worker) plus a UI container. Split further only when a real need appears.
-- Portable-core rule: application code depends only on PostgreSQL, Kafka, OIDC, HTTP and OpenTelemetry (OTLP). Application code calls no AWS-specific API. Platform settings are environment variables (injected from Secrets Manager by ECS in AWS, from a git-ignored .env locally), and ERP connection credentials are stored encrypted in PostgreSQL (AES-GCM, key from an environment variable, key ID stored with the ciphertext). Any new AWS-only dependency needs a local story before it is adopted.
+- AWS-native rule (replaces the retired portable-core rule, 2026-09-21): the platform targets AWS-managed services (Cognito, SQS/SNS, RDS PostgreSQL); application code MAY call AWS APIs, isolated behind interfaces for testability. Platform settings are environment variables (injected from Secrets Manager by ECS in AWS, from a git-ignored .env pointed at Floci locally); AWS access uses task IAM roles. ERP connection credentials are stored encrypted in PostgreSQL (AES-GCM, key from Secrets Manager/KMS, key ID stored with the ciphertext). The Floci emulator is a convenience and is not authoritative for security-critical behavior; the auth/token path is validated against real Cognito in a dev AWS account.
 - Serve the UI from a container (not S3/CloudFront), keep payload and delivery logs in PostgreSQL, and run ERP polling with an in-app scheduler.
 - Test tiers: unit tests with no containers; integration tests with Testcontainers; ERP conformance tests against real Odoo and ERPNext containers; a post-deploy smoke test in a dev AWS account.
 
@@ -417,7 +417,7 @@ What CI/CD tooling and deployment process should this workload use?
 
 A) Use our existing CI/CD pipeline — provide the tool (e.g., GitHub Actions, GitLab CI, Jenkins, CodePipeline).
 
-B) No pipeline exists — propose a CI/CD pipeline definition appropriate to Terraform and the .NET/container runtime.
+B) No pipeline exists — propose a CI/CD pipeline definition appropriate to Terraform and the JVM/Spring Boot container runtime.
 
 X) Other (describe after [Answer]: Btag below)
 

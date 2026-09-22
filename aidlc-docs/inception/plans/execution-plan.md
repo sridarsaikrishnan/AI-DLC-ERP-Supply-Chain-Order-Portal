@@ -10,7 +10,7 @@
 
 ### Change Impact Assessment
 - **User-facing changes**: Yes — reseller GraphQL API, reseller web UI (4 screens), operator admin UI (6 screens), webhooks.
-- **Structural changes**: Yes — a new multi-service system (modular monolith: `api`, `worker`, `ui`, plus Keycloak) with canonical model, routing, and mapping engine.
+- **Structural changes**: Yes — a new multi-service system (modular monolith: `api`, `worker`, `ui`; identity via managed Amazon Cognito) with canonical model, routing, and mapping engine.
 - **Data model changes**: Yes — canonical entities (Sales Order, Purchase Order, Item, Customer), lifecycle state machine, bindings, item ownership, outbox, delivery log, audit.
 - **API changes**: Yes — new reseller GraphQL schema and a separate operator/admin schema; ERP-facing adapter calls (Odoo, ERPNext).
 - **NFR impact**: Yes — guaranteed delivery, tenant isolation, encryption, observability, multi-zone; three enabled extensions (Security, Resiliency, PBT) impose blocking constraints.
@@ -131,7 +131,7 @@ OPERATIONS PHASE
 - [ ] Application Design — **EXECUTE**
   - **Rationale**: An entirely new component/service topology is needed (canonical model, routing engine, mapping engine, adapter seam, reseller vs operator schemas, worker/outbox). Maps the ten designed screens to components, routes, and API operations.
 - [ ] Units Generation — **EXECUTE**
-  - **Rationale**: The system decomposes into several units that can be designed and built in sequence (candidates: Platform Core/canonical + persistence; ERP Integration/adapters + mapping + conformance; Ordering & Routing + delivery/outbox; Reseller API & Webhooks; Reseller Web UI; Operator Admin (API + UI); Identity/Keycloak; Platform/Infra & Dev Enablement). Units are formalized in that stage.
+  - **Rationale**: The system decomposes into several units that can be designed and built in sequence (candidates: Platform Core/canonical + persistence; ERP Integration/adapters + mapping + conformance; Ordering & Routing + delivery/outbox; Reseller API & Webhooks; Reseller Web UI; Operator Admin (API + UI); Identity (Cognito integration); Platform/Infra & Dev Enablement). Units are formalized in that stage.
 
 ### 🟢 CONSTRUCTION PHASE (per unit)
 - [ ] Functional Design — **EXECUTE**
@@ -141,9 +141,9 @@ OPERATIONS PHASE
 - [ ] NFR Design — **EXECUTE**
   - **Rationale**: Design the reliability and security patterns — transactional outbox, retry/backoff with retry + dead-letter topics, idempotency, tenant isolation, circuit breakers/timeouts, observability — and answer the resiliency testing question (RESILIENCY-14).
 - [ ] Infrastructure Design — **EXECUTE**
-  - **Rationale**: Map to AWS (ECS Fargate, RDS PostgreSQL Multi-AZ, MSK, ALB, Keycloak on ECS) via Terraform, honoring the portable-core rule (NFR-05) and multi-zone baseline (RESILIENCY-08, incl. the Keycloak O-10 decision).
+  - **Rationale**: Map to AWS (ECS Fargate, RDS PostgreSQL Multi-AZ, SQS FIFO + SNS, Cognito, ALB) via Terraform, honoring the AWS-native rule (NFR-05) and multi-zone baseline (RESILIENCY-08; O-10 closed by managed Cognito). Floci used for local IaC smoke-tests.
 - [ ] Code Generation — **EXECUTE (ALWAYS)**
-  - **Rationale**: Implement each unit (.NET api/worker, React UI, Terraform, mappings, tests) per its design.
+  - **Rationale**: Implement each unit (Java/Spring Boot api/worker, React UI, Terraform, mappings, tests) per its design.
 - [ ] Build and Test — **EXECUTE (ALWAYS)**
   - **Rationale**: Build all units; run unit, integration (Testcontainers), ERP conformance, property-based, and smoke tests.
 

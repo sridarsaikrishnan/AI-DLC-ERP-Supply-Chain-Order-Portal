@@ -6,7 +6,7 @@
 **How to use this file**: Answer every `[Answer]:` tag in Section A. Many architectural choices are already fixed by the requirements (see "Already decided" below), so these questions focus only on the open component-boundary decisions. Where you have no strong preference, pick the recommended option and I'll proceed.
 
 ## Already decided (from requirements — not re-asked)
-- Modular monolith, two deployables (`api`, `worker`) plus a `ui` container and Keycloak; .NET + GraphQL (HotChocolate), React, PostgreSQL, Kafka, AWS/ECS, Terraform.
+- Modular monolith, two deployables (`api`, `worker`) plus a `ui` container; Java + Spring Boot + Spring for GraphQL, React, RDS PostgreSQL, Amazon SQS FIFO + SNS, Amazon Cognito (identity), AWS/ECS, Terraform. Local dev via Floci (emulates Cognito/SQS/SNS) + a real PostgreSQL container.
 - Canonical model with declarative field mappings (no template language); adapter seam per ERP; transactional outbox; retry + dead-letter topics; read model for reseller queries.
 - Separate reseller vs operator GraphQL schemas; no ERP identity on reseller surfaces (FR-19).
 
@@ -17,7 +17,7 @@
 ## Question 1
 How should the `api` deployable expose the two audiences?
 
-A) One ASP.NET Core process hosting two separate GraphQL schemas/endpoints (reseller at `/graphql`, operator at `/admin/graphql`), isolated by schema and authorization
+A) One Spring Boot process hosting two separate GraphQL schemas/endpoints (reseller at `/graphql`, operator at `/admin/graphql`), isolated by schema and authorization
 
 B) Two separate API processes (reseller-api and operator-api) from the start
 
@@ -80,13 +80,13 @@ X) Other (please describe after [Answer]: tag below)
 [Answer]: 
 
 ## Question 6
-How should the .NET solution be organized at the top level (component boundaries)?
+How should the Gradle multi-module build be organized at the top level (component boundaries)?
 
-A) By layer: Api, Worker, Domain, Infrastructure, Contracts, Ui (few projects)
+A) By layer: api, worker, domain, infrastructure, contracts, ui (few modules)
 
-B) By feature/module: Ordering, Routing, Integration(ERP), Identity, Webhooks, Admin, Platform — each with its own domain + infrastructure, composed into Api/Worker hosts
+B) By feature/module: ordering, routing, integration(ERP), identity, webhooks, admin, platform — each with its own domain + infrastructure, composed into api/worker application modules
 
-C) Hybrid — feature modules for the domain, shared Infrastructure and Contracts projects, thin Api/Worker host projects
+C) Hybrid — feature modules for the domain, shared infrastructure and contracts modules, thin api/worker application modules
 
 X) Other (please describe after [Answer]: tag below)
 

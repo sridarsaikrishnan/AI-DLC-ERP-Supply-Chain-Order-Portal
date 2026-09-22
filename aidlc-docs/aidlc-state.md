@@ -20,6 +20,15 @@
 - **Documentation**: aidlc-docs/ only
 - **Structure patterns**: See code-generation.md Critical Rules
 
+## Key Technology Decisions (updated 2026-09-21)
+- **Backend**: Java 21 + Spring Boot (was .NET)
+- **Identity**: Amazon Cognito (was Keycloak) — closes O-10
+- **Messaging**: Amazon SQS FIFO + SNS fan-out (was Kafka/MSK); transactional outbox retained
+- **Datastore**: RDS PostgreSQL (kept; DynamoDB rejected); Aurora Serverless v2 = upgrade path
+- **Local dev**: Floci AWS emulator (Cognito/SQS/SNS) + real PostgreSQL container
+- **Principle**: portable-core (NFR-05) retired → AWS-native; emulator not authoritative for security-critical (auth) behavior
+- **Event sourcing**: not for MVP; use append-only status-history + audit log + outbox
+
 ## Extension Configuration
 | Extension | Enabled | Decided At |
 |---|---|---|

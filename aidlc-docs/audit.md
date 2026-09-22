@@ -146,3 +146,21 @@
 **Workflow Planning Approval**: APPROVED
 
 ---
+
+## Technology Change — Backend switched to Java + Spring Boot
+**Timestamp**: 2026-09-21T02:10:00Z
+**User Input**: "Lets go with Java + springboot"
+**AI Response**: "Recorded backend change from .NET to Java + Spring Boot (Q12: D -> X). Updated live decision docs (audit history preserved, not rewritten): requirement-verification-questions.md (Q12 answer, Technology clarification, Q25 option wording); requirements.md Section 5 (Backend=Java 21 + Spring Boot with Spring for GraphQL; added Gradle build and Spring Data JPA/Flyway persistence rows; Messaging via Spring Kafka; Testing=JUnit 5 + jqwik + Testcontainers), NFR-10 (jqwik with JUnit 5), RESILIENCY-04 (JVM/Spring Boot containers), traceability Q12 row; execution-plan.md (Code Generation rationale); application-design-plan.md (already-decided line, Q1 option A -> Spring Boot process, Q6 -> Gradle multi-module wording). React + TypeScript UI unchanged. Prior advisory discussion also covered: language comparison (.NET/Java/Python/Go) and event sourcing (recommended against full ES for MVP; use append-only status-history + audit log + outbox)."
+**Context**: INCEPTION - Application Design Part 1; backend technology decision changed to Java + Spring Boot
+**Decision**: Backend = Java + Spring Boot (confirmed by user)
+
+---
+
+## Technology Change — AWS-native pivot (Cognito + SQS/SNS + Floci); DynamoDB rejected
+**Timestamp**: 2026-09-21T02:40:00Z
+**User Input**: "yes cognito, why not sqs?" / "Yes, why not Dynamo DB, floci is not providing Dynamo db?" / "continue"
+**AI Response**: "Advisory: explained Floci is an AWS emulator (LocalStack-style) usable for local dev + IaC smoke tests; corrected that Floci DOES provide DynamoDB. Recommended and user confirmed an AWS-native pivot: Identity Keycloak -> Amazon Cognito; Messaging Kafka/MSK -> Amazon SQS FIFO (MessageGroupId=orderId) + SNS fan-out with native DLQ/redrive (keep transactional outbox); Local dev via Floci (emulates Cognito/SQS/SNS) + real PostgreSQL container; retired portable-core rule (NFR-05) -> AWS-native rule with 'emulator not authoritative for security' caveat. Rejected DynamoDB and KEPT RDS PostgreSQL (relational domain: uniqueness constraints AC-05/AC-06, transactional outbox, many admin query patterns); noted Aurora Serverless v2 as serverless upgrade path. Recommended against full event sourcing earlier. Updated live docs (audit history preserved): requirements.md (Status note, FR-37, NFR-05, NFR-06, NFR-12, SECURITY-01/04/07/09/12, RESILIENCY-01/06/08/11-13, Section 5 table Compute/Datastore/Messaging/Identity/Configuration/Local environment + new Local AWS emulation row, O-10 closed, Section 8 note); requirement-verification-questions.md (Technology + proposed-direction bullets for identity/messaging/local-stack/AWS-native rule); execution-plan.md (structural changes, units, Infra Design rationale); application-design-plan.md (already-decided line). O-10 closed by managed Cognito. Verified no stray Keycloak/Kafka/MSK/portable-core references remain in live docs."
+**Context**: INCEPTION - Application Design Part 1; AWS-native architecture pivot
+**Decisions**: Identity = Amazon Cognito; Messaging = Amazon SQS FIFO + SNS; Datastore = RDS PostgreSQL (DynamoDB rejected); Local emulation = Floci; NFR-05 portable-core retired -> AWS-native; Event sourcing = not for MVP (append-only status-history + audit log + outbox)
+
+---
