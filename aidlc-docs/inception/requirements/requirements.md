@@ -2,7 +2,7 @@
 
 **Date**: 2026-09-21
 **Status**: Draft for review - generated from the answers in `requirement-verification-questions.md`. Resiliency decisions are recorded at MVP level (Q22-Q28) and should be confirmed.
-**Architecture direction (updated 2026-09-21)**: AWS-native. Backend Java + Spring Boot; identity = Amazon Cognito; messaging = Amazon SQS FIFO + SNS; datastore = RDS PostgreSQL (kept). The earlier portable-core rule is retired (see NFR-05). Local development uses the Floci AWS emulator (Cognito/SQS/SNS) plus a real PostgreSQL container; the auth/token path is validated against real Cognito in a dev AWS account.
+**Architecture direction (updated 2026-09-21)**: AWS-native, **event-driven with event sourcing + CQRS**. Backend Java + Spring Boot + **Axon Framework**; identity = Amazon Cognito; messaging = Amazon SQS FIFO + SNS; datastore = RDS PostgreSQL (kept — also hosts the Axon event store and CQRS projections). The `Order` aggregate is **event-sourced**; reads come from **CQRS read-model projections** (eventual consistency); reference/config data (connections, bindings, mappings, item catalog, audit) stays CRUD. Event store = PostgreSQL via Axon's JPA/JDBC store (no Axon Server). The earlier portable-core rule is retired (see NFR-05). Local development uses the Floci AWS emulator (Cognito/SQS/SNS) plus a real PostgreSQL container; the auth/token path is validated against real Cognito in a dev AWS account.
 **Requirement source tags**: Q# = questionnaire answer, D = decision made by the user in discussion, P = proposed design direction (to confirm in Application Design).
 
 ---
@@ -120,6 +120,7 @@ A multi-tenant order portal that lets resellers place and track orders that are 
 - **NFR-07** Structured logging, metrics and traces via OpenTelemetry, with a correlation identifier on every request and message.
 - **NFR-08** UI accessibility: text contrast at least 4.5:1 and control borders at least 3:1 in light and dark themes, as in the design system.
 - **NFR-09** Developer experience: one-command local environment, hot reload, and integration tests that start their own containers.
+- **NFR-13** Eventual consistency (ES/CQRS): CQRS read-model projections are updated asynchronously from the `Order` event store, so a query issued immediately after a command may briefly lag. Command responses return the resulting order state and version so the submitter has read-your-writes; projection lag is monitored and alarmed. Event schema evolution uses Axon upcasters. (D 2026-09-21)
 
 ### 4.3 Security (Q19 = A, blocking)
 | Rule | Project requirement |
@@ -164,18 +165,21 @@ A multi-tenant order portal that lets resellers place and track orders that are 
   - Idempotence: reprocessing the same command or event, outbox relay, webhook delivery de-duplication.
   - Invariants: one order maps to one connection; routing is deterministic for the same inputs; binding and item-ownership uniqueness; order totals and currency consistency.
   - Stateful: the order lifecycle state machine compared to a simple model over random command sequences.
+  - Event sourcing / CQRS (Axon): replay determinism (replaying an `Order` event stream yields identical state; snapshot + tail == full replay); projection consistency (a projection rebuilt from scratch equals the incrementally-updated read model); command→event round-trip for the aggregate.
 
 ---
 
 ## 5. Technology Decisions
 | Area | Decision | Source |
 |---|---|---|
-| Backend | Java 21 + Spring Boot (Spring for GraphQL, Spring Web, Spring Security) | Q12 = X (Java/Spring Boot; changed 2026-09-21, was D) |
+| Backend | Java 21 + Spring Boot (Spring for GraphQL, Spring Web, Spring Security) + Axon Framework (event sourcing + CQRS) | Q12 = X; ES/CQRS via Axon (2026-09-21) |
+| Event sourcing / CQRS | Axon Framework. `Order` aggregate is event-sourced (command → events → replay). CQRS read-model projections in PostgreSQL, rebuilt by event handlers. Reference/config data (connections, bindings, mappings, catalog) stays CRUD. | D (2026-09-21) |
+| Event store | PostgreSQL — Axon JPA/JDBC event store on RDS; no Axon Server (avoids extra infra/licensing) | D (2026-09-21) |
 | Build | Gradle (multi-module), JVM container images | Q12 = X |
 | Frontend | React | Q13 = A |
 | Cloud | AWS | Q14 = A, D |
 | Compute | ECS Fargate containers: `api`, `worker`, `ui` (modular monolith, two deployables plus UI). No Keycloak container — identity is managed Cognito. | P |
-| Datastore | PostgreSQL (RDS) with row-level tenant isolation (kept; DynamoDB rejected — relational domain with uniqueness and transactional needs). Aurora Serverless v2 (PostgreSQL) is the serverless upgrade path. | Q15 = C, P |
+| Datastore | PostgreSQL (RDS) with row-level tenant isolation (kept; DynamoDB rejected — relational domain with uniqueness and transactional needs). Also hosts the Axon event store and CQRS projection tables. Aurora Serverless v2 (PostgreSQL) is the serverless upgrade path. | Q15 = C, P |
 | Messaging | Amazon SQS FIFO (MessageGroupId = order ID for per-order ordering) with SNS fan-out to per-consumer queues; transactional outbox; native dead-letter queue + redrive | D (SQS chosen 2026-09-21, was Kafka/MSK) |
 | Identity | Amazon Cognito (OIDC): user pool + app clients; client_credentials for M2M, authorization-code for UI; tenant identifier as a token claim; app validates standard JWTs | D (Cognito chosen 2026-09-21, was Keycloak) |
 | Edge | ALB only; no API gateway, WAF or CloudFront in the MVP; rate limiting in the API | D |
@@ -185,7 +189,7 @@ A multi-tenant order portal that lets resellers place and track orders that are 
 | Local environment | Docker Compose: real PostgreSQL, Floci (emulates Cognito/SQS/SNS; pinned `floci/floci` image), mock ERP, optional Odoo and ERPNext profile. Auth/token path verified against real Cognito in a dev AWS account. | D, P |
 | Local AWS emulation | Floci (LocalStack-style AWS emulator) for Cognito/SQS/SNS and Terraform smoke-tests; not authoritative for security-critical behavior | D (2026-09-21) |
 | Testing | JUnit 5, jqwik (property-based), Testcontainers; tiers: unit, integration, ERP conformance, post-deploy smoke test in a dev AWS account | P |
-| Persistence | Spring Data JPA / Hibernate (or jOOQ), Flyway migrations | P |
+| Persistence | Axon-managed event store for the `Order` aggregate; Spring Data JPA / Hibernate + Flyway for CRUD reference data and CQRS projection tables | P |
 
 ---
 

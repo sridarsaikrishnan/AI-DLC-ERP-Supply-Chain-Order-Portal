@@ -1,0 +1,27 @@
+# Scratch Odoo quickstart for exploring the ERP API during design.
+# NOT the production/U7 local stack — that is generated later in Code Generation.
+# Use fictional data only (FR-40). Open the portal at http://localhost:8069
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - odoo-db:/var/lib/postgresql/data
+  odoo:
+    image: odoo:17
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: odoo
+    volumes:
+      - odoo-web:/var/lib/odoo
+volumes:
+  odoo-db:
+  odoo-web:

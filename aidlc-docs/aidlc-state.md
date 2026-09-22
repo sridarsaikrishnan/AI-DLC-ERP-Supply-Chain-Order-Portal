@@ -4,8 +4,8 @@
 - **Project Name**: ERP & Supply Chain Order Portal
 - **Project Type**: Greenfield
 - **Start Date**: 2026-09-21T00:00:00Z
-- **Current Phase**: INCEPTION
-- **Current Stage**: Units Generation (in progress)
+- **Current Phase**: CONSTRUCTION
+- **Current Stage**: U1 Platform Foundation — NFR Design
 
 ## Workspace State
 - **Existing Code**: No
@@ -27,7 +27,8 @@
 - **Datastore**: RDS PostgreSQL (kept; DynamoDB rejected); Aurora Serverless v2 = upgrade path
 - **Local dev**: Floci AWS emulator (Cognito/SQS/SNS) + real PostgreSQL container
 - **Principle**: portable-core (NFR-05) retired → AWS-native; emulator not authoritative for security-critical (auth) behavior
-- **Event sourcing**: not for MVP; use append-only status-history + audit log + outbox
+- **Event sourcing + CQRS**: adopted 2026-09-21 (reverses earlier "no ES" decision) via **Axon Framework**; the `Order` aggregate is event-sourced (event store on PostgreSQL, no Axon Server); reads from CQRS projections (eventual consistency, NFR-13); reference/config data stays CRUD
+- **Axon**: event store = PostgreSQL (JPA/JDBC); command/query buses; projectors build read models
 
 ## Extension Configuration
 | Extension | Enabled | Decided At |
@@ -44,15 +45,18 @@
 - [x] User Stories (approved 2026-09-21; 4 personas, 8 epics, 38 stories)
 - [x] Workflow Planning (approved 2026-09-21)
 - [x] Application Design - EXECUTE (approved 2026-09-21; 7 artifacts incl. canonical-model, events, tenancy-and-routing, status mapping; modules renamed for clarity)
-- [~] Units Generation - EXECUTE (in progress)
+- [x] Units Generation - EXECUTE (approved 2026-09-21; 7 units U1-U7; build sequence = walking skeleton across both ERPs first)
 
-### 🟢 CONSTRUCTION PHASE (per unit)
-- [ ] Functional Design - EXECUTE
-- [ ] NFR Requirements - EXECUTE
-- [ ] NFR Design - EXECUTE
-- [ ] Infrastructure Design - EXECUTE
-- [ ] Code Generation - EXECUTE
-- [ ] Build and Test - EXECUTE
+### 🟢 CONSTRUCTION PHASE (per unit; order U1→U2→U3→U4→U5→U6, U7 alongside)
+**U1 Platform Foundation**
+- [x] Functional Design - approved 2026-09-21
+- [x] NFR Requirements - approved 2026-09-21
+- [~] NFR Design - in progress
+- [ ] NFR Design
+- [ ] Infrastructure Design
+- [ ] Code Generation
+(remaining units U2-U7 follow)
+- [ ] Build and Test (after all units)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations (placeholder)

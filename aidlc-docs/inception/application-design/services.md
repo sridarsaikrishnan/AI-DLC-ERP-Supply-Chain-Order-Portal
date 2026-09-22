@@ -1,7 +1,8 @@
 # Services & Orchestration — ERP & Supply Chain Order Portal
 
 The service layer, using proper names. Reading model:
-- The **`api`** process handles GraphQL, accepts commands, and serves reads straight from PostgreSQL (Q4=A, Q5=B).
+- The **`api`** process handles GraphQL, dispatches **Axon commands** to the event-sourced `Order` aggregate, and serves reads from **CQRS projections** in PostgreSQL (Q4=A; Q5 revised to CQRS on the 2026-09-21 ES decision).
+- **Event sourcing + CQRS (Axon)**: commands → `Order` aggregate `@CommandHandler` → events in the Axon PostgreSQL event store (source of truth); `@EventHandler` **projectors** build read-model projections; `@QueryHandler` query services read them (eventual consistency, NFR-13). Only `Order` is event-sourced; reference/config data is CRUD.
 - The **`worker`** process owns the order-processing saga, ERP delivery, ingestion, webhook dispatch, and the outbox relay.
 - The two processes never call each other directly — they communicate through the **transactional outbox → SNS → SQS FIFO** pipeline (see `events.md`).
 - All ERP access goes through a single facade, **`ErpGateway`**.
@@ -16,8 +17,8 @@ Interfaces are listed in `component-methods.md`; canonical types and payloads in
 |---|---|---|
 | `ResellerGraphQlController` | GraphQL entry (`/graphql`) | Reseller queries/mutations; binds `TenantContext`; returns reseller view types only |
 | `OperatorGraphQlController` | GraphQL entry (`/admin/graphql`) | Operator queries/mutations; enforces operator roles; may return ERP identity |
-| `OrderCommandService` | application service | `createSalesOrder`, `updateSalesOrder`, `cancelSalesOrder`; persists aggregate + outbox row in one transaction; returns `SalesOrderView` |
-| `OrderQueryService` | application service | `getOrder`, `listOrders`, `getTimeline`; reads PostgreSQL; maps to `SalesOrderView` (no ERP identity) |
+| `OrderCommandService` | application service | Dispatches Axon commands (`CreateSalesOrderCommand`, `UpdateSalesOrderCommand`, `CancelSalesOrderCommand`) to the `Order` aggregate; returns the resulting `SalesOrderView` (read-your-writes, NFR-13) |
+| `OrderQueryService` | application service (`@QueryHandler`) | `getOrder`, `listOrders`, `getTimeline`; reads **CQRS projections** in PostgreSQL; maps to `SalesOrderView` (no ERP identity) |
 | `ItemCatalogQueryService` | application service | Read-only item catalog for a tenant (FR-10) |
 | `LinkedCustomerQueryService` | application service | Read-only linked-customer view (FR-11) |
 | `WebhookEndpointService` | application service | Register/update/pause/resume/deactivate endpoints; issues one-time signing secret |
@@ -42,7 +43,8 @@ Interfaces are listed in `component-methods.md`; canonical types and payloads in
 | `OdooStatusIngestor`, `ErpNextStatusIngestor` | ingestors | Poll native status → `MappingEngine.toCanonical` → emit `ErpOrderStatusChanged` |
 | `ItemSynchronizationService` | domain service | Sync items; emit `ItemSynced` / `ItemOwnershipConflictDetected` |
 | `WebhookDispatchListener` | SQS listener (`webhook-dispatch.fifo`) | Map internal event → public webhook event; `WebhookSigner` + `WebhookSender`; record via `DeliveryLogWriter` |
-| `OutboxRelayScheduler` | scheduled job | Publish committed outbox rows to SNS (`DomainEventPublisher`) |
+| `OrderProjector` | Axon `@EventHandler` | Builds/updates CQRS read-model projections (`order_summary`, `order_detail`, `order_timeline`, `delivery_view`) from `Order` events; rebuildable by replay |
+| `OutboxRelayScheduler` | scheduled job | Relays committed domain events to SNS (`DomainEventPublisher`) for cross-process/external integration |
 
 ## 3. Shared services (both processes)
 
@@ -65,10 +67,11 @@ Interfaces are listed in `component-methods.md`; canonical types and payloads in
 ### 4.1 Place order → deliver (happy path)
 ```
 Reseller → ResellerGraphQlController.createSalesOrder
-  → OrderCommandService.create:
-       persist SalesOrder(SUBMITTED) + Outbox(OrderSubmitted) in ONE transaction
-       return SalesOrderView (orderId, status=SUBMITTED)          (FR-07)
-OutboxRelayScheduler → SNS(platform-domain-events) → SQS(order-processing.fifo, group=orderId)
+  → OrderCommandService dispatches CreateSalesOrderCommand (Axon)
+       → Order aggregate @CommandHandler applies OrderSubmitted -> Axon event store (PostgreSQL, source of truth)
+       → OrderProjector (@EventHandler) updates order_summary/order_detail projections
+       → return SalesOrderView (orderId, status=SUBMITTED)         (FR-07, read-your-writes)
+OrderSubmitted relayed (outbox / Axon processor) → SNS(platform-domain-events) → SQS(order-processing.fifo, group=orderId)
 OrderProcessingListener.onOrderSubmitted
   → OrderValidationService.validate
   → OrderRoutingService.resolve → owningConnectionId            (FR-14/17)

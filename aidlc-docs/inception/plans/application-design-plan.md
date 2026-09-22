@@ -77,7 +77,7 @@ C) Separate read store
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: B
+[Answer]: B — SUPERSEDED 2026-09-21 by the event sourcing + CQRS decision. Now option A in effect: reads come from CQRS read-model projections in PostgreSQL, rebuilt from the `Order` event store by Axon event handlers. Eventual consistency applies (NFR-13).
 
 ## Question 6
 How should the Gradle multi-module build be organized at the top level (component boundaries)?

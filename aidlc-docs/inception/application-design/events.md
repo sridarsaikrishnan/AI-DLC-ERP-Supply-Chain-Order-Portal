@@ -38,6 +38,17 @@ record EventEnvelope<T>(
 
 ---
 
+## 0a. Event sourcing & CQRS (Axon) — how the Order aggregate works
+
+The `Order` aggregate is **event-sourced with Axon Framework**:
+- A **command** (e.g. `CreateSalesOrderCommand`) is routed to the `Order` aggregate's `@CommandHandler`, which validates and **applies events**.
+- Applied events are persisted to the **Axon event store (PostgreSQL)** — this event stream is the **source of truth**. Aggregate state is rebuilt by replaying events via `@EventSourcingHandler` (with periodic snapshots).
+- **CQRS**: `@EventHandler` **projectors** build read-model **projections** in PostgreSQL (e.g. `order_summary`, `order_detail`, `order_timeline`, `delivery_view`). Reseller/operator queries hit these projections via `@QueryHandler` (eventual consistency, NFR-13).
+- **Integration boundary**: the domain events below are the event-sourced facts; a subset is **relayed to SNS → SQS FIFO** (via the transactional outbox / an Axon event processor) to drive cross-process work (delivery, ingestion follow-ups, webhook dispatch) and external notifications. So "internal domain events" now live in the Axon store **and** are published for integration.
+- **Schema evolution**: event versioning uses Axon **upcasters**.
+
+Only the `Order` aggregate is event-sourced; reference/config aggregates (connection, binding, item ownership, mappings, audit) remain CRUD.
+
 ## 1. Commands (in-process, `api`)
 
 | Command | Handler | Result |

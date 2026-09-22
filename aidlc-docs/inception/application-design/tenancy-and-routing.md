@@ -107,9 +107,10 @@ Decided at Validated (FR-14/16/17): `OrderRoutingService` resolves the single `o
 Ingestion runs **per connection (instance)**. Whatever an instance returns must be attributed to the correct reseller and to nobody else. Three cases:
 
 ### 4.1 Order status changes
+The reverse lookup uses the **order projection** (a CQRS read model keyed by `(connectionId, erpOrderId)`); the authoritative order state is the event-sourced aggregate.
 ```
 resolveTenantForInboundOrder(connectionId, erpOrderId):
-    order = orderRepository.findByConnectionAndErpOrderId(connectionId, erpOrderId)
+    order = orderProjection.findByConnectionAndErpOrderId(connectionId, erpOrderId)
     if order == null: ignore            // not an order we created -> never surfaced
     return order.tenantId               // deterministic, unambiguous
 ```

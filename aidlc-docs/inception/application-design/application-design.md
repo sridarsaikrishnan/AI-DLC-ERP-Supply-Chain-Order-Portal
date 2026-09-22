@@ -21,13 +21,13 @@ This is a high-level design: components, interfaces, services, and dependencies.
 ---
 
 ## 1. Architecture at a glance
-- **Style**: modular monolith, event-driven between processes. Three deployables: `api` (Spring Boot), `worker` (Spring Boot), `ui` (two React apps). AWS-native.
+- **Style**: modular monolith, event-driven, with **event sourcing + CQRS (Axon Framework)** for the `Order` aggregate. Three deployables: `api` (Spring Boot), `worker` (Spring Boot), `ui` (two React apps). AWS-native. The `Order` aggregate's state is a stream of events in an Axon-managed PostgreSQL event store; reads come from CQRS projections. Reference/config data (connections, bindings, mappings, catalog, audit) stays CRUD.
 - **Design decisions applied** (from the plan):
   - Q1=A — one `api` process, two isolated GraphQL schemas: reseller `/graphql`, operator `/admin/graphql`.
   - Q2=B — canonical↔ERP mappings are version-controlled files, loaded on deploy (operator runtime editing deferred; MVP has a read-only mapping viewer).
   - Q3=C — common `ErpAdapter` + a transport-agnostic request engine, with per-ERP **transport adapters** (Odoo XML-RPC/JSON-RPC, ERPNext REST) for protocol/auth/status quirks. *(Verified 2026-09-21: ERPNext is REST; Odoo is primarily RPC — see FR-24, O-12/O-13.)*
   - Q4=A — routing + lifecycle state machine live in the `worker`; `api` accepts commands and serves reads.
-  - Q5=B — read model = same PostgreSQL tables queried directly (no separate projections for the MVP).
+  - Q5 — **revised to CQRS (2026-09-21)**: reads come from **read-model projections** in PostgreSQL, rebuilt from the `Order` event store by Axon event handlers (was B = same tables). Eventual consistency applies (NFR-13).
   - Q6=C — hybrid Gradle multi-module: feature/domain modules + shared infrastructure/contracts + thin `api`/`worker` app modules.
   - Q7=A — a dedicated tenant-context component injects an immutable `TenantContext`.
   - Q8=A — a distinct ingestion component per adapter, in-app scheduler.
@@ -84,7 +84,8 @@ Ten designed screens map to reseller (C-17) and operator (C-18) apps and their b
 | One order = one ERP (FR-16/17, AC-03) | RoutingService resolves at Validated and persists an immutable decision (C-08) |
 | Mixed-ERP rejection (FR-18/AC-04) | RoutingService raises a reseller-safe rejection before any ERP call |
 | Guaranteed delivery (FR-29, AC-07/16) | Outbox + SQS FIFO + retry/backoff + DLQ; idempotent DeliveryOrchestrator (C-03, C-11) |
-| Reads during outage (FR-31/AC-10) | Queries served from PostgreSQL read model; no ERP call on read path (C-07, C-12) |
+| Reads during outage (FR-31/AC-10) | Queries served from CQRS projections in PostgreSQL; no ERP call on read path (C-07, C-12) |
+| Order state & history (FR-12..15, audit) | Event-sourced `Order` aggregate (Axon); full lifecycle history is the event stream; timeline projection derived from it |
 | Add an ERP in days (FR-24..27, AC-12) | ErpAdapter seam + MappingEngine + ConnectionRegistry + ConformanceRunner (C-10); API-first for future US-F7 |
 | Bindings/ownership uniqueness (FR-20/22, AC-05/06) | BindingService + ItemOwnershipService with DB uniqueness constraints (C-09, C-08b) |
 | Audit (FR-38) | Append-only AuditService on every admin mutation (C-14) |

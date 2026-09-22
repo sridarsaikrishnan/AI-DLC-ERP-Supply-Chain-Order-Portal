@@ -51,9 +51,9 @@ High-level component identification and responsibilities. Based on the approved 
 ## B. Domain / feature modules
 
 ### C-07 Ordering
-- **Deployable**: api (command intake, queries) + worker (lifecycle transitions)
-- **Purpose**: The order aggregate and its lifecycle.
-- **Responsibilities**: Create/update/cancel order commands; the lifecycle state machine (Draft → Submitted → Validated → Sent to ERP → Confirmed → Fulfilled → Closed, plus Retrying/Rejected); append-only order status-history (feeds the timeline; no event sourcing); order queries for the read model.
+- **Deployable**: api (command dispatch, queries) + worker (event processing, projectors)
+- **Purpose**: The **event-sourced** `Order` aggregate (Axon) and its lifecycle.
+- **Responsibilities**: Handle create/update/cancel commands on the `Order` aggregate; apply lifecycle events (Draft → Submitted → Validated → Sent to ERP → Confirmed → Fulfilled → Closed, plus Retrying/Rejected) to the Axon event store (source of truth); CQRS projectors build read-model projections (`order_summary`, `order_detail`, `order_timeline`); the event stream is the order history. (Event sourcing + CQRS via Axon; NFR-13 eventual consistency.)
 - **Reqs**: FR-05, FR-07, FR-09, FR-12..FR-15; US-006..US-010, US-020, US-021.
 
 ### C-08 Routing

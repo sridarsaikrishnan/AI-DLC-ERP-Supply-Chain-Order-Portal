@@ -246,3 +246,98 @@
 **Context**: INCEPTION - Units Generation Part 1 (Planning), awaiting answers
 
 ---
+
+## Unit of Work Planning - Answers Filled In
+**Timestamp**: 2026-09-22T06:18:01Z
+**User Input**: "Commit the changes and fill unit-of-work-plan"
+**AI Response**: "Filled Q1-Q6 in unit-of-work-plan.md: Q1=A (the proposed 7-unit decomposition matches the capability-module boundaries already set in application-design.md; merging or splitting further would create inconsistency between the design and build-sequencing artifacts); Q2=X, a thin end-to-end order flow across U1-U4 covering BOTH Odoo and ERPNext rather than one ERP (matches earlier advisory guidance that a two-week thin slice across both ERPs is the real test of the canonical-model claim, given single-ERP validation would not test it); Q3=A (reseller UI stays its own unit given FR-19 is specifically a reseller-surface risk; operator UI is bundled with its API since it carries no such isolation risk and is a smaller surface); Q4=A (canonical-model, platform-infrastructure and access-control stay in one U1 Platform Foundation unit; splitting adds process overhead with no parallel-team benefit, consistent with the single-team answer to Q6); Q5=A (single mono-repo, matching the existing workspace and the Gradle multi-module decision from application design); Q6=A (single team, sequential build; nothing in the project's history indicates multiple parallel teams, and the MVP-level resiliency answers already assumed limited resources). Section B (generation checklist) was not edited."
+**Context**: INCEPTION - Units Generation, Part 1 planning (awaiting user confirmation of answers)
+
+---
+
+## Architecture Change — Event Sourcing + CQRS via Axon
+**Timestamp**: 2026-09-21T05:55:00Z
+**User Input**: "Before that, it has to be event driven, event sourcing and CQRS" / "aXON IS GOOD, if so can we go with it?"
+**AI Response**: "User mandated event-driven + event sourcing + CQRS (reverses earlier 'no ES for MVP' decision). Scoping confirmed: event-source the Order aggregate only (1A); Axon Framework (2B) with a PostgreSQL JPA event store on RDS (NO Axon Server, avoids infra/licensing); CQRS read-model projections in PostgreSQL (3). Applied across docs: requirements.md (Architecture direction note; Section 5 Backend+Axon, new Event sourcing/CQRS and Event store rows, Datastore/Persistence updates; NFR-13 eventual consistency; NFR-11 ES/CQRS PBT properties); application-design.md (style + Q5 revised B->CQRS + requirement-mechanism rows); application-design-plan.md (Q5 answer superseded); events.md (new Section 0a Event sourcing & CQRS with Axon); services.md (ES/CQRS model, OrderCommandService dispatches Axon commands, OrderProjector, flow 4.1); components.md (C-07 now event-sourced); tenancy-and-routing.md (reverse lookup uses order projection); unit-of-work-plan.md (U1 gains Axon event store+projection framework, U3 event-sourced Order); aidlc-state.md key decisions reversed. Only Order is event-sourced; reference/config data stays CRUD."
+**Context**: INCEPTION - Units Generation Part 1; ES/CQRS/Axon architecture adopted
+**Decisions**: Event sourcing + CQRS = YES (Order aggregate); Axon Framework; event store = PostgreSQL (no Axon Server); reads via CQRS projections; eventual consistency (NFR-13)
+
+---
+
+## Units Generation — Answers Analyzed & Artifacts Generated
+**Timestamp**: 2026-09-21T06:15:00Z
+**User Input**: "yes" (answers filled in unit-of-work-plan.md: Q1=A, Q2=X thin slice across both ERPs, Q3=A, Q4=A, Q5=A, Q6=A)
+**AI Response**: "Analyzed answers: all clear and consistent; Q2 refined to a thin end-to-end slice covering BOTH Odoo and ERPNext (tests the one-canonical-model premise). Generated unit-of-work.md (7 units U1-U7 with modules, responsibilities, ES/CQRS placement, and greenfield mono-repo code organization), unit-of-work-dependency.md (dependency matrix + Mermaid + 4-milestone build sequence: walking skeleton across both ERPs first), unit-of-work-story-map.md (all 38 stories assigned primary+supporting units, coverage check, future US-F* noted). Marked plan checkboxes complete. Awaiting approval."
+**Context**: INCEPTION - Units Generation Part 2 complete; awaiting approval
+**Unit Answers**: Q1=A, Q2=X (thin slice both ERPs), Q3=A, Q4=A, Q5=A, Q6=A
+
+---
+
+## Units Generation Approved; Construction Begins (U1)
+**Timestamp**: 2026-09-21T06:25:00Z
+**User Input**: "yes continue" (after confirming Terraform/U7 scope question)
+**AI Response**: "Confirmed Terraform is in scope (U7, infra/ folder, designed in Infrastructure Design, written in Code Generation; Floci for local IaC smoke tests, real dev-AWS authoritative). Recorded Units Generation approval — INCEPTION phase complete. Entered CONSTRUCTION phase; per-unit order U1->U2->U3->U4->U5->U6 with U7 alongside. Loaded functional-design.md and started U1 Platform Foundation Functional Design."
+**Context**: CONSTRUCTION - U1 Functional Design begins
+**Units Approval**: APPROVED
+
+---
+
+## U1 Platform Foundation - Functional Design Planning Answers Filled In
+**Timestamp**: 2026-09-22T06:54:10Z
+**User Input**: "Fill UI platform foundation md. make sure that the answers are architecturally right"
+**AI Response**: "Read the ES/CQRS/Axon decision from audit.md before answering (user-mandated 2026-09-21, reverses an earlier ES-not-for-MVP recommendation; noted, not re-litigated). Filled Q1-Q8 in U1-platform-foundation-functional-design-plan.md: Q1=A (prefixed sortable UUIDv7/ULID IDs; readable in logs/audit, time-ordered for the event store and projections, matches the ord_ style already used in the design mocks); Q2=X, overriding the file's recommended A - kept application-level TenantContext plus added PostgreSQL RLS as a backstop (SECURITY-11 defense-in-depth is blocking; tenant isolation is the platform's core promise), scoped to the CQRS projection tables and reference/config tables only, not Axon's internal event-store tables (never queried in a tenant-scoped way; the projector uses its own privileged role that bypasses RLS); Q3=A (two roles, matches the single-operator-persona design, no story indicates a need for granular operator sub-permissions yet); Q4=A (BigDecimal + ISO-4217, satisfies clean round-trip PBT properties, avoids a lossy int-minor-units conversion step); Q5=A plus a note to model the error enum as a closed/sealed type so the compiler enforces FR-19/AC-02 structurally, not by convention; Q6=X, overriding the file's recommended A on one point - kept aggregate id = orderId and upcasters (both effectively required for any evolving event-sourced system) but skipped pre-committing to snapshot-every-50-events, since an order's event stream is short and a threshold now would be tuned against no evidence; defer snapshot tuning to NFR/Infrastructure Design; Q7=A (soft-delete only, required by the audit trail and AdminAudit screen already designed, which shows before/after values that hard-delete would destroy); Q8=A (accept all conventions, consistent with Q4 and with Axon's own sequence-based concurrency). Section B (generation checklist) was not edited."
+**Context**: CONSTRUCTION - U1 Platform Foundation, Functional Design Part 1 planning (awaiting user confirmation of answers)
+
+---
+
+## U1 Functional Design — Answers Analyzed & Artifacts Generated
+**Timestamp**: 2026-09-21T06:45:00Z
+**User Input**: "Filled it, make sure it is event driven, event sourcing and solid" (answers: Q1=A, Q2=X app-level+RLS scoped to projection/reference tables not Axon event store, Q3=A, Q4=A, Q5=A sealed error set, Q6=X orderId+upcasters, skip snapshots for MVP, Q7=A, Q8=A)
+**AI Response**: "Analyzed answers — all clear, sophisticated, no ambiguity. Generated U1 functional design artifacts under construction/U1-platform-foundation/functional-design/: domain-entities.md (value objects, event-sourced Order aggregate, reference/config entities with uniqueness, CQRS projections, ER diagram, Q2 isolation model), business-logic-model.md (ES+CQRS command->event->projection loop, tenant-context resolution, sealed canonical error mapping, audit path, outbox integration relay, explicit SOLID adherence section), business-rules.md (BR-U1-01..20), testable-properties.md (PBT-01: P-U1-01..13 incl. replay determinism, projection consistency, idempotent handling, tenant-scope + no-ERP-identity invariants, binding/item uniqueness, credential round-trip). Emphasized event-driven + event sourcing + SOLID per request. Marked plan checkboxes complete. Awaiting approval."
+**Context**: CONSTRUCTION - U1 Functional Design complete; awaiting approval
+**U1 FD Answers**: Q1=A, Q2=X (app+RLS scoped), Q3=A, Q4=A, Q5=A (sealed), Q6=X (orderId+upcasters, no snapshot MVP), Q7=A, Q8=A
+
+---
+
+## U1 Functional Design Approved; NFR Requirements Begins
+**Timestamp**: 2026-09-21T06:55:00Z
+**User Input**: "yes"
+**AI Response**: "Recorded U1 Functional Design approval. Loaded nfr-requirements.md and began U1 NFR Requirements stage."
+**Context**: CONSTRUCTION - U1 Functional Design approved; U1 NFR Requirements begins
+**U1 Functional Design Approval**: APPROVED
+
+---
+
+## U1 Platform Foundation - NFR Requirements / Tech Stack Planning Answers Filled In
+**Timestamp**: 2026-09-22T07:11:55Z
+**User Input**: "Fill the techstack decisions"
+**AI Response**: "Filled Q1-Q6 in U1-platform-foundation-nfr-requirements-plan.md (this plan's Section B generates both nfr-requirements.md and tech-stack-decisions.md; Q3 is titled 'U1 tech-stack confirmations'). Q1=A (p95<300ms/p99<800ms command ack; B's <150ms is tight for a JVM/Axon/Postgres round trip with no snapshot, unjustified without real traffic data); Q2=A (p95<1s/p99<3s projection lag; read-your-writes is already satisfied by the command response per NFR-13, so sub-second freshness elsewhere has no user-facing need); Q3=A, accept all U1 libraries, with a clarifying note that MapStruct/hand-written mappers are for internal entity-DTO-GraphQL mapping only, never the ERP canonical<->native mapping, which stays the declarative MappingEngine config from application-design Q2=B - keeping the two 'mapping' concerns distinct for code generation; Q4=A (confirm inherited availability/scale targets, consistent with RESILIENCY-02/08 MVP answers and the earlier snapshot-deferral decision); Q5=A, noting the vulnerability scan and PBT-in-CI-with-seed pieces are not actually optional against B - SECURITY-10 and PBT-08 already mandate them as blocking rules; ArchUnit module-boundary enforcement matches the just-decided modular layout (application-design Q6=C); Q6=A, tying observability directly to Q2's projection-lag alarm and the functional-design-plan snapshot-deferral decision, both of which need these metrics to be actionable rather than aspirational. Section B (generation checklist) was not edited."
+**Context**: CONSTRUCTION - U1 Platform Foundation, NFR Requirements Part 1 planning (awaiting user confirmation of answers)
+
+---
+
+## U1 NFR Requirements — Artifacts Generated + Odoo Quickstart
+**Timestamp**: 2026-09-21T07:20:00Z
+**User Input**: "done, but How do i setup odoo?..." then "Go ahead"
+**AI Response**: "Answered the Odoo setup question (design phase — no product portal yet; Code Generation builds it; U7 has the local stack). Verified current Odoo docker setup via web search and created a scratch quickstart at docker/odoo-quickstart/ (compose.yaml + README) for exploring the ERP API — fictional data only, precursor to U7. Read U1 NFR answers (all A with clarifications; key: MapStruct is internal object mapping only, NOT the ERP MappingEngine; vuln-scan + PBT-in-CI are blocking regardless; ArchUnit proportionate for Q6=C). No ambiguity. Generated U1 nfr-requirements.md (NFR-U1-P1/P2 latency+projection-lag, A1/A2, R1/R2, S1-S4, M1-M3, O1/O2, T1) and tech-stack-decisions.md (Axon/JPA/Flyway/Spring Security/ULID/MapStruct/jqwik/Testcontainers/ArchUnit + the MapStruct-vs-MappingEngine clarification). Awaiting approval."
+**Context**: CONSTRUCTION - U1 NFR Requirements complete; awaiting approval
+**U1 NFR Answers**: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A
+
+---
+
+## U1 NFR Requirements Approved; NFR Design Begins
+**Timestamp**: 2026-09-21T07:30:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U1 NFR Requirements approval. Loaded nfr-design.md and began U1 NFR Design."
+**Context**: CONSTRUCTION - U1 NFR Requirements approved; U1 NFR Design begins
+**U1 NFR Requirements Approval**: APPROVED
+
+---
+
+## U1 Platform Foundation - NFR Design Planning Answers Filled In (nfr-design-patterns.md)
+**Timestamp**: 2026-09-22T07:25:41Z
+**User Input**: "Fill nfr-design-patterns.md"
+**AI Response**: "No file with that exact name existed yet; it is generated by Section B of U1-platform-foundation-nfr-design-plan.md after Section A is answered, so filled that plan's Q1-Q6. Q1=A (Axon's event-store commit + tracking-processor token already is a durable at-least-once outbox for the Order aggregate; a separate outbox table for the same events would be a duplicate source of truth; a small conventional outbox is kept only for the CRUD reference/config entities that have no event store behind them); Q2=A (tracking-processor token reset to replay and rebuild projections - a first-class Axon capability, not hand-written rebuild scripts); Q3=A, with a stated boundary that nothing cached is tenant-scoped or business-critical, only shared/rarely-changing data (JWKS, connection config/mappings, reference lookups), to keep the RLS backstop (functional design plan Q2) meaningful; Q4=A (KMS envelope encryption behind a CredentialCipher port, chosen over a raw symmetric key in Secrets Manager: the raw key material never leaves KMS in usable form even if the database is exfiltrated, every decrypt is individually logged in CloudTrail per SECURITY-14, and key rotation does not require re-encrypting stored data); Q5=A, noting Axon's default tracking-processor segmentation is already consistent-hashed by aggregate id so ordering holds even with more segments later - this is a throughput knob deferred for the same reason as snapshot tuning (NFR requirements plan Q6 gives the metrics to tune from); Q6=A with one addition - name the small CRUD outbox table + relay/poller (from Q1) as its own logical component, since it is not covered by the ES-specific 'tracking event processors + projectors' language and would otherwise risk being dropped from logical-components.md. Section B (generation checklist) was not edited."
+**Context**: CONSTRUCTION - U1 Platform Foundation, NFR Design Part 1 planning (awaiting user confirmation of answers)
+
+---
