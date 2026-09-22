@@ -75,7 +75,7 @@ A multi-tenant order portal that lets resellers place and track orders that are 
 
 ### 3.7 ERP integration (Q1 = C, Q5 = D, Q6 = D)
 - **FR-23** MVP ERPs are Odoo and ERPNext, each with multiple instances.
-- **FR-24** Integration is over each ERP's REST APIs, with an adapter seam so other protocols can be added later.
+- **FR-24** Integration is over each ERP's native API through an adapter seam that abstracts the protocol (verified 2026-09-21): **ERPNext/Frappe** exposes a REST API (`/api/resource/{DocType}` CRUD; token `api_key:api_secret` or OAuth2 auth); **Odoo** integrates via its External API — XML-RPC/JSON-RPC over ORM models such as `sale.order` (a REST API exists only in v17+, and the RPC endpoints are slated for removal in Odoo 22). The two MVP ERPs therefore use **different protocols**; the adapter seam (C-10) hides this from the domain via per-ERP transport adapters. (Q6 = D)
 - **FR-25** Mapping between the canonical model and each ERP's native format is declarative: field maps (source path, target path, type conversion, value lookups) plus a small set of named transform functions. No template or transformation language. (D)
 - **FR-26** Connection details are configuration: endpoint, authentication, pagination, rate limits and capability flags. ERP credentials are stored per connection, encrypted, and managed by the operator. (Q5, P)
 - **FR-27** Adding an ERP means configuration, mappings, fixtures and a passing conformance suite, targeting days rather than months. (Q16 = D)
@@ -210,6 +210,9 @@ A multi-tenant order portal that lets resellers place and track orders that are 
 | O-09 | Order update and cancel rules per lifecycle state. | Functional Design |
 | O-10 | RESOLVED (2026-09-21): identity moved to Amazon Cognito (AWS-managed, multi-AZ), so the Keycloak single-instance zone-redundancy concern no longer applies. | Closed |
 | O-11 | Consider opting out of the Resiliency extension (Q20 = B) if the MVP should not carry its blocking rules (multi-zone compute, DR runbooks). Application-level reliability stays as NFR-01 either way. | User decision |
+| O-12 | Odoo protocol/version: XML-RPC/JSON-RPC is deprecated for removal in Odoo 22 (~2028); the newer REST/JSON-2 API needs v17+. Decide the target Odoo version and transport (RPC now vs JSON-2/REST) for the Odoo adapter. (Verified 2026-09-21.) | ERP Integration / Functional Design |
+| O-13 | ERPNext/Frappe has no OpenAPI/Swagger spec; integration relies on DocType metadata. Affects the future AI/MCP onboarding (US-F7) introspection approach. | Future (US-F7) |
+| O-14 | Canonical lifecycle status is DERIVED from multiple native fields, not a 1:1 map (verified 2026-09-21). A first-draft status-mapping table for Odoo and ERPNext now exists in `application-design/canonical-model.md` (Section 5a). Confirm/finalize the per-ERP derivation tables (incl. partial-delivery and On Hold handling, and Odoo version specifics per O-12). | Functional Design (Ordering/ERP Integration) |
 
 ## 8. Extension Compliance at This Stage
 - **Security Baseline**: enabled. Requirements for SECURITY-01 to 15 are captured (Section 4.3). Design-level and infrastructure-level verification happens in later stages. No blocking finding at this stage.

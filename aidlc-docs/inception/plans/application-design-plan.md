@@ -25,7 +25,7 @@ C) One process, one schema, separated only by field-level authorization
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 2
 How should the canonical↔ERP mapping definitions be stored and loaded?
@@ -38,7 +38,7 @@ C) Hybrid — files are the source of truth in git, imported into PostgreSQL for
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: B
 
 ## Question 3
 How should ERP adapters be structured so a new ERP is "config + mappings", not code?
@@ -51,7 +51,7 @@ C) Combination — common `IErpAdapter` + generic REST engine, with per-ERP adap
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: C
 
 ## Question 4
 Where does order routing and the lifecycle state machine live?
@@ -64,7 +64,7 @@ C) Split — command validation in `api`, routing + delivery + status ingestion 
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 5
 How should the read model (what resellers query) be maintained?
@@ -77,7 +77,7 @@ C) Separate read store
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: B
 
 ## Question 6
 How should the Gradle multi-module build be organized at the top level (component boundaries)?
@@ -90,7 +90,7 @@ C) Hybrid — feature modules for the domain, shared infrastructure and contract
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: C
 
 ## Question 7
 How is the tenant identity resolved and enforced across components?
@@ -101,7 +101,7 @@ B) Each resolver/handler reads the claim itself
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 8
 Should the ERP status-change ingestion (poll/events) be its own component within the worker?
@@ -112,7 +112,7 @@ B) No — fold ingestion into the delivery adapter
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 9
 For the operator admin UI and reseller UI, should they be one React app or two?
@@ -123,21 +123,21 @@ B) One React app with role-based routing
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ---
 
 ## Section B — Methodology & Execution Checklist (executed after answers approved)
 
-- [ ] Load requirements, stories, personas, and `design/README.md` screen inventory
-- [ ] Identify components and responsibilities → `components.md`
-- [ ] Define component method signatures (interfaces, I/O types; business rules deferred) → `component-methods.md`
-- [ ] Define the service/orchestration layer → `services.md`
-- [ ] Define dependencies, communication patterns, and data flows → `component-dependency.md`
-- [ ] Map each of the ten designed screens to components, routes, and API operations
-- [ ] Note "Not yet designed" surfaces (sign in, new-order form, item catalog, mapping editor) as components needing UI design later
-- [ ] Consolidate into `application-design.md`
-- [ ] Validate completeness and consistency against FR/US and extension constraints (SECURITY/RESILIENCY/PBT)
+- [x] Load requirements, stories, personas, and `design/README.md` screen inventory
+- [x] Identify components and responsibilities → `components.md`
+- [x] Define component method signatures (interfaces, I/O types; business rules deferred) → `component-methods.md`
+- [x] Define the service/orchestration layer → `services.md`
+- [x] Define dependencies, communication patterns, and data flows → `component-dependency.md`
+- [x] Map each of the ten designed screens to components, routes, and API operations
+- [x] Note "Not yet designed" surfaces (sign in, new-order form, item catalog, mapping viewer) as components needing UI design later
+- [x] Consolidate into `application-design.md`
+- [x] Validate completeness and consistency against FR/US and extension constraints (SECURITY/RESILIENCY/PBT)
 
 ---
 

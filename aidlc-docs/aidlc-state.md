@@ -5,7 +5,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-09-21T00:00:00Z
 - **Current Phase**: INCEPTION
-- **Current Stage**: Application Design (Part 1 - Planning; awaiting answers)
+- **Current Stage**: Units Generation (in progress)
 
 ## Workspace State
 - **Existing Code**: No
@@ -43,8 +43,8 @@
 - [x] Requirements Analysis (approved 2026-09-21; Q29=A, Q30=A confirmed; O-01, O-02 closed)
 - [x] User Stories (approved 2026-09-21; 4 personas, 8 epics, 38 stories)
 - [x] Workflow Planning (approved 2026-09-21)
-- [~] Application Design - EXECUTE (Part 1 Planning; awaiting answers)
-- [ ] Units Generation - EXECUTE
+- [x] Application Design - EXECUTE (approved 2026-09-21; 7 artifacts incl. canonical-model, events, tenancy-and-routing, status mapping; modules renamed for clarity)
+- [~] Units Generation - EXECUTE (in progress)
 
 ### 🟢 CONSTRUCTION PHASE (per unit)
 - [ ] Functional Design - EXECUTE

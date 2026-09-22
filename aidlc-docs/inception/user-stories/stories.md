@@ -336,6 +336,9 @@ A story is Done only when all of the following hold (per the approved Q3/Q6 appr
 - **US-F4: Split orders across ERPs** — one order fulfilled by multiple ERPs. (Explicitly out; MVP is one order = one ERP.)
 - **US-F5: Platform-created ERP customers** — the platform creates/updates ERP customer records. (Out; platform only binds to existing customers.)
 - **US-F6: Data exports** — reseller/operator export features. (Proposed in design; deferred.)
+- **US-F7: AI-assisted ERP onboarding via MCP** — an MCP server wraps the onboarding surface (introspect ERP schema, propose mappings, create connection, run conformance, read failures) so an AI agent can draft config + declarative mappings and iterate until the conformance suite passes; a human operator approves, and it runs against non-production targets first. Feasible because onboarding is declarative config + mappings, not connector code (FR-24..FR-27). Guardrails: no auto-publish to tenants (FR-20, FR-22), no ERP-identity leakage (FR-19), operator-managed encrypted credentials. (Future phase; extends Q16.)
+
+**Design principle carried into Application Design** (to keep US-F7 cheap later): ERP onboarding operations (connections, mappings, conformance runs) are exposed as an **API-first, machine-drivable interface**; the operator admin UI is a client of that API, not the only way to drive it.
 
 ---
 
