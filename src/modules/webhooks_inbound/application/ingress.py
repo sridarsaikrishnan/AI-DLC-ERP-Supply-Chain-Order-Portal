@@ -1,0 +1,85 @@
+"""InboundWebhookService — verify, attribute, dedupe, then drive order status."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+from src.modules.integration.domain.status_mapping import map_native_status
+from src.shared.types import ConnectionId
+
+from ..domain.signature import verify_shared_secret, verify_signature
+from .ports import DedupStore, OrderLocator, OrderStatusPort, SecretResolver
+
+
+class IngressOutcome(str, Enum):
+    ACCEPTED = "ACCEPTED"  # attributed + status transition applied
+    NO_TRANSITION = "NO_TRANSITION"  # attributed, but native status maps to nothing
+    UNAUTHORIZED = "UNAUTHORIZED"  # bad/missing signature
+    DUPLICATE = "DUPLICATE"  # already processed this delivery
+    UNATTRIBUTABLE = "UNATTRIBUTABLE"  # not an order we created -> ignore
+
+
+class WebhookAuthMode(str, Enum):
+    HMAC = "HMAC"  # ERPNext: real signature over the raw body
+    SHARED_SECRET = "SHARED_SECRET"  # Odoo: Automation Rules can't sign, so the secret
+    # itself travels in the URL path; `signature` below holds that raw secret instead.
+
+
+@dataclass(frozen=True)
+class InboundWebhook:
+    connection_id: ConnectionId
+    erp_type: str
+    erp_order_id: str
+    native_status: str
+    event_ref: str  # provider delivery id, used for dedup
+    raw_body: bytes
+    signature: str
+    auth_mode: WebhookAuthMode = WebhookAuthMode.HMAC
+    invoice_status: str | None = None
+
+
+class InboundWebhookService:
+    def __init__(
+        self,
+        *,
+        secrets: SecretResolver,
+        dedup: DedupStore,
+        locator: OrderLocator,
+        order_status: OrderStatusPort,
+    ) -> None:
+        self._secrets = secrets
+        self._dedup = dedup
+        self._locator = locator
+        self._order_status = order_status
+
+    def handle(self, webhook: InboundWebhook) -> IngressOutcome:
+        # 1. authenticate
+        secret = self._secrets.secret_for(webhook.connection_id)
+        if webhook.auth_mode is WebhookAuthMode.SHARED_SECRET:
+            authenticated = secret is not None and verify_shared_secret(secret, webhook.signature)
+        else:
+            authenticated = secret is not None and verify_signature(secret, webhook.raw_body, webhook.signature)
+        if not authenticated:
+            return IngressOutcome.UNAUTHORIZED
+
+        # 2. dedupe
+        dedup_key = f"{webhook.connection_id}:{webhook.event_ref}"
+        if self._dedup.seen(dedup_key):
+            return IngressOutcome.DUPLICATE
+
+        # 3. attribute before publication (reverse routing)
+        order_id = self._locator.find_order(webhook.connection_id, webhook.erp_order_id)
+        if order_id is None:
+            # Not an order we created (or not yet recorded): drop, do NOT mark seen so a
+            # later redelivery can attribute once the order exists.
+            return IngressOutcome.UNATTRIBUTABLE
+
+        # 4. map + apply (only now do we mark the delivery processed)
+        status = map_native_status(webhook.erp_type, webhook.native_status, webhook.invoice_status)
+        self._dedup.mark(dedup_key)
+        if status is None:
+            return IngressOutcome.NO_TRANSITION
+
+        self._order_status.apply_status(order_id, status)
+        return IngressOutcome.ACCEPTED

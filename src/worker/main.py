@@ -1,0 +1,199 @@
+"""Worker entrypoint (postgres/AWS deployment).
+
+Builds the postgres-profile container (same composition root as the API), then starts:
+- one `SqsConsumerRunner` per queue (order-processing / order-delivery / projections),
+  each handler wrapped so it dedupes on `event_id` via `processed_events` BEFORE calling
+  into the module handler — the handler itself only has to be correct, not idempotent
+  (item A's carried-forward note: the projection store's own conflict-handling is a
+  second line of defense, not a substitute for this).
+- the outbox `RelayRunner` (Postgres outbox -> SNS FIFO topic).
+- the `ReconcileScheduler` (periodic fallback sweep for missed webhooks).
+
+`webhook-dispatch.fifo` has no consumer here: per messaging-topology.md it's optional/
+secondary (outbound webhooks are off by default; GraphQL is the primary read path) and no
+webhook_dispatch handler has been built. `scripts/messaging_bootstrap.py` still
+provisions the queue/DLQ so turning it on later is additive, not a redesign.
+
+Not built: per-connection circuit breaker (plan item C mentions it; deferred — a
+transient ERP failure today just raises `DeliveryRetry`, which the SQS redrive/backoff
+already turns into bounded retries. A breaker that trips PER CONNECTION and short-circuits
+without hitting the ERP is real, separable follow-up work, not needed to get the async
+pipeline running end-to-end).
+"""
+
+from __future__ import annotations
+
+import logging
+import signal
+import threading
+from types import FrameType
+
+import boto3
+from sqlalchemy import Column, MetaData, String, Table, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session, sessionmaker
+
+from src.composition import build_container
+from src.shared.config import get_settings
+from src.shared.eventsourcing import StoredEvent
+from src.shared.messaging.aws import SnsFifoPublisher, SqsConsumerRunner
+from src.shared.persistence.engine import get_session_factory
+from src.shared.persistence.relay import OutboxRelay
+from src.shared.types import ConnectionId
+
+from .relay_runner import RelayRunner
+from .scheduler import ReconcileScheduler
+
+log = logging.getLogger("worker")
+
+_QUEUES = ["order-processing.fifo", "order-delivery.fifo", "projections.fifo"]
+
+_TERMINAL_STATES = ("CLOSED", "CANCELLED", "REJECTED")
+
+_processed_events = Table(
+    "processed_events",
+    MetaData(),
+    Column("consumer", String, primary_key=True),
+    Column("event_id", String, primary_key=True),
+)
+
+
+def _dedupe(consumer: str, session_factory: sessionmaker[Session], handler):
+    """Wrap a handler so at-least-once redelivery of the same `event_id` to THIS consumer
+    is a no-op. Marks processed only after `handler` returns without raising, so a failed
+    attempt is still retried (and eventually redriven to the DLQ) rather than silently
+    swallowed."""
+
+    def wrapped(event: StoredEvent) -> None:
+        session = session_factory()
+        try:
+            already_seen = (
+                session.execute(
+                    select(_processed_events.c.event_id).where(
+                        _processed_events.c.consumer == consumer,
+                        _processed_events.c.event_id == event.event_id,
+                    )
+                ).first()
+                is not None
+            )
+        finally:
+            session.close()
+        if already_seen:
+            log.info("skip duplicate event_id=%s consumer=%s", event.event_id, consumer)
+            return
+
+        handler(event)
+
+        session = session_factory()
+        try:
+            stmt = pg_insert(_processed_events).values(consumer=consumer, event_id=event.event_id)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["consumer", "event_id"])
+            session.execute(stmt)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    return wrapped
+
+
+def _queue_url(sqs: object, name: str) -> str:
+    return sqs.get_queue_url(QueueName=name)["QueueUrl"]  # type: ignore[attr-defined]
+
+
+def _open_orders_provider(session_factory: sessionmaker[Session]):
+    placeholders = ", ".join(f"'{s}'" for s in _TERMINAL_STATES)
+
+    def provider(connection_id: ConnectionId) -> list[str]:
+        session = session_factory()
+        try:
+            rows = session.execute(
+                text(
+                    f"SELECT erp_order_id FROM orders "
+                    f"WHERE owning_connection_id = :cid AND erp_order_id IS NOT NULL "
+                    f"AND state NOT IN ({placeholders})"
+                ),
+                {"cid": str(connection_id)},
+            ).all()
+        finally:
+            session.close()
+        return [row[0] for row in rows]
+
+    return provider
+
+
+def main() -> None:  # pragma: no cover - process entrypoint
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+    settings = get_settings()
+    if settings.profile != "postgres":
+        raise SystemExit(f"worker requires APP_PROFILE=postgres (got {settings.profile!r})")
+
+    container = build_container(settings)
+    session_factory = get_session_factory(settings.database_url)
+    assert container.reconcile_sweeper is not None  # guaranteed by the postgres profile
+
+    publisher = SnsFifoPublisher(
+        settings.domain_topic_arn, endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
+    )
+    relay = RelayRunner(OutboxRelay(session_factory, publisher))
+
+    sqs = boto3.client("sqs", endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region)
+    consumers = [
+        SqsConsumerRunner(
+            _queue_url(sqs, "order-processing.fifo"),
+            _dedupe("order-processing", session_factory, container.order_processor.handle),
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
+        ),
+        SqsConsumerRunner(
+            _queue_url(sqs, "order-delivery.fifo"),
+            _dedupe("order-delivery", session_factory, container.delivery_handler.handle),
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
+        ),
+        SqsConsumerRunner(
+            _queue_url(sqs, "projections.fifo"),
+            _dedupe("projections", session_factory, container.order_projector.handle),
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
+        ),
+    ]
+
+    scheduler = ReconcileScheduler(
+        container.reconcile_sweeper,
+        connections_provider=lambda: [c.connection_id for c in container.connections.list_active()],
+        open_orders_provider=_open_orders_provider(session_factory),
+        interval_seconds=settings.reconcile_interval_seconds,
+    )
+
+    stop = threading.Event()
+
+    def _shutdown(signum: int, _frame: FrameType | None) -> None:
+        log.info("received signal %s, shutting down", signum)
+        stop.set()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    threads = [threading.Thread(target=relay.run_forever, name="outbox-relay", daemon=True)]
+    threads += [
+        threading.Thread(target=consumer.run_forever, name=f"consumer-{i}", daemon=True)
+        for i, consumer in enumerate(consumers)
+    ]
+    threads.append(threading.Thread(target=scheduler.run_forever, name="reconcile-scheduler", daemon=True))
+
+    log.info("worker starting: %d consumer(s), relay, reconcile scheduler", len(consumers))
+    for thread in threads:
+        thread.start()
+
+    # Threads are daemons (run_forever loops never return); block here so the process
+    # stays up, and exit promptly once a shutdown signal flips `stop`.
+    stop.wait()
+    log.info("worker stopped")
+
+
+if __name__ == "__main__":
+    main()
