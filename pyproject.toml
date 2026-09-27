@@ -13,6 +13,7 @@ dependencies = [
     "strawberry-graphql==0.246.2",
     "boto3==1.35.36",
     "PyJWT==2.9.0",
+    "cryptography==50.0.1",  # PyJWT's RS256 backend — Cognito JWTs are always RS256
     "pyotp==2.9.0",
     "python-dateutil==2.9.0",
     "python-ulid==2.7.0",

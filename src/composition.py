@@ -16,8 +16,11 @@ except the api/worker hosts.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
 
 from src.modules.catalog.application.ports import ItemRepository
 from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
@@ -55,6 +58,8 @@ from src.modules.webhooks_inbound.infrastructure.postgres import (
 )
 from src.shared.config import Settings, get_settings
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
+from src.shared.identity import CognitoIdentityProvider, HeaderStubIdentityProvider, IdentityProvider
+from src.shared.identity.cognito import issuer_url
 from src.shared.messaging import InMemoryMessageBus
 from src.shared.persistence.engine import get_session_factory
 from src.shared.persistence.event_store import PostgresEventStore
@@ -135,6 +140,7 @@ class Container:
     delivery_handler: DeliveryHandler
     order_projector: OrderProjector
     reconcile_sweeper: ReconcileSweeper | None  # None in the memory profile (worker-only)
+    identity: IdentityProvider
 
 
 def build_container(settings: Settings | None = None) -> Container:
@@ -194,6 +200,7 @@ def _build_memory_container(settings: Settings) -> Container:
         delivery_handler=delivery,
         order_projector=projector,
         reconcile_sweeper=None,
+        identity=HeaderStubIdentityProvider(),
     )
 
 
@@ -216,6 +223,28 @@ def _resolve_adapter_for(settings: Settings) -> Callable[[str], ErpAdapter]:
     return resolve
 
 
+def _resolve_identity_provider(settings: Settings) -> IdentityProvider:
+    """Real Cognito verification once `COGNITO_USER_POOL_ID`/`COGNITO_CLIENT_ID` are
+    configured; the header stub until then (so the postgres profile stays usable for
+    local dev against floci — with a *live* Odoo/worker/SQS pipeline but no Cognito user
+    pool set up yet — without hard-failing container construction). Set both env vars to
+    turn on real verification; nothing else changes."""
+    if not settings.cognito_user_pool_id or not settings.cognito_client_id:
+        log.warning("COGNITO_USER_POOL_ID/COGNITO_CLIENT_ID not set — using the header stub, not real auth")
+        return HeaderStubIdentityProvider()
+    issuer = issuer_url(
+        aws_endpoint_url=settings.aws_endpoint_url,
+        aws_region=settings.aws_region,
+        user_pool_id=settings.cognito_user_pool_id,
+    )
+    return CognitoIdentityProvider(
+        user_pool_id=settings.cognito_user_pool_id,
+        client_id=settings.cognito_client_id,
+        issuer=issuer,
+        resource_server_id=settings.cognito_resource_server_id,
+    )
+
+
 def _build_postgres_container(settings: Settings) -> Container:
     session_factory = get_session_factory(settings.database_url)
     event_store = PostgresEventStore(session_factory)
@@ -230,6 +259,7 @@ def _build_postgres_container(settings: Settings) -> Container:
     secrets: SecretStore = SecretsManagerSecretStore(
         endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
     )
+    identity = _resolve_identity_provider(settings)
 
     projections = PostgresOrderProjectionStore(session_factory)
     locator = PostgresOrderLocator(session_factory)
@@ -276,4 +306,5 @@ def _build_postgres_container(settings: Settings) -> Container:
         delivery_handler=delivery,
         order_projector=projector,
         reconcile_sweeper=reconcile_sweeper,
+        identity=identity,
     )

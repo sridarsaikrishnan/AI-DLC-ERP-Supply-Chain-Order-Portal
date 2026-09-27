@@ -57,6 +57,9 @@ def _postgres_settings() -> Settings:
         erp_odoo_timeout_seconds=base.erp_odoo_timeout_seconds,
         log_level=base.log_level,
         reconcile_interval_seconds=base.reconcile_interval_seconds,
+        cognito_user_pool_id=base.cognito_user_pool_id,
+        cognito_client_id=base.cognito_client_id,
+        cognito_resource_server_id=base.cognito_resource_server_id,
     )
 
 

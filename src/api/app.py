@@ -1,12 +1,13 @@
 """FastAPI composition root: mounts GraphQL (reseller + operator) + HTTP (webhooks, health).
 
-Security headers (SECURITY-04) are applied to all responses. Tenant/roles are taken from
-the validated Cognito JWT; a header-based stub is used until Cognito is wired (Phase 3).
+Security headers (SECURITY-04) are applied to all responses. Tenant/roles come from
+`container.identity` — the header stub in the memory profile and whenever Cognito isn't
+configured, real Cognito JWT verification once it is (`composition._resolve_identity_provider`).
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from strawberry.fastapi import GraphQLRouter
 
 from src.api.graphql.context import GraphQLContext
@@ -24,33 +25,26 @@ _SECURITY_HEADERS = {
 }
 
 
-def _identity(request: Request) -> tuple[str, tuple[str, ...]]:
-    """Resolve (tenant_id, roles). TODO(Phase 3): validate Cognito JWT (issuer/aud/exp/sig).
-
-    Until then, trust a gateway-provided header in local dev only.
-    """
-    tenant = request.headers.get("x-tenant-id", "tnt_demo")
-    roles = tuple(r for r in request.headers.get("x-roles", "").split(",") if r)
-    return tenant, roles
+async def _build_context(request: Request) -> GraphQLContext:
+    container = request.app.state.container
+    principal = container.identity.authenticate(request.headers)
+    if principal is None:
+        # Reject unauthenticated calls (SEC-08) — raised here, before GraphQL execution
+        # starts, so an invalid/expired/missing token is a clean 401, not a GraphQL
+        # response with a partial/empty result a caller could mistake for "no data".
+        raise HTTPException(status_code=401, detail="missing or invalid credentials")
+    return GraphQLContext(container=container, tenant_id=principal.tenant_id, roles=principal.roles)
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ERP & Supply Chain Order Portal", version="0.2.0")
     app.state.container = build_container()
 
-    async def reseller_context(request: Request) -> GraphQLContext:
-        tenant, roles = _identity(request)
-        return GraphQLContext(container=app.state.container, tenant_id=tenant, roles=roles)
-
-    async def operator_context(request: Request) -> GraphQLContext:
-        tenant, roles = _identity(request)
-        return GraphQLContext(container=app.state.container, tenant_id=tenant, roles=roles)
-
     app.include_router(
-        GraphQLRouter(build_reseller_schema(), context_getter=reseller_context), prefix="/graphql/reseller"
+        GraphQLRouter(build_reseller_schema(), context_getter=_build_context), prefix="/graphql/reseller"
     )
     app.include_router(
-        GraphQLRouter(build_operator_schema(), context_getter=operator_context), prefix="/graphql/operator"
+        GraphQLRouter(build_operator_schema(), context_getter=_build_context), prefix="/graphql/operator"
     )
     app.include_router(webhooks.router)
     app.include_router(health.router)

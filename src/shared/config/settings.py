@@ -21,6 +21,9 @@ class Settings:
     erp_odoo_timeout_seconds: float  # OdooAdapter-specific; a new ERP adapter gets its own timeout setting if it needs one
     log_level: str
     reconcile_interval_seconds: int
+    cognito_user_pool_id: str | None
+    cognito_client_id: str | None
+    cognito_resource_server_id: str  # OAuth scope namespace for client_credentials (M2M) tokens — {this}/tenant.<id>, {this}/role.<ROLE>
 
 
 @lru_cache
@@ -39,4 +42,7 @@ def get_settings() -> Settings:
         erp_odoo_timeout_seconds=float(os.environ.get("ERP_ODOO_TIMEOUT_SECONDS", "10")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         reconcile_interval_seconds=int(os.environ.get("RECONCILE_INTERVAL_SECONDS", "900")),
+        cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID"),
+        cognito_client_id=os.environ.get("COGNITO_CLIENT_ID"),
+        cognito_resource_server_id=os.environ.get("COGNITO_RESOURCE_SERVER_ID", "erp-portal"),
     )

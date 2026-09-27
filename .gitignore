@@ -16,6 +16,8 @@ portal_local.db
 # Environment / secrets
 .env
 *.env
+.cognito_demo.json
+*_token.txt
 
 # IDE / tooling
 .kiro/settings/
