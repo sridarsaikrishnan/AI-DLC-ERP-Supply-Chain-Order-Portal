@@ -84,3 +84,10 @@ It was removed as part of a refactor from ad hoc if/elif dispatch (scattered acr
 `ErpType.ERP_NEXT` existed with a status mapper but no adapter ever implemented, and
 partly to prove out this checklist with a clean example before other developers or
 automation rely on it. Adding it back is exactly the 4-step process described here.
+
+## Read next
+- **`docs/erp-integration-patterns.md`** — webhook shapes (rich vs. thin/NetSuite-style)
+  and how multiple instances of an ERP, and multiple tenants, get routed without
+  tangling. Read this before writing a new adapter for an ERP with unusual webhooks.
+- **`aidlc-docs/inception/application-design/target-architecture.md`** / **`docs/database-schema.md`**
+  — the system this adapter plugs into.

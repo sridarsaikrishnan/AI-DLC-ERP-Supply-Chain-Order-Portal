@@ -5,9 +5,12 @@ A multi-tenant portal that routes reseller orders to the ERP system that owns ea
 event-sourced orders, a transactional-outbox/SNS/SQS async pipeline, and a GraphQL API
 split by audience (reseller vs. operator, so ERP identity never reaches a reseller — FR-19).
 
-See `aidlc-docs/` for the full AI-DLC design trail (requirements, architecture, per-unit
-design) and `aidlc-docs/inception/application-design/target-architecture.md` for the
-current target architecture in detail.
+**Start here for how it actually works**:
+`aidlc-docs/inception/application-design/target-architecture.md` (the one architecture
+doc — AI-DLC's design-of-record, kept current in place rather than forked into a second
+file; its "Implementation status" note at the top lists what changed since it was
+drafted), `docs/database-schema.md` (every table), and
+`docs/event-sourcing-explained.md` (why events instead of just updating rows).
 
 ## Tech stack
 Python 3.11 · FastAPI + Strawberry GraphQL · SQLAlchemy + PostgreSQL (event store +
@@ -30,7 +33,9 @@ migrations/       # Alembic
 tests/e2e/        # full in-memory flow (place order -> deliver -> webhook -> projection)
 tests/integration/# against real Postgres + floci (self-skip if unreachable)
 scripts/          # messaging_bootstrap.py (SNS/SQS topology), seed_demo.py
-docs/             # local-setup.md, adding-an-erp.md, odoo-webhook-setup.md
+docs/             # local-setup.md, database-schema.md, event-sourcing-explained.md,
+                  # erp-integration-patterns.md, adding-an-erp.md, odoo-webhook-setup.md
+                  # (architecture itself: aidlc-docs/.../target-architecture.md — one doc)
 ```
 
 ## Run locally
