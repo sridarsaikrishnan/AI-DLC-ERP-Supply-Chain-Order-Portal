@@ -66,10 +66,22 @@ c.admin_create_user(UserPoolId=pool_id, Username="demo-operator",
 c.admin_set_user_password(UserPoolId=pool_id, Username="demo-operator", Password="DemoPass123!", Permanent=True)
 c.create_group(GroupName="OPERATOR", UserPoolId=pool_id)
 c.admin_add_user_to_group(UserPoolId=pool_id, Username="demo-operator", GroupName="OPERATOR")
+
+# A reseller demo user too — no group needed: the reseller GraphQL schema has no role
+# requirement (only the operator schema calls require_role), and the UI treats "no
+# OPERATOR group" as reseller by default (App.tsx).
+c.admin_create_user(UserPoolId=pool_id, Username="demo-reseller",
+    UserAttributes=[{"Name": "custom:tenant_id", "Value": "tnt_demo"}],
+    MessageAction="SUPPRESS", TemporaryPassword="TempPass123!")
+c.admin_set_user_password(UserPoolId=pool_id, Username="demo-reseller", Password="DemoPass123!", Permanent=True)
+
 print(f"COGNITO_USER_POOL_ID={pool_id}")
 print(f"COGNITO_CLIENT_ID={client_id}")
 PY
 ```
+Both demo users land in the same tenant (`tnt_demo`) so they see the same seeded
+connection/binding/items from step 5 — `demo-operator` for the admin screens,
+`demo-reseller` for the order screens.
 Export those two values, restart `api` (step 6), then get a real token and use it:
 ```bash
 export COGNITO_USER_POOL_ID=...  COGNITO_CLIENT_ID=...
