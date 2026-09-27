@@ -53,7 +53,7 @@ def _postgres_settings() -> Settings:
         aws_endpoint_url=base.aws_endpoint_url,
         aws_region=base.aws_region,
         domain_topic_arn=base.domain_topic_arn,
-        erp_odoo_mode="stub",
+        erp_adapter_mode="stub",
         erp_odoo_timeout_seconds=base.erp_odoo_timeout_seconds,
         log_level=base.log_level,
         reconcile_interval_seconds=base.reconcile_interval_seconds,

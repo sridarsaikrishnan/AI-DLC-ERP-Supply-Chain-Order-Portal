@@ -17,8 +17,8 @@ class Settings:
     aws_endpoint_url: str | None
     aws_region: str
     domain_topic_arn: str
-    erp_odoo_mode: str  # "real" | "stub"
-    erp_odoo_timeout_seconds: float
+    erp_adapter_mode: str  # "real" (dispatch via the adapter registry) | "stub" (force StubErpAdapter for every ERP type)
+    erp_odoo_timeout_seconds: float  # OdooAdapter-specific; a new ERP adapter gets its own timeout setting if it needs one
     log_level: str
     reconcile_interval_seconds: int
 
@@ -35,7 +35,7 @@ def get_settings() -> Settings:
         domain_topic_arn=os.environ.get(
             "DOMAIN_TOPIC_ARN", "arn:aws:sns:us-east-1:000000000000:platform-domain-events.fifo"
         ),
-        erp_odoo_mode=os.environ.get("ERP_ODOO_MODE", "real"),
+        erp_adapter_mode=os.environ.get("ERP_ADAPTER_MODE", "real"),
         erp_odoo_timeout_seconds=float(os.environ.get("ERP_ODOO_TIMEOUT_SECONDS", "10")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         reconcile_interval_seconds=int(os.environ.get("RECONCILE_INTERVAL_SECONDS", "900")),

@@ -1,4 +1,4 @@
-"""Deterministic in-memory ERP adapter for tests and local runs (ERP_ODOO_MODE=stub)."""
+"""Deterministic in-memory ERP adapter for tests and local runs (ERP_ADAPTER_MODE=stub)."""
 
 from __future__ import annotations
 

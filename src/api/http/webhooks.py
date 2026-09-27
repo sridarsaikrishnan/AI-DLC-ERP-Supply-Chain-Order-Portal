@@ -1,8 +1,10 @@
 """Inbound ERP webhook HTTP routes — the transport in front of webhooks_inbound.
 
 Two routes, two auth schemes (target-architecture.md 5a, infrastructure-design.md):
-- `POST /erp/webhook/{connection_id}` — HMAC signature in the `x-erp-signature` header.
-  ERPNext has native webhooks and can compute this.
+- `POST /erp/webhook/{connection_id}` — HMAC signature in the `x-erp-signature` header,
+  for any ERP that can compute one over the raw body (ERPNext's native webhooks can;
+  ERPNext isn't currently a registered adapter — see `ErpType` — but this route doesn't
+  care, it just needs `erp_type` in the payload to match a registered status mapper).
 - `POST /erp/webhook/{connection_id}/{webhook_secret}` — shared-secret-in-path. Odoo
   Automation Rules can only POST to a URL; they can't set custom headers or sign a body.
   The secret itself IS the URL segment, verified with a constant-time comparison against
@@ -54,12 +56,13 @@ async def _dispatch(request: Request, webhook: InboundWebhook) -> Response:
 
 @router.post("/erp/webhook/{connection_id}")
 async def erp_webhook_hmac(connection_id: str, request: Request) -> Response:
-    """ERPNext (or any ERP that can sign): HMAC over the raw body."""
+    """Any ERP that can sign a webhook body: HMAC over the raw body. `erp_type` in the
+    payload selects the status mapper (see `STATUS_MAPPERS`); no default is assumed."""
     raw = await request.body()
     body = _parse_body(raw)
     webhook = InboundWebhook(
         connection_id=ConnectionId(connection_id),
-        erp_type=str(body.get("erp_type", "ERP_NEXT")),
+        erp_type=str(body.get("erp_type", "")),
         erp_order_id=str(body.get("erp_order_id") or body.get("name") or ""),
         native_status=str(body.get("state") or body.get("status") or ""),
         event_ref=request.headers.get("x-erp-delivery-id", "") or str(body.get("event_id", "")),

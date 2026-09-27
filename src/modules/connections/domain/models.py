@@ -9,8 +9,11 @@ from src.shared.types import ConnectionId
 
 
 class ErpType(str, Enum):
+    """Every ERP type the platform knows about. Adding one here is step 4 of "add a new
+    ERP" — see `integration/infrastructure/registry.py`'s module docstring for the full
+    checklist (adapter class, status mapper, registry entry, then this enum member)."""
+
     ODOO = "ODOO"
-    ERP_NEXT = "ERP_NEXT"
 
 
 class ConnectionStatus(str, Enum):
@@ -20,7 +23,8 @@ class ConnectionStatus(str, Enum):
 
 @dataclass
 class ErpConnection:
-    """One ERP instance (one Odoo db / one ERPNext site). Operator-only identity.
+    """One ERP instance (e.g. one Odoo database) — see `ErpType` for which ERPs are
+    currently registered. Operator-only identity.
 
     `secret_ref` is a Secrets Manager reference — never the raw credential (SECURITY-12).
     `instance_label` is operator-only and must never reach a reseller surface (FR-19).

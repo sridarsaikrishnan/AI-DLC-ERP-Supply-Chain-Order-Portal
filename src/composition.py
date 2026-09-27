@@ -26,9 +26,9 @@ from src.modules.connections.application.ports import ConnectionRepository
 from src.modules.connections.infrastructure.memory import InMemoryConnectionRepository
 from src.modules.connections.infrastructure.postgres import PostgresConnectionRepository
 from src.modules.integration.application.delivery import DeliveryHandler
-from src.modules.integration.application.ports import ErpAdapter, ErpTarget
+from src.modules.integration.application.ports import ErpAdapter, ErpTarget, UnknownErpType
 from src.modules.integration.application.reconcile import ReconcileSweeper
-from src.modules.integration.infrastructure.odoo_adapter import OdooAdapter
+from src.modules.integration.infrastructure.registry import build_adapter_registry
 from src.modules.integration.infrastructure.stub_adapter import StubErpAdapter
 from src.modules.ordering.application.adapters import (
     OrderCommandAdapter,
@@ -197,6 +197,25 @@ def _build_memory_container(settings: Settings) -> Container:
     )
 
 
+def _resolve_adapter_for(settings: Settings) -> Callable[[str], ErpAdapter]:
+    """`erp_adapter_mode="stub"` overrides every ERP type with the deterministic stub
+    (local dev/testing, no real HTTP). Otherwise dispatch through the adapter registry —
+    see `integration/infrastructure/registry.py` for how a new ERP gets added here."""
+    if settings.erp_adapter_mode == "stub":
+        stub = StubErpAdapter()
+        return lambda _erp_type: stub
+
+    registry = build_adapter_registry(settings)
+
+    def resolve(erp_type: str) -> ErpAdapter:
+        adapter = registry.get(erp_type)
+        if adapter is None:
+            raise UnknownErpType(erp_type)
+        return adapter
+
+    return resolve
+
+
 def _build_postgres_container(settings: Settings) -> Container:
     session_factory = get_session_factory(settings.database_url)
     event_store = PostgresEventStore(session_factory)
@@ -215,12 +234,7 @@ def _build_postgres_container(settings: Settings) -> Container:
     projections = PostgresOrderProjectionStore(session_factory)
     locator = PostgresOrderLocator(session_factory)
 
-    erp_adapter: ErpAdapter = (
-        OdooAdapter(timeout_seconds=settings.erp_odoo_timeout_seconds)
-        if settings.erp_odoo_mode == "real"
-        else StubErpAdapter()
-    )
-    adapter_for = lambda _erp_type: erp_adapter  # noqa: E731
+    adapter_for = _resolve_adapter_for(settings)
 
     connections_resolver = ConnectionsResolver(connections, secrets)
     status_applier = StatusApplier(repo)

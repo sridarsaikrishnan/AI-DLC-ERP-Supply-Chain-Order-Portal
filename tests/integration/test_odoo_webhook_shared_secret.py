@@ -54,7 +54,7 @@ def _id(prefix: str) -> str:
 
 def _app():
     os.environ["APP_PROFILE"] = "postgres"
-    os.environ["ERP_ODOO_MODE"] = "stub"
+    os.environ["ERP_ADAPTER_MODE"] = "stub"
     get_settings.cache_clear()
     from src.api.app import create_app
 

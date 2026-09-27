@@ -8,6 +8,12 @@ from typing import Any, Protocol
 from src.shared.types import ConnectionId, OrderId
 
 
+class UnknownErpType(Exception):
+    """No adapter is registered for this erp_type (see `infrastructure/registry.py`).
+    A configuration gap, not a transient failure — callers should let this surface (e.g.
+    to a DLQ for operator triage) rather than retry indefinitely without a code change."""
+
+
 @dataclass(frozen=True)
 class ErpTarget:
     """Resolved connection details handed to an adapter (secret already fetched)."""
