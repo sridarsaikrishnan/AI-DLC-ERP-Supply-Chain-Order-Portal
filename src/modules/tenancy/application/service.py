@@ -46,3 +46,18 @@ class BindingService:
         binding.status = BindingStatus.VERIFIED
         self._repository.update(binding)
         return binding
+
+    def remove_binding(self, binding_id: BindingId) -> TenantConnectionBinding:
+        """Status change, not a delete (`tenant_connection_bindings` keeps the row so
+        historical orders still resolve their routing). `is_bound`/ownership checks
+        already treat any non-VERIFIED status as unbound, so this takes effect
+        immediately. Note: the `(tenant_id, connection_id)` UNIQUE constraint means a new
+        binding for the same pair can't be created while this REMOVED row still exists —
+        re-onboarding that pair isn't supported without a schema change, which is out of
+        scope for a status-only removal."""
+        binding = self._repository.get(binding_id)
+        if binding is None:
+            raise BindingNotFound(str(binding_id))
+        binding.status = BindingStatus.REMOVED
+        self._repository.update(binding)
+        return binding

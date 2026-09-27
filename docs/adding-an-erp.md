@@ -89,5 +89,8 @@ automation rely on it. Adding it back is exactly the 4-step process described he
 - **`docs/erp-integration-patterns.md`** — webhook shapes (rich vs. thin/NetSuite-style)
   and how multiple instances of an ERP, and multiple tenants, get routed without
   tangling. Read this before writing a new adapter for an ERP with unusual webhooks.
+- **`docs/erps/`** — one file per registered ERP with everything specific to it (auth,
+  API shape, quirks discovered while building it). Add your new ERP's page there once
+  it's registered — that's where its knowledge lives, not scattered across code comments.
 - **`aidlc-docs/inception/application-design/target-architecture.md`** / **`docs/database-schema.md`**
   — the system this adapter plugs into.

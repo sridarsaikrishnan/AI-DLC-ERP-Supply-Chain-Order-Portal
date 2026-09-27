@@ -73,7 +73,15 @@ class EventSourcedRepository(Generic[A]):
             return []
 
         expected = aggregate.version - len(pending)
-        tenant_id, correlation_id = self._metadata() if self._metadata else (None, None)
+        provided_tenant_id, correlation_id = self._metadata() if self._metadata else (None, None)
+        # Prefer the aggregate's own tenant_id (set by the time `emit()` applies the
+        # event, per Aggregate.emit) over metadata_provider: a worker consumer saves
+        # aggregates for many tenants from one process with no "current request" to ask,
+        # so a provider with no aggregate in scope can never answer this correctly for
+        # worker-driven saves. metadata_provider stays for correlation_id (genuinely
+        # request-scoped) and as a fallback for aggregates with no tenant_id of their own.
+        aggregate_tenant_id = getattr(aggregate, "tenant_id", None)
+        tenant_id = str(aggregate_tenant_id) if aggregate_tenant_id else provided_tenant_id
 
         stored: list[StoredEvent] = []
         version = expected

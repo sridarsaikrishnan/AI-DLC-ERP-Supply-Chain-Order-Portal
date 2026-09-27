@@ -3,6 +3,12 @@
 A `secret_ref` stored on a connection (or a webhook signing key ref) is resolved to the
 actual value here — never stored in plaintext in the DB (SECURITY-12). Local dev uses
 env vars; production uses AWS Secrets Manager. Same call sites either way.
+
+Every `secret_ref` up to now was provisioned externally (ops runs `aws secretsmanager
+create-secret` by hand, then passes the ref in). Outbound webhook signing secrets are the
+first case where the app itself generates the value (so it can show it to the reseller
+exactly once), which is why `put_secret` exists — it's a real capability gap this closed,
+not a speculative addition.
 """
 
 from __future__ import annotations
@@ -17,6 +23,7 @@ class SecretNotFound(Exception):
 
 class SecretStore(Protocol):
     def get_secret(self, secret_ref: str) -> str: ...
+    def put_secret(self, secret_ref: str, value: str) -> None: ...
 
 
 class EnvSecretStore:
@@ -28,6 +35,10 @@ class EnvSecretStore:
         if value is None:
             raise SecretNotFound(secret_ref)
         return value
+
+    def put_secret(self, secret_ref: str, value: str) -> None:
+        name = secret_ref.split("env:", 1)[-1]
+        os.environ[name] = value
 
 
 class SecretsManagerSecretStore:
@@ -48,3 +59,9 @@ class SecretsManagerSecretStore:
         except Exception as exc:  # noqa: BLE001
             raise SecretNotFound(secret_ref) from exc
         return str(response["SecretString"])
+
+    def put_secret(self, secret_ref: str, value: str) -> None:
+        try:
+            self._client.create_secret(Name=secret_ref, SecretString=value)
+        except self._client.exceptions.ResourceExistsException:
+            self._client.put_secret_value(SecretId=secret_ref, SecretString=value)

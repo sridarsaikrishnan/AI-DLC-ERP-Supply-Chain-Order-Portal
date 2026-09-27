@@ -17,5 +17,11 @@ class InMemoryConnectionRepository:
     def get(self, connection_id: ConnectionId) -> ErpConnection | None:
         return self._by_id.get(connection_id)
 
+    def update(self, connection: ErpConnection) -> None:
+        self._by_id[connection.connection_id] = connection
+
     def list_active(self) -> list[ErpConnection]:
         return [c for c in self._by_id.values() if c.is_active]
+
+    def list_all(self) -> list[ErpConnection]:
+        return list(self._by_id.values())

@@ -3,12 +3,17 @@
 Security headers (SECURITY-04) are applied to all responses. Tenant/roles come from
 `container.identity` — the header stub in the memory profile and whenever Cognito isn't
 configured, real Cognito JWT verification once it is (`composition._resolve_identity_provider`).
+CORS is restricted to `Settings.cors_allowed_origins` (SEC-08) — the UI is a separate
+origin (S3/CloudFront in prod, the Vite dev server locally), not same-origin with the API.
 """
 
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from strawberry.fastapi import GraphQLRouter
+
+from src.shared.config import get_settings
 
 from src.api.graphql.context import GraphQLContext
 from src.api.graphql.operator.schema import build_operator_schema
@@ -39,6 +44,14 @@ async def _build_context(request: Request) -> GraphQLContext:
 def create_app() -> FastAPI:
     app = FastAPI(title="ERP & Supply Chain Order Portal", version="0.2.0")
     app.state.container = build_container()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_allowed_origins,
+        allow_credentials=False,  # auth is a Bearer header, not cookies — no credentials mode needed
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
     app.include_router(
         GraphQLRouter(build_reseller_schema(), context_getter=_build_context), prefix="/graphql/reseller"

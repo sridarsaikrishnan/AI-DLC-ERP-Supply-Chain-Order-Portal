@@ -84,6 +84,21 @@ class PostgresConnectionRepository:
             session.close()
         return _to_model(row) if row is not None else None
 
+    def update(self, connection: ErpConnection) -> None:
+        session = self._session_factory()
+        try:
+            session.execute(
+                erp_connections_table.update()
+                .where(erp_connections_table.c.connection_id == str(connection.connection_id))
+                .values(status=connection.status.value)
+            )
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def list_active(self) -> list[ErpConnection]:
         session = self._session_factory()
         try:
@@ -92,6 +107,14 @@ class PostgresConnectionRepository:
                     erp_connections_table.c.status == ConnectionStatus.ACTIVE.value
                 )
             ).all()
+        finally:
+            session.close()
+        return [_to_model(row) for row in rows]
+
+    def list_all(self) -> list[ErpConnection]:
+        session = self._session_factory()
+        try:
+            rows = session.execute(select(erp_connections_table)).all()
         finally:
             session.close()
         return [_to_model(row) for row in rows]

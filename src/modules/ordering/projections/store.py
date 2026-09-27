@@ -85,6 +85,10 @@ class OrderProjectionStore:
             if r.tenant_id == tenant_id
         ]
 
+    def list_operator_views(self) -> list[OperatorOrderView]:
+        """Cross-tenant — operator debugging/visibility only, never reseller-reachable."""
+        return [self.get_operator_view(r.order_id) for r in self._records.values()]  # type: ignore[misc]
+
     def get_operator_view(self, order_id: str) -> OperatorOrderView | None:
         record = self._records.get(order_id)
         if record is None:

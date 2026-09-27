@@ -73,3 +73,11 @@ class PostgresItemRepository:
         finally:
             session.close()
         return _to_model(row) if row is not None else None
+
+    def list_all(self) -> list[Item]:
+        session = self._session_factory()
+        try:
+            rows = session.execute(select(items_table)).all()
+        finally:
+            session.close()
+        return [_to_model(row) for row in rows]

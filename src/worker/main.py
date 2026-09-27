@@ -1,18 +1,19 @@
 """Worker entrypoint (postgres/AWS deployment).
 
 Builds the postgres-profile container (same composition root as the API), then starts:
-- one `SqsConsumerRunner` per queue (order-processing / order-delivery / projections),
-  each handler wrapped so it dedupes on `event_id` via `processed_events` BEFORE calling
-  into the module handler — the handler itself only has to be correct, not idempotent
-  (item A's carried-forward note: the projection store's own conflict-handling is a
-  second line of defense, not a substitute for this).
+- one `SqsConsumerRunner` per queue (order-processing / order-delivery / projections /
+  webhook-dispatch), each handler wrapped so it dedupes on `event_id` via
+  `processed_events` BEFORE calling into the module handler — the handler itself only has
+  to be correct, not idempotent (item A's carried-forward note: the projection store's
+  own conflict-handling is a second line of defense, not a substitute for this).
 - the outbox `RelayRunner` (Postgres outbox -> SNS FIFO topic).
 - the `ReconcileScheduler` (periodic fallback sweep for missed webhooks).
 
-`webhook-dispatch.fifo` has no consumer here: per messaging-topology.md it's optional/
-secondary (outbound webhooks are off by default; GraphQL is the primary read path) and no
-webhook_dispatch handler has been built. `scripts/messaging_bootstrap.py` still
-provisions the queue/DLQ so turning it on later is additive, not a redesign.
+`webhook-dispatch.fifo` now has a consumer (`container.webhook_dispatcher.handle`) —
+outbound webhooks are still secondary to GraphQL as the primary read path, but the queue
+is no longer just provisioned-and-idle: a reseller-registered endpoint actually gets
+called. `WebhookDispatchService` raises for redrive itself (mirroring `DeliveryHandler`),
+so this consumer needs no special handling beyond the same dedupe wrapper as the others.
 
 Not built: per-connection circuit breaker (plan item C mentions it; deferred — a
 transient ERP failure today just raises `DeliveryRetry`, which the SQS redrive/backoff
@@ -157,6 +158,12 @@ def main() -> None:  # pragma: no cover - process entrypoint
         SqsConsumerRunner(
             _queue_url(sqs, "projections.fifo"),
             _dedupe("projections", session_factory, container.order_projector.handle),
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
+        ),
+        SqsConsumerRunner(
+            _queue_url(sqs, "webhook-dispatch.fifo"),
+            _dedupe("webhook-dispatch", session_factory, container.webhook_dispatcher.handle),
             endpoint_url=settings.aws_endpoint_url,
             region_name=settings.aws_region,
         ),

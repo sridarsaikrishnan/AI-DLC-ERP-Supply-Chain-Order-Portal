@@ -19,3 +19,6 @@ class InMemoryItemRepository:
 
     def get(self, item_id: str) -> Item | None:
         return self._by_id.get(item_id)
+
+    def list_all(self) -> list[Item]:
+        return list(self._by_id.values())

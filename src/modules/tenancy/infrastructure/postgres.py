@@ -128,3 +128,11 @@ class PostgresBindingRepository:
         finally:
             session.close()
         return _to_model(row) if row is not None else None
+
+    def list_all(self) -> list[TenantConnectionBinding]:
+        session = self._session_factory()
+        try:
+            rows = session.execute(select(tenant_connection_bindings_table)).all()
+        finally:
+            session.close()
+        return [_to_model(row) for row in rows]

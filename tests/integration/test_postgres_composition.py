@@ -60,6 +60,7 @@ def _postgres_settings() -> Settings:
         cognito_user_pool_id=base.cognito_user_pool_id,
         cognito_client_id=base.cognito_client_id,
         cognito_resource_server_id=base.cognito_resource_server_id,
+        cors_allowed_origins=base.cors_allowed_origins,
     )
 
 

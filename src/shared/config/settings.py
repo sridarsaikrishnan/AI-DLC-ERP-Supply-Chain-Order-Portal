@@ -24,6 +24,7 @@ class Settings:
     cognito_user_pool_id: str | None
     cognito_client_id: str | None
     cognito_resource_server_id: str  # OAuth scope namespace for client_credentials (M2M) tokens — {this}/tenant.<id>, {this}/role.<ROLE>
+    cors_allowed_origins: list[str]  # the UI's origin(s) — e.g. an S3/CloudFront URL in prod
 
 
 @lru_cache
@@ -45,4 +46,9 @@ def get_settings() -> Settings:
         cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID"),
         cognito_client_id=os.environ.get("COGNITO_CLIENT_ID"),
         cognito_resource_server_id=os.environ.get("COGNITO_RESOURCE_SERVER_ID", "erp-portal"),
+        cors_allowed_origins=[
+            origin.strip()
+            for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+            if origin.strip()
+        ],
     )

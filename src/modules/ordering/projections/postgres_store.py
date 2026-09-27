@@ -216,3 +216,24 @@ class PostgresOrderProjectionStore:
             )
         finally:
             session.close()
+
+    def list_operator_views(self) -> list[OperatorOrderView]:
+        """Cross-tenant — operator debugging/visibility only, never reseller-reachable."""
+        session = self._session_factory()
+        try:
+            rows = session.execute(select(orders_table)).all()
+            return [
+                OperatorOrderView(
+                    order_id=row.order_id,
+                    tenant_id=row.tenant_id,
+                    client_reference=row.client_reference,
+                    status=status_label(OrderState(row.state)),
+                    owning_connection_id=row.owning_connection_id,
+                    erp_order_id=row.erp_order_id,
+                    lines=self._lines(row.lines),
+                    timeline=self._timeline(session, row.order_id),
+                )
+                for row in rows
+            ]
+        finally:
+            session.close()

@@ -56,8 +56,20 @@ from src.modules.webhooks_inbound.infrastructure.postgres import (
     PostgresDedupStore,
     PostgresOrderLocator,
 )
+from src.modules.webhooks_outbound.application.dispatch import WebhookDispatchService
+from src.modules.webhooks_outbound.domain.models import DISPATCHABLE_EVENT_TYPES
+from src.modules.webhooks_outbound.application.ports import WebhookDeliveryRepository, WebhookEndpointRepository
+from src.modules.webhooks_outbound.infrastructure.http_sender import HttpWebhookSender
+from src.modules.webhooks_outbound.infrastructure.memory import (
+    InMemoryWebhookDeliveryRepository,
+    InMemoryWebhookEndpointRepository,
+)
+from src.modules.webhooks_outbound.infrastructure.postgres import (
+    PostgresWebhookDeliveryRepository,
+    PostgresWebhookEndpointRepository,
+)
 from src.shared.config import Settings, get_settings
-from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
+from src.shared.eventsourcing import EventSourcedRepository, EventStore, InMemoryEventStore
 from src.shared.identity import CognitoIdentityProvider, HeaderStubIdentityProvider, IdentityProvider
 from src.shared.identity.cognito import issuer_url
 from src.shared.messaging import InMemoryMessageBus
@@ -141,6 +153,11 @@ class Container:
     order_projector: OrderProjector
     reconcile_sweeper: ReconcileSweeper | None  # None in the memory profile (worker-only)
     identity: IdentityProvider
+    event_store: EventStore  # raw event access — the operator "order events" dev view reads this directly
+    webhook_endpoints: WebhookEndpointRepository
+    webhook_deliveries: WebhookDeliveryRepository
+    webhook_dispatcher: WebhookDispatchService
+    secrets: SecretStore  # exposed so WebhookEndpointService (GraphQL layer) can generate+store signing secrets
 
 
 def build_container(settings: Settings | None = None) -> Container:
@@ -175,9 +192,20 @@ def _build_memory_container(settings: Settings) -> Container:
     )
     projector = OrderProjector(projections, locator=locator)
 
+    webhook_endpoints = InMemoryWebhookEndpointRepository()
+    webhook_deliveries = InMemoryWebhookDeliveryRepository()
+    webhook_dispatcher = WebhookDispatchService(
+        endpoints=webhook_endpoints,
+        deliveries=webhook_deliveries,
+        secrets=secrets,
+        sender=HttpWebhookSender(),
+        orders=projections,
+    )
+
     bus.subscribe("projections", projector.handle)
     bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
     bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
+    bus.subscribe("webhook-dispatch", webhook_dispatcher.handle, event_types=set(DISPATCHABLE_EVENT_TYPES))
 
     ingress = InboundWebhookService(
         secrets=ConnectionWebhookSecretResolver(connections, secrets),
@@ -201,6 +229,11 @@ def _build_memory_container(settings: Settings) -> Container:
         order_projector=projector,
         reconcile_sweeper=None,
         identity=HeaderStubIdentityProvider(),
+        event_store=event_store,
+        webhook_endpoints=webhook_endpoints,
+        webhook_deliveries=webhook_deliveries,
+        webhook_dispatcher=webhook_dispatcher,
+        secrets=secrets,
     )
 
 
@@ -292,6 +325,16 @@ def _build_postgres_container(settings: Settings) -> Container:
         order_status=status_applier,
     )
 
+    webhook_endpoints = PostgresWebhookEndpointRepository(session_factory)
+    webhook_deliveries = PostgresWebhookDeliveryRepository(session_factory)
+    webhook_dispatcher = WebhookDispatchService(
+        endpoints=webhook_endpoints,
+        deliveries=webhook_deliveries,
+        secrets=secrets,
+        sender=HttpWebhookSender(),
+        orders=projections,
+    )
+
     return Container(
         settings=settings,
         order_service=OrderService(repo),
@@ -307,4 +350,9 @@ def _build_postgres_container(settings: Settings) -> Container:
         order_projector=projector,
         reconcile_sweeper=reconcile_sweeper,
         identity=identity,
+        event_store=event_store,
+        webhook_endpoints=webhook_endpoints,
+        webhook_deliveries=webhook_deliveries,
+        webhook_dispatcher=webhook_dispatcher,
+        secrets=secrets,
     )

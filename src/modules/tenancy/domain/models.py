@@ -11,6 +11,7 @@ from src.shared.types import BindingId, ConnectionId, TenantId
 class BindingStatus(str, Enum):
     TO_VERIFY = "TO_VERIFY"
     VERIFIED = "VERIFIED"
+    REMOVED = "REMOVED"
 
 
 @dataclass

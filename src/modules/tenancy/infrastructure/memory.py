@@ -43,3 +43,6 @@ class InMemoryBindingRepository:
             ),
             None,
         )
+
+    def list_all(self) -> list[TenantConnectionBinding]:
+        return list(self._by_id.values())
