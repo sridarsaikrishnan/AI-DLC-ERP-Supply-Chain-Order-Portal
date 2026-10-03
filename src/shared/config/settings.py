@@ -10,7 +10,15 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 _ALL_WORKER_ROLES = frozenset(
-    {"order-processing", "order-delivery", "projections", "webhook-dispatch", "relay", "reconcile"}
+    {
+        "order-processing",
+        "order-delivery",
+        "order-fulfillment",
+        "projections",
+        "webhook-dispatch",
+        "relay",
+        "reconcile",
+    }
 )
 
 
@@ -27,8 +35,9 @@ class Settings:
     erp_odoo_timeout_seconds: float
     log_level: str
     reconcile_interval_seconds: int
-    worker_roles: frozenset[str]  # which of {order-processing, order-delivery, projections,
-    # webhook-dispatch, relay, reconcile} this `worker` process runs — "all" (default) runs
+    worker_roles: frozenset[str]  # which of {order-processing, order-delivery,
+    # order-fulfillment, projections, webhook-dispatch, relay, reconcile} this `worker`
+    # process runs — "all" (default) runs
     # every one, matching today's single-process behavior (ADR-0010's role split, Part 1)
     cognito_user_pool_id: str | None
     cognito_client_id: str | None

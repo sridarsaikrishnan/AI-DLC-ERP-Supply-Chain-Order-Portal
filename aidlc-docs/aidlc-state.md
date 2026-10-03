@@ -362,7 +362,7 @@
 ## Increment 6 — Module regrouping + fulfillment split + event-driven saga (extraction-readiness refactor)
 - **Started**: 2026-10-03
 - **Goal**: Make future per-module / microservice extraction low-friction. (1) Regroup the flat `src/modules/*` into subdomain groups by kind. (2) Split the overloaded `fulfillment` module into separate modules + aggregates (`shipment`, `invoicing`, `payments`, `returns`). (3) Convert the shipment/invoice → order cross-aggregate coupling from a synchronous cross-aggregate `UnitOfWork` into an event-driven saga (eventual consistency), so modules no longer share a write transaction.
-- **Lifecycle Phase**: CONSTRUCTION — Code Generation. **Commit 1 (regroup + split) COMPLETE** through all quality gates (recorded in ADR-0017). Commit 2 (event-driven saga) still pending.
+- **Lifecycle Phase**: CONSTRUCTION — Code Generation. **COMPLETE** — Commit 1 (regroup + split, ADR-0017) and Commit 2 (event-driven saga, ADR-0018) both landed through all quality gates.
 
 ### Design decisions (this increment)
 - **Module grouping** (confirmed): `sales/` (order lifecycle: `ordering`, `quoting`, + the new `shipment`/`invoicing`/`payments`/`returns`), `reference/` (master data: `catalog`, `connections`, `tenancy`), `integration/` (edges: ERP connectivity + webhooks). Rejected `order/` as a group name (stutters with `ordering`).
@@ -389,13 +389,16 @@
 
 **Decisions preserved in commit 1 (not drift):** `Order.record_fulfillment` / `fulfillment_status` / `FulfillmentStatus` / `OrderLineFulfilled` kept — these are the order's *quantity score* (Increment 5), distinct from the `Shipment` *act*; `ShipmentService` records a shipment then bumps that score. Event class renamed `FulfillmentRecorded` → `ShipmentRecorded` (registry is keyed by class name → old stored events wouldn't replay; acceptable only pre-production — noted in ADR-0017).
 
-### Action items (Commit 2 — event-driven saga)
-- [ ] `ShipmentService`/`InvoiceService`: drop the order repo + UoW; publish `ShipmentRecorded`/`InvoiceRecorded` only
-- [ ] New ordering consumer for `ShipmentRecorded`/`InvoiceRecorded`; wire into `composition.py` / `worker/main.py` / messaging topology
-- [ ] Remove `src/shared/unit_of_work.py` + `PostgresUnitOfWork` + event_store ambient-session support
-- [ ] Move `CanonicalStatus` from `integration/erp/domain/status_mapping.py` → `src/shared/` (resolve the cross-group edge from `sales/ordering/application/adapters.py`)
-- [ ] ADR superseding FR-A4 (atomic → eventually consistent); tests for the saga path
-- [ ] Quality gates (as above); commit 2
+### Action items (Commit 2 — event-driven saga) — COMPLETE
+- [x] `ShipmentService`/`InvoiceService`: drop the order repo + UoW; publish-only (ctor takes just their own repo)
+- [x] New ordering consumer `OrderFulfillmentConsumer` (`sales/ordering/application/fulfillment_consumer.py`) reacts to `ShipmentRecorded`/`InvoiceRecorded` by event-type string + payload (no shipment/invoicing import); wired into `composition.py` (bus `order-fulfillment` subscription in memory; outbox→queue in postgres), `worker/main.py` (new `order-fulfillment` consumer spec + role), `settings._ALL_WORKER_ROLES`, and `scripts/messaging_bootstrap.py` (`order-fulfillment.fifo` filtered to the two events)
+- [x] Removed `src/shared/unit_of_work.py` + `PostgresUnitOfWork` + `current_session`/`_active` from `engine.py`; `PostgresEventStore.append` simplified to always own its session (per-aggregate outbox transaction unchanged)
+- [x] Moved `CanonicalStatus` → `src/shared/canonical_status.py` (`status_mapping.py` re-exports; `sales` adapters + test import from shared) — **sales no longer imports integration**
+- [x] ADR-0018 (saga supersedes FR-A4's atomic guarantee) + README index + hld.md updated; new import-linter contract "Sales does not import integration"; saga tests (consumer unit test + bus-wiring tests on both shipment and invoicing)
+- [x] Quality gates — **all green**: `ruff format` stable; `ruff check` All checks passed; `lint-imports` **4 kept / 0 broken** (new sales⊥integration contract KEPT); `APP_PROFILE=memory pytest src tests` **179 passed / 5 skipped** (+5 saga/consumer tests over the 174 baseline). UI unchanged this commit (not a required gate; pre-commit still runs tsc).
+
+### Increment 6 — DONE
+Both commits landed. The four split modules (`shipment`/`invoicing`/`payments`/`returns`) are now independently extractable: no shared write transaction with `ordering`, and `sales ⊥ integration` is machine-enforced. Still deferred (not drift): per-ERP `integration/erp/adapters/<erp>/` move (YAGNI until a 2nd ERP); `Payment`/`Return` feeding back into the order's statuses (needs a business-policy decision).
 
 ### Known environment constraint
 - Terminal intermittently hangs/times out on piped or large-output bash commands and `git commit` heredocs. Workaround: commit via message file (`git commit -q -F <file>` then remove it); use the `grep_search` tool instead of bash `grep`.

@@ -12,17 +12,12 @@ string arguments, which was Odoo's shape leaking into what was meant to be ERP-n
 from __future__ import annotations
 
 from collections.abc import Callable
-from enum import Enum
 
+# `CanonicalStatus` lives in `shared` now (ADR-0018) so `sales` can consume it without
+# importing `integration`. Re-exported here so this module's own API is unchanged.
+from src.shared.canonical_status import CanonicalStatus
 
-class CanonicalStatus(str, Enum):
-    """Canonical lifecycle statuses an ERP poll/webhook can drive. Increment 5 removed
-    `FULFILLED` (FR-A6): "fully delivered" is a shipped/delivered fact tracked via
-    Fulfillment records, not a lifecycle status an ERP status string advances."""
-
-    CONFIRMED = "CONFIRMED"
-    CLOSED = "CLOSED"
-    CANCELLED = "CANCELLED"
+__all__ = ["CanonicalStatus", "StatusMapper", "map_native_status", "STATUS_MAPPERS"]
 
 
 # Inputs are already lowercased/stripped by `map_native_status` before the mapper sees them.

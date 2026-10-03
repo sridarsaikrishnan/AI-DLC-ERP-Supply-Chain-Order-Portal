@@ -4,11 +4,13 @@ from decimal import Decimal
 
 import pytest
 
+from src.modules.sales.ordering.application.fulfillment_consumer import OrderFulfillmentConsumer
 from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.domain.models import FulfillmentStatus, OrderLine
 from src.modules.sales.shipment.application.service import ShipmentService
 from src.modules.sales.shipment.domain.aggregate import Shipment
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
+from src.shared.messaging import InMemoryMessageBus
 from src.shared.types import ConnectionId, OrderId, TenantId
 
 
@@ -56,18 +58,42 @@ def test_shipment_requires_at_least_one_line() -> None:
         Shipment.record(shipment_id="shp_2", order_id="ord_1", lines=[])
 
 
-# --- coordinating service: the Shipment -> Order link -------------------------------
+# --- service: records a shipment ONLY (no order coupling anymore, ADR-0018) ----------
 
 
-def test_shipment_service_updates_order_derived_status() -> None:
-    event_store = InMemoryEventStore()
-    order_repo, order_id = _confirmed_order(event_store)
+def test_shipment_service_records_without_touching_an_order() -> None:
     shipment_repo: EventSourcedRepository[Shipment] = EventSourcedRepository(
         InMemoryEventStore(), Shipment
     )
-    service = ShipmentService(shipment_repo, order_repo)
+    service = ShipmentService(shipment_repo)
+    shipment = service.record(
+        order_id="ord_1", lines=[{"line_id": "l_a", "quantity": "10"}], carrier="UPS"
+    )
+    assert shipment.order_id == "ord_1"
+    assert shipment_repo.get(shipment.id).carrier == "UPS"
 
-    service.record(order_id=order_id, lines=[{"line_id": "l_a", "quantity": "10"}], carrier="UPS")
+
+# --- saga: recording a shipment eventually bumps the order's score via events --------
+
+
+def test_recording_a_shipment_updates_the_order_via_the_saga() -> None:
+    store = InMemoryEventStore()
+    order_repo, order_id = _confirmed_order(store)
+
+    bus = InMemoryMessageBus()
+    bus.subscribe(
+        "order-fulfillment",
+        OrderFulfillmentConsumer(order_repo).handle,
+        event_types={"ShipmentRecorded", "InvoiceRecorded"},
+    )
+    # Shipment publishes its event; the ordering consumer reacts — no shared transaction.
+    shipment_repo: EventSourcedRepository[Shipment] = EventSourcedRepository(
+        InMemoryEventStore(), Shipment, publisher=bus
+    )
+    ShipmentService(shipment_repo).record(
+        order_id=order_id, lines=[{"line_id": "l_a", "quantity": "10"}], carrier="UPS"
+    )
+    bus.run_until_empty()
 
     order = order_repo.get(order_id)
     assert order.fulfillment_status is FulfillmentStatus.FULFILLED

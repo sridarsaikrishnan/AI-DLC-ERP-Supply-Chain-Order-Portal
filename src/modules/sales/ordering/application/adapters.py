@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, Any, Protocol
 
-from src.modules.integration.erp.domain.status_mapping import CanonicalStatus
+from src.shared.canonical_status import CanonicalStatus
 from src.shared.money import money_to_payload, tax_rate_to_payload
 from src.shared.types import ConnectionId, OrderId, TenantId
 

@@ -24,6 +24,7 @@ under a minute.
 | [0015](0015-erp-capabilities-declared-not-gated.md) | `ErpCapabilities` is declared now, gated later (once a 2nd adapter exists) | Accepted |
 | [0016](0016-price-from-quote-not-catalog.md) | Price lives on the quote, not the catalog; an order replies to a quote | Accepted (supersedes 0011, 0013) |
 | [0017](0017-module-grouping-and-fulfillment-split.md) | Group modules by subdomain (`sales`/`reference`/`integration`); split `fulfillment` into `shipment`/`invoicing`/`payments`/`returns` | Accepted |
+| [0018](0018-shipment-invoice-order-saga.md) | Shipment/invoice → order is an event-driven saga, not a cross-aggregate transaction | Accepted (supersedes FR-A4's atomic guarantee) |
 
 ## How to read one
 

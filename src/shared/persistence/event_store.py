@@ -18,7 +18,6 @@ from sqlalchemy.exc import IntegrityError
 
 from src.shared.eventsourcing import ConcurrencyError, Snapshot, StoredEvent
 
-from .engine import current_session
 from .tables import events_table, outbox_table, snapshots_table
 
 if TYPE_CHECKING:
@@ -30,12 +29,11 @@ class PostgresEventStore:
         self._session_factory = session_factory
 
     def append(self, stream_id: str, expected_version: int, events: list[StoredEvent]) -> None:
-        # Join an enclosing unit of work (FR-A4) if one is active — then another aggregate's
-        # append in the same `atomic()` block commits together with this one. Otherwise own
-        # the session + commit, exactly as before.
-        ambient = current_session()
-        session = ambient or self._session_factory()
-        owns = ambient is None
+        # Each aggregate's append owns its own transaction (events + their outbox rows
+        # commit together — no dual-write). Cross-aggregate atomicity is no longer a thing:
+        # the shipment/invoice -> order link is an event-driven saga now (ADR-0018), not a
+        # shared transaction, so there is no ambient unit of work to join.
+        session = self._session_factory()
         try:
             current = session.execute(
                 select(func.coalesce(func.max(events_table.c.version), 0)).where(
@@ -70,19 +68,15 @@ class PostgresEventStore:
                         occurred_at=event.occurred_at,
                     )
                 )
-            if owns:
-                session.commit()
+            session.commit()
         except IntegrityError as exc:  # unique(stream_id, version) or event_id race
-            if owns:
-                session.rollback()
+            session.rollback()
             raise ConcurrencyError(stream_id, expected_version, expected_version) from exc
         except Exception:
-            if owns:
-                session.rollback()
+            session.rollback()
             raise
         finally:
-            if owns:
-                session.close()
+            session.close()
 
     def load(self, stream_id: str, after_version: int = 0) -> list[StoredEvent]:
         session = self._session_factory()

@@ -22,6 +22,7 @@ TOPIC = "platform-domain-events.fifo"
 QUEUES: dict[str, list[str] | None] = {
     "order-processing.fifo": ["OrderSubmitted", "OrderAmended"],
     "order-delivery.fifo": ["OrderReadyForDelivery", "OrderCancellationRequested"],
+    "order-fulfillment.fifo": ["ShipmentRecorded", "InvoiceRecorded"],
     "projections.fifo": None,
     "webhook-dispatch.fifo": [
         "OrderSentToErp",

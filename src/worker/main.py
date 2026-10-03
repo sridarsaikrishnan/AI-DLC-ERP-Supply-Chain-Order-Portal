@@ -53,8 +53,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("worker")
 
-_QUEUES = ["order-processing.fifo", "order-delivery.fifo", "projections.fifo"]
-
 _TERMINAL_STATES = ("CLOSED", "CANCELLED", "REJECTED")
 
 _processed_events = Table(
@@ -166,6 +164,11 @@ def main() -> None:  # pragma: no cover - process entrypoint
     consumer_specs = [
         ("order-processing", "order-processing.fifo", container.order_processor.handle),
         ("order-delivery", "order-delivery.fifo", container.delivery_handler.handle),
+        (
+            "order-fulfillment",
+            "order-fulfillment.fifo",
+            container.order_fulfillment_consumer.handle,
+        ),
         ("projections", "projections.fifo", container.order_projector.handle),
         ("webhook-dispatch", "webhook-dispatch.fifo", container.webhook_dispatcher.handle),
     ]

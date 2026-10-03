@@ -91,8 +91,8 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 |---|---|---|---|
 | — | shared event-sourcing kernel | `events`, `outbox`, `snapshots` | — |
 | `sales` | `ordering` *(event-sourced)* | `orders`, `order_status_history` (projections) | persists Order events via the kernel |
-| `sales` | `shipment` *(event-sourced)* | — | persists Shipment events via the kernel; bumps the `orders` fulfilled-quantity score through `ordering` |
-| `sales` | `invoicing` *(event-sourced)* | — | persists Invoice events via the kernel; bumps the `orders` invoiced-quantity score through `ordering` |
+| `sales` | `shipment` *(event-sourced)* | — | persists Shipment events via the kernel; `ShipmentRecorded` drives the `orders` fulfilled-quantity score asynchronously via the `order-fulfillment` saga consumer (ADR-0018) |
+| `sales` | `invoicing` *(event-sourced)* | — | persists Invoice events via the kernel; `InvoiceRecorded` drives the `orders` invoiced-quantity score asynchronously via the `order-fulfillment` saga consumer (ADR-0018) |
 | `sales` | `payments` *(event-sourced)* | — | persists Payment events via the kernel (standalone; not yet wired to the order) |
 | `sales` | `returns` *(event-sourced)* | — | persists Return events via the kernel (standalone; not yet wired to the order) |
 | `sales` | `quoting` | `quotes`, `operating_companies` | — |
@@ -133,10 +133,12 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
   Secrets Manager (never the DB); inbound webhooks authenticated (shared-secret/HMAC);
   outbound webhooks HMAC-signed; FR-19 reseller/ERP data isolation; RLS available in the
   DB for defense in depth.
-- **Reliability / consistency** — events + outbox written in one DB transaction (no
-  dual-write); at-least-once delivery with per-consumer dedupe; DLQ for poison messages;
-  ERP submit is idempotent (keyed on the platform order id); reconciliation sweeper as the
-  missed-event safety net.
+- **Reliability / consistency** — each aggregate's events + outbox rows are written in one
+  DB transaction (no dual-write); at-least-once delivery with per-consumer dedupe; DLQ for
+  poison messages; ERP submit is idempotent (keyed on the platform order id); reconciliation
+  sweeper as the missed-event safety net. Cross-aggregate links (shipment/invoice → order
+  score) are **event-driven sagas** (ADR-0018), eventually consistent — not a shared
+  transaction — which is what keeps the modules independently extractable.
 - **Scalability** — stateless API/Worker scale horizontally; async work absorbs ERP
   latency/outages via the queue; single Postgres today (read-model/replica scaling: TBD).
 - **Observability** — structured logging across API/Worker; delivery log + failed-message

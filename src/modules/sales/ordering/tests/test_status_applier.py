@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from src.modules.integration.erp.domain.status_mapping import CanonicalStatus
 from src.modules.sales.ordering.application.adapters import StatusApplier
 from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.domain.models import OrderLine, OrderState
+from src.shared.canonical_status import CanonicalStatus
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.types import ConnectionId, OrderId, TenantId
 

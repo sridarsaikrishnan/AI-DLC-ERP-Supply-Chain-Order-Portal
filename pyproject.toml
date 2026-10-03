@@ -97,3 +97,12 @@ name = "Reference is a leaf subdomain (no imports from sales or integration)"
 type = "forbidden"
 source_modules = ["src.modules.reference"]
 forbidden_modules = ["src.modules.sales", "src.modules.integration"]
+
+# After moving `CanonicalStatus` to `shared` (ADR-0018), `sales` no longer imports
+# `integration`. The shipment/invoice -> order link is an event-driven saga (ordering
+# reacts to event-type strings), not a code dependency — enforce that it stays that way.
+[[tool.importlinter.contracts]]
+name = "Sales does not import integration (the link is an event-driven saga)"
+type = "forbidden"
+source_modules = ["src.modules.sales"]
+forbidden_modules = ["src.modules.integration"]

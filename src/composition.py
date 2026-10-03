@@ -58,6 +58,7 @@ from src.modules.sales.ordering.application.adapters import (
     OrderReaderAdapter,
     StatusApplier,
 )
+from src.modules.sales.ordering.application.fulfillment_consumer import OrderFulfillmentConsumer
 from src.modules.sales.ordering.application.order_service import OrderService
 from src.modules.sales.ordering.application.processing import OrderProcessor
 from src.modules.sales.ordering.domain.aggregate import Order
@@ -89,11 +90,10 @@ from src.shared.identity import (
 from src.shared.identity.cognito import issuer_url
 from src.shared.messaging import InMemoryMessageBus
 from src.shared.messaging.facts import BusFactPublisher, FactPublisher, OutboxFactPublisher
-from src.shared.persistence.engine import PostgresUnitOfWork, get_session_factory
+from src.shared.persistence.engine import get_session_factory
 from src.shared.persistence.event_store import PostgresEventStore
 from src.shared.secrets import EnvSecretStore, SecretStore
 from src.shared.secrets.aws import SecretsManagerSecretStore
-from src.shared.unit_of_work import NullUnitOfWork
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -214,6 +214,9 @@ class Container:
     invoice_service: InvoiceService
     payment_service: PaymentService
     return_service: ReturnService
+    # ordering side of the shipment/invoice saga (ADR-0018) — the `order-fulfillment`
+    # consumer; exposed so the worker can wire it into an SqsConsumerRunner
+    order_fulfillment_consumer: OrderFulfillmentConsumer
     orders: EventSourcedRepository[
         Order
     ]  # exposed so GraphQL can read fulfillment_status/invoice_status (derived, aggregate-only)
@@ -235,11 +238,14 @@ def _build_memory_container(settings: Settings) -> Container:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(event_store, Order, publisher=bus)
     # Same event store as Order — one `events` table in Postgres too, differentiated by
     # aggregate_type + stream_id, not a separate store per aggregate type.
-    uow = NullUnitOfWork()  # memory can't partially fail across appends (FR-A4 is a no-op here)
-    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment), repo, uow)
-    invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
+    # Shipment/Invoice publish their events to the bus (ADR-0018); the ordering saga
+    # consumer below reacts to them and bumps the order's quantity scores — no shared
+    # write transaction. Payment/Return drive nothing, so they don't publish.
+    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment, publisher=bus))
+    invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice, publisher=bus))
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))
+    order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = InMemoryConnectionRepository()
     items = InMemoryItemRepository()
@@ -280,6 +286,11 @@ def _build_memory_container(settings: Settings) -> Container:
     bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
     bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
     bus.subscribe(
+        "order-fulfillment",
+        order_fulfillment_consumer.handle,
+        event_types={"ShipmentRecorded", "InvoiceRecorded"},
+    )
+    bus.subscribe(
         "webhook-dispatch", webhook_dispatcher.handle, event_types=set(DISPATCHABLE_EVENT_TYPES)
     )
 
@@ -315,6 +326,7 @@ def _build_memory_container(settings: Settings) -> Container:
         invoice_service=invoice_service,
         payment_service=payment_service,
         return_service=return_service,
+        order_fulfillment_consumer=order_fulfillment_consumer,
         orders=repo,
         quote_service=quote_service,
         quotes=quotes,
@@ -373,13 +385,15 @@ def _build_postgres_container(settings: Settings) -> Container:
     # twice (once here, once by the relay). outbox=None, publisher=None is deliberate.
     repo: EventSourcedRepository[Order] = EventSourcedRepository(event_store, Order)
     # Same reasoning as the memory profile: one `events` table, one store, differentiated
-    # by aggregate_type + stream_id — these 4 aren't a separate Postgres setup.
-    # One UoW so a shipment/invoice + its order quantity update commit together (FR-A4).
-    uow = PostgresUnitOfWork(session_factory)
-    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment), repo, uow)
-    invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
+    # by aggregate_type + stream_id — these 4 aren't a separate Postgres setup. Shipment/
+    # Invoice publish via the outbox (PostgresEventStore writes the outbox row); the relay
+    # delivers them to the `order-fulfillment` queue, whose consumer bumps the order's
+    # scores (ADR-0018). No publisher here, same as the Order repo.
+    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment))
+    invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice))
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))
+    order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = PostgresConnectionRepository(session_factory)
     items = PostgresItemRepository(session_factory)
@@ -458,6 +472,7 @@ def _build_postgres_container(settings: Settings) -> Container:
         invoice_service=invoice_service,
         payment_service=payment_service,
         return_service=return_service,
+        order_fulfillment_consumer=order_fulfillment_consumer,
         orders=repo,
         quote_service=quote_service,
         quotes=quotes,
