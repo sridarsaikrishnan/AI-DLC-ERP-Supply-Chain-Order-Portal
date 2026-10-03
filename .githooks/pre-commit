@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+#
+# Strong pre-commit linting hook (version-controlled — the source of truth lives here,
+# not in .git/hooks). Activate with `bash scripts/install-hooks.sh`.
+#
+# What it enforces, only on what you're committing where possible:
+#   1. ruff   — lints staged Python files against the project config (pyproject.toml).
+#   2. import-linter — the architecture contracts (layering + domain-is-framework-free),
+#                      repo-wide, run whenever Python is staged.
+#   3. tsc    — type-checks the UI when staged files touch ui/.
+#   4. mypy   — optional static types (opt in with RUN_MYPY=1), when available.
+#
+# Escape hatches (use sparingly, and say why in the commit message):
+#   git commit --no-verify      # skip this hook entirely
+#   SKIP_LINT=1 git commit ...  # same, honored below
+#
+# Notes:
+# - ruff runs on the STAGED file list, so it enforces cleanliness on the code you touch
+#   (boy-scout rule). The repo carries pre-existing lint debt in files you don't touch;
+#   that is intentionally not your commit's problem.
+# - A required tool that is installed-but-failing blocks the commit. A tool that is not
+#   installed at all is reported and skipped, so a missing optional toolchain never wedges
+#   someone's commit — the message tells them what they're missing.
+
+set -uo pipefail
+
+if [ "${SKIP_LINT:-0}" = "1" ]; then
+  echo "pre-commit: SKIP_LINT=1 set — skipping lint hook."
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+GREEN="$(printf '\033[32m')"; RED="$(printf '\033[31m')"; YEL="$(printf '\033[33m')"; DIM="$(printf '\033[2m')"; OFF="$(printf '\033[0m')"
+ok()   { printf "  %s✓%s %s\n" "$GREEN" "$OFF" "$1"; }
+bad()  { printf "  %s✗%s %s\n" "$RED" "$OFF" "$1"; }
+skip() { printf "  %s–%s %s\n" "$YEL" "$OFF" "$1"; }
+
+echo "pre-commit: linting staged changes…"
+
+# --- collect staged files (added/copied/modified/renamed; never deleted) ---
+STAGED_ALL="$(git diff --cached --name-only --diff-filter=ACMR)"
+PY_STAGED="$(printf '%s\n' "$STAGED_ALL" | grep -E '\.py$' || true)"
+UI_STAGED="$(printf '%s\n' "$STAGED_ALL" | grep -E '^ui/.*\.(ts|tsx)$' || true)"
+
+status=0
+
+# --- 1. ruff: lint staged Python against the project config -----------------
+if [ -n "$PY_STAGED" ]; then
+  if python -m ruff --version >/dev/null 2>&1; then
+    # --force-exclude so pyproject's exclude list is honored even with explicit paths.
+    if printf '%s\n' "$PY_STAGED" | xargs python -m ruff check --force-exclude; then
+      ok "ruff (staged Python)"
+    else
+      bad "ruff found lint errors in staged Python"
+      printf "    %sfix with: python -m ruff check --fix %s<files>%s   (then re-stage)%s\n" "$DIM" "" "" "$OFF"
+      status=1
+    fi
+  else
+    bad "ruff is not installed but Python files are staged"
+    printf "    %sinstall with: python -m pip install 'ruff==0.6.9'%s\n" "$DIM" "$OFF"
+    status=1
+  fi
+else
+  skip "ruff (no staged Python)"
+fi
+
+# --- 2. import-linter: architecture contracts (repo-wide) -------------------
+if [ -n "$PY_STAGED" ]; then
+  if command -v lint-imports >/dev/null 2>&1; then
+    if lint-imports >/tmp/lint-imports.$$ 2>&1; then
+      ok "import-linter (architecture contracts)"
+    else
+      bad "import-linter: a contract is broken"
+      sed 's/^/    /' /tmp/lint-imports.$$ | tail -n 25
+      status=1
+    fi
+    rm -f /tmp/lint-imports.$$
+  else
+    bad "import-linter is not installed but Python files are staged"
+    printf "    %sinstall with: python -m pip install 'import-linter==2.1'%s\n" "$DIM" "$OFF"
+    status=1
+  fi
+fi
+
+# --- 3. tsc: type-check the UI when it changed ------------------------------
+if [ -n "$UI_STAGED" ]; then
+  if [ -d ui/node_modules ]; then
+    if npm --prefix ui run --silent typecheck >/tmp/tsc.$$ 2>&1; then
+      ok "tsc (ui typecheck)"
+    else
+      bad "tsc: UI type errors"
+      sed 's/^/    /' /tmp/tsc.$$ | tail -n 25
+      status=1
+    fi
+    rm -f /tmp/tsc.$$
+  else
+    skip "tsc skipped — ui/node_modules missing (run: npm --prefix ui install)"
+  fi
+fi
+
+# --- 4. mypy: optional static type check (opt in) ---------------------------
+if [ "${RUN_MYPY:-0}" = "1" ] && [ -n "$PY_STAGED" ]; then
+  if python -m mypy --version >/dev/null 2>&1; then
+    if python -m mypy src >/tmp/mypy.$$ 2>&1; then
+      ok "mypy"
+    else
+      bad "mypy: type errors"
+      sed 's/^/    /' /tmp/mypy.$$ | tail -n 25
+      status=1
+    fi
+    rm -f /tmp/mypy.$$
+  else
+    skip "mypy requested (RUN_MYPY=1) but not installed — run: python -m pip install 'mypy==1.11.2'"
+  fi
+fi
+
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "${RED}pre-commit: blocked — fix the issues above, re-stage, and commit again.${OFF}"
+  echo "${DIM}(emergency bypass: git commit --no-verify)${OFF}"
+  exit 1
+fi
+
+echo "${GREEN}pre-commit: all lint checks passed.${OFF}"
+exit 0
