@@ -1,8 +1,12 @@
 # Architecture
 
-- **High-Level Design:** [`hld.svg`](hld.svg) — the system at a glance (clients → API →
-  domain modules → shared kernel → worker/messaging → data → external), with the two
-  primary flows (place-order-to-ERP, and ERP-status-back-to-reseller).
+- **High-Level Design (document):** [`hld.md`](hld.md) — C4 container-level write-up:
+  system context, component responsibilities, key flows, data ownership, boundaries, and
+  architecturally-significant NFRs (with `TBD`s called out).
+- **HLD diagram (editable):** [`hld.drawio`](hld.drawio) — C4 container view, open in
+  diagrams.net or the VS Code Draw.io extension. This is the canonical, maintainable HLD.
+- **HLD diagram (quick view):** [`hld.svg`](hld.svg) — a layered overview that renders
+  anywhere without a tool.
 
 ## Why SVG, not Mermaid
 
