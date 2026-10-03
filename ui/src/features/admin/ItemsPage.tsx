@@ -4,24 +4,32 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { InfoTag } from "../../components/InfoTag";
 import { useConnections, useItems, useSyncItem } from "../../hooks/useAdmin";
 import type { Item } from "../../api/queries/admin";
+import { formatMoney } from "../../lib/money";
 
 export function ItemsPage() {
   const { data: items, isLoading, error } = useItems();
   const { data: connections } = useConnections();
   const syncItem = useSyncItem();
-  const [form, setForm] = useState({ sku: "", name: "", owningConnectionId: "" });
+  const [form, setForm] = useState({ sku: "", name: "", owningConnectionId: "", unitPrice: "", currency: "USD" });
   const [showForm, setShowForm] = useState(false);
 
   const columns: Column<Item>[] = [
     { key: "sku", header: "SKU", render: (i) => <span className="id">{i.sku}</span> },
     { key: "name", header: "Name", render: (i) => i.name },
     { key: "owner", header: "Owning connection", render: (i) => i.owningConnectionId },
+    { key: "price", header: "Unit price", render: (i) => formatMoney(i.unitPrice) },
   ];
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await syncItem.mutateAsync(form);
-    setForm({ sku: "", name: "", owningConnectionId: "" });
+    await syncItem.mutateAsync({
+      sku: form.sku,
+      name: form.name,
+      owningConnectionId: form.owningConnectionId,
+      unitPrice: form.unitPrice === "" ? null : Number(form.unitPrice),
+      currency: form.unitPrice === "" ? null : form.currency,
+    });
+    setForm({ sku: "", name: "", owningConnectionId: "", unitPrice: "", currency: "USD" });
     setShowForm(false);
   }
 
@@ -67,6 +75,32 @@ export function ItemsPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="field">
+              <label htmlFor="unitPrice">
+                Unit price <InfoTag text="Resolved onto every order line for this SKU at submission time — a reseller's order never carries its own price." />
+              </label>
+              <input
+                className="input"
+                id="unitPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.unitPrice}
+                onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
+                placeholder="Leave blank for no price yet"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="currency">Currency</label>
+              <input
+                className="input"
+                id="currency"
+                value={form.currency}
+                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                maxLength={3}
+                disabled={form.unitPrice === ""}
+              />
             </div>
           </div>
           {syncItem.error && <div className="callout callout--danger">{(syncItem.error as Error).message}</div>}

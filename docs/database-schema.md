@@ -2,11 +2,12 @@
 
 One PostgreSQL database (see `aidlc-docs/inception/application-design/target-architecture.md`
 §6 for why one, not several).
-Defined across three Alembic migrations in `migrations/versions/`: `0001_target_architecture`
-(everything except the two rows below), `0002_order_lines` (added `orders.lines`),
-`0003_webhook_secret_ref` (added `erp_connections.webhook_secret_ref`). This doc is the
-"what's actually there" reference that didn't exist before — if you add a column, update
-this file in the same change.
+Defined across Alembic migrations in `migrations/versions/`: `0001_target_architecture`
+(everything except the rows below), `0002_order_lines` (added `orders.lines`),
+`0003_webhook_secret_ref` (added `erp_connections.webhook_secret_ref`), `0004_webhook_outbound`
+(rebuilt `webhook_endpoints`, added `webhook_deliveries`), `0005_item_price` (added
+`items.unit_price`/`items.currency`). This doc is the "what's actually there" reference
+that didn't exist before — if you add a column, update this file in the same change.
 
 ## Diagram
 
@@ -37,6 +38,8 @@ erDiagram
         text item_id PK
         text sku UK
         text owning_connection_id FK
+        text unit_price "str(Decimal), nullable — no price set yet"
+        text currency "nullable, paired with unit_price"
     }
     orders {
         text order_id PK
@@ -44,7 +47,7 @@ erDiagram
         text state
         text owning_connection_id FK
         text erp_order_id "reverse-routing key, with owning_connection_id"
-        jsonb lines
+        jsonb lines "per-line unit_price/line_total now included, see ADR-0011"
     }
     order_status_history {
         bigint id PK
@@ -103,7 +106,9 @@ erDiagram
   back to the right reseller unambiguous.
 - **`items`** — which connection "owns" a SKU. An order can only route to one connection,
   so every line's item must resolve to the *same* owning connection or the order is
-  rejected (`mixed_erp`) before anything is sent anywhere.
+  rejected (`mixed_erp`) before anything is sent anywhere. Also the price source: `unit_price`/
+  `currency` are resolved onto an order's lines at submission time, never trusted from the
+  reseller (ADR-0011) — both nullable, since not every item has a price set yet.
 
 ### Projections — the fast, read-only copy GraphQL actually queries
 - **`orders`** — one row per order, kept in sync by replaying events (see the projector

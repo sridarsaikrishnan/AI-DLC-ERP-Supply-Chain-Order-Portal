@@ -13,6 +13,7 @@ handler, status applier and webhook ingress are the real implementations.
 
 from __future__ import annotations
 
+from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.integration.application.delivery import DeliveryHandler
 from src.modules.integration.application.ports import ErpTarget
 from src.modules.integration.infrastructure.stub_adapter import StubErpAdapter
@@ -90,7 +91,7 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
     bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
 
     # --- place an order and drain the pipeline ---
-    order_id = OrderService(repo).place_order(
+    order_id = OrderService(repo, InMemoryItemRepository()).place_order(
         tenant_id=_TENANT,
         client_reference="PO-1001",
         lines=[OrderLine(product_key="ANVIL", quantity=3, unit_of_measure="EA")],

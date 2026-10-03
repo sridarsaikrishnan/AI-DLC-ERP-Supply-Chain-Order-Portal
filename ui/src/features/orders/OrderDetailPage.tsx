@@ -4,6 +4,7 @@ import { OrderTimeline } from "../../components/OrderTimeline";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useAuth } from "../../auth/AuthContext";
 import { useCancelOrder, useOrder } from "../../hooks/useOrders";
+import { formatMoney } from "../../lib/money";
 
 const CANCELLABLE = new Set(["Submitted", "Validated"]);
 
@@ -52,6 +53,8 @@ export function OrderDetailPage() {
                     <th>Item</th>
                     <th className="num">Qty</th>
                     <th>Unit</th>
+                    <th className="num">Unit price</th>
+                    <th className="num">Line total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -60,9 +63,19 @@ export function OrderDetailPage() {
                       <td className="id">{line.productKey}</td>
                       <td className="num">{line.quantity}</td>
                       <td>{line.unitOfMeasure}</td>
+                      <td className="num">{formatMoney(line.unitPrice)}</td>
+                      <td className="num">{formatMoney(line.lineTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
+                {order.subtotal && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4}>Subtotal</td>
+                      <td className="num">{formatMoney(order.subtotal)}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </section>

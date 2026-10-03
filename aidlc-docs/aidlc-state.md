@@ -213,3 +213,54 @@
 - [x] "Lively" — `ToastProvider`/`useToast` (all mutations now confirm success/failure instead of failing silently), `refetchInterval` polling on order/delivery queries so status changes appear without a manual reload, `InfoTag` "?" hover component applied to non-obvious fields (secret refs, ERP customer ID, owning-connection re-assignment).
 - **Verified live, end-to-end, real infrastructure**: registered a real webhook endpoint via GraphQL as `demo-reseller`; placed a real order; the worker carried it through Submitted → Validated → Sent to ERP; the webhook-dispatch consumer signed and POSTed the event to the dev receiver running on `localhost:8090`; the receiver verified the signature as VALID; `deliveryLog` correctly showed `DELIVERED`, `attempts: 1`, `"200 OK"`. Also verified cross-tenant `orders` query, `pauseConnection`/`resumeConnection` (with the paused connection staying visible), and `removeBinding` (via a scratch binding, demo data left intact) directly against the running API. `pytest src tests`: 108 passed, 2 skipped (unchanged skip set — live-AWS-only tests).
 - [ ] Not committed — commit wasn't requested for this batch.
+
+---
+
+## Increment 4 — Rich Canonical Model (multi-domain, multi-ERP readiness)
+- **Started**: 2026-10-03
+- **Goal**: Replace the Odoo-shaped canonical order model (`client_reference` + bare
+  `lines[product_key, quantity, unit_of_measure]`, 4-value linear `CanonicalStatus`) with
+  one rich enough that SAP/NetSuite/Dynamics/ERPNext can each map their subset onto it
+  without a schema change per ERP — proper status branching (partial fulfillment, not a
+  linear walk) and proper money/quantity calculation (`Decimal`, never `float`).
+- **Design trail** (pre-dates this formal gate, done as direct chat iteration): the gap
+  analysis, Odoo-compatibility review, and full `docs/canonical-model-v2.md` design
+  (value objects, domains, derived-status tables, calculation formulas, 5-phase build
+  order) were produced first; this increment formalizes Phase 1 under AI-DLC and gates
+  the remaining phases through proper requirements sign-off before more code is written.
+
+### 🔵 INCEPTION PHASE (Increment 4)
+- [x] Workspace Detection (resume; brownfield)
+- [x] Reverse Engineering (SKIPPED — design trail + direct code analysis already done this session: `routing.py`, `status_mapping.py`, `aggregate.py`, `odoo_adapter.py`, event-sourcing kernel, projection stores all read and traced)
+- [x] Requirements Analysis — `requirements/canonical-model-questions.md` answered (Q1=B, Q2=B, Q3=A, Q4=A, Q5=A, Q6=A). Scope: tax/discount/line-total/order-total calculations on top of Phase 1, Odoo-only, backend-only, with PBT coverage.
+- [x] Workflow Planning — no Application Design / Units Generation needed (extends existing `ordering` unit, no new component boundary — confirmed by Q1=B and Q6=A)
+- [ ] Application Design (SKIPPED — see above)
+- [ ] Units Generation (SKIPPED — see above)
+
+### 🟢 CONSTRUCTION PHASE (Increment 4)
+- [x] Phase 1 code (pre-gate, see design trail note above): `src/shared/money.py` (`Money` + `round_money`), `OrderLine.quantity: Decimal` (`ordering/domain/models.py`), JSONB-safe (de)serialization (`ordering/domain/aggregate.py`). Tests: `src/shared/tests/test_money.py`, `test_quantity_is_decimal_and_survives_event_replay_exactly` in `test_order_aggregate.py`.
+- [x] Phase 2 code (Q1=B scope) — DONE. `src/shared/money.py` gained `TaxRate` + payload helpers. `OrderLine` (`ordering/domain/models.py`) gained `unit_price`/`line_discount`/`tax_rates` + `to_dict`/`from_dict` (also simplified `aggregate.py`, which now calls these instead of hand-building dicts in 3 places). New pure module `ordering/domain/calculations.py`: `line_total`, `line_tax_total`, `line_total_with_tax`, `order_subtotal`, `order_tax_total`, `order_grand_total`. Tests: `ordering/tests/test_calculations.py` (11 unit + 5 Hypothesis property tests) + 1 new event-replay round-trip test in `test_order_aggregate.py`.
+- [x] Build and Test — `pytest src tests`: **121 unit + 2 integration passed**, 5 skipped (unchanged — no live Postgres/AWS in this environment). Smoke-tested `build_container()` + both GraphQL schemas (`reseller`/`operator`) still build cleanly after the `OrderLine` shape change.
+
+### Extension Configuration (Increment 4)
+| Extension | Enabled | Decided At |
+|---|---|---|
+| Security Baseline | Inherited (Increment 3: Yes) — no new surface this phase | Requirements Analysis |
+| Resiliency Baseline | Inherited (Increment 3: Yes) | Requirements Analysis |
+| Property-Based Testing | Yes — extend to new pure calculation functions (line-total/tax) | Requirements Analysis (Q5=A) |
+
+---
+
+## Increment 4, continued — catalog price source, wired fully end to end (incl. UI)
+- **Trigger**: user explicitly superseded Q2/Q3's deferral — "Wire a real price source through the catalog next, MAKE SURE everything is in sync and update... When I say end to end, it includes UI too", then "including ADR documentations, flow md too".
+- [x] `Item.unit_price: Money | None` (`catalog/domain/models.py`), `CatalogService.sync_item()` accepts it, both repos (memory + Postgres) persist it, migration `0005_item_price` (nullable `unit_price`/`currency` columns — no backfill, this is pre-production tooling, not a system with real data to protect).
+- [x] `OrderService.place_order()` resolves price from the catalog per line *before* `OrderSubmitted` is emitted (`OrderService._priced`, new `PriceCatalog` protocol) — recorded as **ADR-0011** (price is catalog-resolved, never trusted from the reseller's `OrderLineInput`, which carries no price field at all).
+- [x] Projection layer: `OrderLineView` gained `unit_price`/`line_total`; `ResellerOrderView`/`OperatorOrderView` gained `subtotal`. `OrderProjector` computes `line_total` via `calculations.line_total` (reused, not re-derived). Both projection stores (in-memory `store.py`, Postgres `postgres_store.py`) updated — Postgres required JSONB-safe (de)serialization of the new line fields via `money_to_payload`/`from_payload`.
+- [x] GraphQL: new `MoneyType` in both reseller and operator schemas. `OrderLineType`/`OperatorOrderLineType` gained `unitPrice`/`lineTotal`; `ResellerOrder`/`OperatorOrder` gained `subtotal`; `ItemType` gained `unitPrice`; `syncItem` mutation gained `unitPrice`/`currency` args. Verified via printed SDL, not just "it builds."
+- [x] UI: `ItemsPage` gained price/currency inputs + a price column. Both `OrderDetailPage`s (reseller, operator) show unit price/line total per line + a subtotal row. New shared `ui/src/lib/money.ts` (`formatMoney`) rather than duplicating formatting 4 times. Fixed a **real latent type bug** surfaced by this change, not introduced by it: `NewOrderPage`/`usePlaceOrder` had been reusing the server's richer `OrderLine` response type for the client's input shape; added the correct `OrderLineInput` type (no price field — matches ADR-0011) and fixed both call sites.
+- [x] Docs: **ADR-0011** (new), `docs/database-schema.md` (items columns + orders.lines JSONB shape + migration list), `docs/canonical-model-v2.md` (step 2b, marked done), `docs/data-flow-walkthrough.md` (new price-resolution step in Direction 1, `line_total`/`subtotal` on the `orders` projection, Odoo-mapping row clarified: price exists on the canonical line now, Odoo adapter still doesn't send it).
+- [x] Build and Test — `pytest src tests`: **125 unit + 2 integration passed**, 5 skipped (unchanged). UI: `npm run build` (tsc --noEmit && vite build) clean. Smoke-tested `build_container()` + both GraphQL schemas build; printed SDL to confirm the new fields' exact shape.
+
+## Increment 4 Status
+- **Lifecycle Phase**: COMPLETE (through Build and Test) for: Phase 1, Phase 2, and the catalog-price-source follow-up (wired end to end through UI).
+- Phases 3-5 of `docs/canonical-model-v2.md`'s build order (fulfilled/invoiced quantities + derived status, Fulfillment/Invoice/Payment/Return entities, `ErpCapabilities`, a second ERP) remain explicitly deferred, not silently dropped — each is its own future increment. Sending price to Odoo itself (`OdooAdapter.submit`) is also not yet built — flagged in `data-flow-walkthrough.md`, not hidden.

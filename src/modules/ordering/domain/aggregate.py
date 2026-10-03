@@ -66,14 +66,9 @@ class Order(Aggregate):
                 order_id=order_id,
                 tenant_id=tenant_id,
                 client_reference=client_reference,
-                lines=[
-                    {
-                        "product_key": line.product_key,
-                        "quantity": line.quantity,
-                        "unit_of_measure": line.unit_of_measure,
-                    }
-                    for line in lines
-                ],
+                # OrderLine.to_dict() is JSON-safe (Decimal/Money -> str) — this payload
+                # lands in a Postgres JSONB column (events/outbox).
+                lines=[line.to_dict() for line in lines],
                 product_keys=[line.product_key for line in lines],
             )
         )
@@ -144,7 +139,7 @@ class Order(Aggregate):
     def _apply_OrderSubmitted(self, e: OrderSubmitted) -> None:
         self.tenant_id = TenantId(e.tenant_id)
         self.client_reference = e.client_reference
-        self.lines = [OrderLine(**line) for line in e.lines]
+        self.lines = [OrderLine.from_dict(line) for line in e.lines]
         self.product_keys = list(e.product_keys)
         self.state = OrderState.SUBMITTED
 
@@ -183,10 +178,7 @@ class Order(Aggregate):
         return {
             "tenant_id": str(self.tenant_id),
             "client_reference": self.client_reference,
-            "lines": [
-                {"product_key": l.product_key, "quantity": l.quantity, "unit_of_measure": l.unit_of_measure}
-                for l in self.lines
-            ],
+            "lines": [l.to_dict() for l in self.lines],
             "product_keys": list(self.product_keys),
             "state": self.state.value if self.state else None,
             "owning_connection_id": str(self.owning_connection_id) if self.owning_connection_id else None,
@@ -197,7 +189,7 @@ class Order(Aggregate):
     def restore(self, state: dict[str, Any]) -> None:
         self.tenant_id = TenantId(state["tenant_id"])
         self.client_reference = state["client_reference"]
-        self.lines = [OrderLine(**line) for line in state["lines"]]
+        self.lines = [OrderLine.from_dict(line) for line in state["lines"]]
         self.product_keys = list(state["product_keys"])
         self.state = OrderState(state["state"]) if state["state"] else None
         self.owning_connection_id = (

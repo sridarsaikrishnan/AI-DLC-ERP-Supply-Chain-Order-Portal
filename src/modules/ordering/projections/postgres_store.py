@@ -10,6 +10,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.shared.money import money_from_payload, money_to_payload
+
+from ..domain.calculations import sum_money
 from ..domain.models import OrderState
 from .read_models import OperatorOrderView, OrderLineView, ResellerOrderView, TimelineEntry, status_label
 
@@ -61,6 +64,8 @@ class PostgresOrderProjectionStore:
                         "product_key": line.product_key,
                         "quantity": line.quantity,
                         "unit_of_measure": line.unit_of_measure,
+                        "unit_price": money_to_payload(line.unit_price),
+                        "line_total": money_to_payload(line.line_total),
                     }
                     for line in lines
                 ],
@@ -149,9 +154,15 @@ class PostgresOrderProjectionStore:
                 product_key=str(line["product_key"]),
                 quantity=float(line["quantity"]),  # type: ignore[arg-type]
                 unit_of_measure=str(line["unit_of_measure"]),
+                unit_price=money_from_payload(line.get("unit_price")),  # type: ignore[arg-type]
+                line_total=money_from_payload(line.get("line_total")),  # type: ignore[arg-type]
             )
             for line in raw_lines
         ]
+
+    @staticmethod
+    def _subtotal(lines: list[OrderLineView]):
+        return sum_money([l.line_total for l in lines if l.line_total is not None])
 
     def _timeline(self, session: Session, order_id: str) -> list[TimelineEntry]:
         rows = session.execute(
@@ -171,12 +182,14 @@ class PostgresOrderProjectionStore:
             ).first()
             if row is None:  # tenant scoping (fail-closed): wrong tenant reads as not-found
                 return None
+            lines = self._lines(row.lines)
             return ResellerOrderView(
                 order_id=row.order_id,
                 client_reference=row.client_reference,
                 status=status_label(OrderState(row.state)),
-                lines=self._lines(row.lines),
+                lines=lines,
                 timeline=self._timeline(session, order_id),
+                subtotal=self._subtotal(lines),
             )
         finally:
             session.close()
@@ -185,16 +198,20 @@ class PostgresOrderProjectionStore:
         session = self._session_factory()
         try:
             rows = session.execute(select(orders_table).where(orders_table.c.tenant_id == tenant_id)).all()
-            return [
-                ResellerOrderView(
-                    order_id=row.order_id,
-                    client_reference=row.client_reference,
-                    status=status_label(OrderState(row.state)),
-                    lines=self._lines(row.lines),
-                    timeline=self._timeline(session, row.order_id),
+            views = []
+            for row in rows:
+                lines = self._lines(row.lines)
+                views.append(
+                    ResellerOrderView(
+                        order_id=row.order_id,
+                        client_reference=row.client_reference,
+                        status=status_label(OrderState(row.state)),
+                        lines=lines,
+                        timeline=self._timeline(session, row.order_id),
+                        subtotal=self._subtotal(lines),
+                    )
                 )
-                for row in rows
-            ]
+            return views
         finally:
             session.close()
 
@@ -204,6 +221,7 @@ class PostgresOrderProjectionStore:
             row = session.execute(select(orders_table).where(orders_table.c.order_id == order_id)).first()
             if row is None:
                 return None
+            lines = self._lines(row.lines)
             return OperatorOrderView(
                 order_id=row.order_id,
                 tenant_id=row.tenant_id,
@@ -211,8 +229,9 @@ class PostgresOrderProjectionStore:
                 status=status_label(OrderState(row.state)),
                 owning_connection_id=row.owning_connection_id,
                 erp_order_id=row.erp_order_id,
-                lines=self._lines(row.lines),
+                lines=lines,
                 timeline=self._timeline(session, order_id),
+                subtotal=self._subtotal(lines),
             )
         finally:
             session.close()
@@ -222,18 +241,22 @@ class PostgresOrderProjectionStore:
         session = self._session_factory()
         try:
             rows = session.execute(select(orders_table)).all()
-            return [
-                OperatorOrderView(
-                    order_id=row.order_id,
-                    tenant_id=row.tenant_id,
-                    client_reference=row.client_reference,
-                    status=status_label(OrderState(row.state)),
-                    owning_connection_id=row.owning_connection_id,
-                    erp_order_id=row.erp_order_id,
-                    lines=self._lines(row.lines),
-                    timeline=self._timeline(session, row.order_id),
+            views = []
+            for row in rows:
+                lines = self._lines(row.lines)
+                views.append(
+                    OperatorOrderView(
+                        order_id=row.order_id,
+                        tenant_id=row.tenant_id,
+                        client_reference=row.client_reference,
+                        status=status_label(OrderState(row.state)),
+                        owning_connection_id=row.owning_connection_id,
+                        erp_order_id=row.erp_order_id,
+                        lines=lines,
+                        timeline=self._timeline(session, row.order_id),
+                        subtotal=self._subtotal(lines),
+                    )
                 )
-                for row in rows
-            ]
+            return views
         finally:
             session.close()

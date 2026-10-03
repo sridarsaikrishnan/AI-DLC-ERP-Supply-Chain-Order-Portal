@@ -9,7 +9,8 @@ from typing import Protocol
 from src.shared.eventsourcing import StoredEvent
 from src.shared.types import ConnectionId, OrderId
 
-from ..domain.models import OrderState
+from ..domain.calculations import line_total
+from ..domain.models import OrderLine, OrderState
 from .read_models import OrderLineView
 from .store import OrderProjectionStore
 
@@ -48,14 +49,7 @@ class OrderProjector:
                 order_id=order_id,
                 tenant_id=str(payload["tenant_id"]),
                 client_reference=str(payload["client_reference"]),
-                lines=[
-                    OrderLineView(
-                        product_key=str(line["product_key"]),
-                        quantity=float(line["quantity"]),
-                        unit_of_measure=str(line.get("unit_of_measure", "")),
-                    )
-                    for line in payload.get("lines", [])
-                ],
+                lines=[self._line_view(line) for line in payload.get("lines", [])],
             )
             self._store.set_state(order_id, OrderState.SUBMITTED, at)
             return
@@ -75,3 +69,14 @@ class OrderProjector:
         state = _STATE_EVENTS.get(event.event_type)
         if state is not None:
             self._store.set_state(order_id, state, at)
+
+    @staticmethod
+    def _line_view(line: dict) -> OrderLineView:
+        order_line = OrderLine.from_dict(line)
+        return OrderLineView(
+            product_key=order_line.product_key,
+            quantity=float(order_line.quantity),
+            unit_of_measure=order_line.unit_of_measure,
+            unit_price=order_line.unit_price,
+            line_total=line_total(order_line),
+        )

@@ -2,17 +2,17 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { usePlaceOrder } from "../../hooks/useOrders";
-import type { OrderLine } from "../../api/queries/orders";
+import type { OrderLineInput } from "../../api/queries/orders";
 
-const EMPTY_LINE: OrderLine = { productKey: "", quantity: 1, unitOfMeasure: "EA" };
+const EMPTY_LINE: OrderLineInput = { productKey: "", quantity: 1, unitOfMeasure: "EA" };
 
 export function NewOrderPage() {
   const navigate = useNavigate();
   const placeOrder = usePlaceOrder();
   const [ref, setRef] = useState("");
-  const [lines, setLines] = useState<OrderLine[]>([{ ...EMPTY_LINE }]);
+  const [lines, setLines] = useState<OrderLineInput[]>([{ ...EMPTY_LINE }]);
 
-  function updateLine(index: number, patch: Partial<OrderLine>) {
+  function updateLine(index: number, patch: Partial<OrderLineInput>) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 

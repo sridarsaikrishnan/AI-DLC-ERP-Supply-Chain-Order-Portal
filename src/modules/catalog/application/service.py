@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.shared.money import Money
 from src.shared.types import ConnectionId, ItemId, generate_id
 
 from ..domain.errors import ItemOwnershipConflict
@@ -13,7 +14,9 @@ class CatalogService:
     def __init__(self, repository: ItemRepository) -> None:
         self._repository = repository
 
-    def sync_item(self, *, sku: str, name: str, owning_connection_id: ConnectionId) -> Item:
+    def sync_item(
+        self, *, sku: str, name: str, owning_connection_id: ConnectionId, unit_price: Money | None = None
+    ) -> Item:
         """Register or refresh an item. Raises if a different connection already owns the SKU."""
         existing = self._repository.find_by_sku(sku)
         existing_owner = existing.owning_connection_id if existing else None
@@ -23,6 +26,7 @@ class CatalogService:
 
         if existing is not None:
             existing.name = name
+            existing.unit_price = unit_price
             self._repository.add(existing)
             return existing
 
@@ -31,6 +35,7 @@ class CatalogService:
             sku=sku,
             name=name,
             owning_connection_id=owning_connection_id,
+            unit_price=unit_price,
         )
         self._repository.add(item)
         return item

@@ -4,6 +4,7 @@ routes -> order becomes READY_FOR_DELIVERY (or REJECTED). Uses the in-memory sto
 
 from __future__ import annotations
 
+from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.ordering.application.order_service import OrderService
 from src.modules.ordering.application.processing import OrderProcessor
 from src.modules.ordering.domain.aggregate import Order
@@ -36,7 +37,7 @@ def _wire(owners: dict[str, str], bound: set[tuple[str, str]]):
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order, publisher=bus)
     processor = OrderProcessor(repo, FakeOwnership(owners), FakeBindings(bound))
     bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
-    return OrderService(repo), repo, bus
+    return OrderService(repo, InMemoryItemRepository()), repo, bus
 
 
 def test_place_order_routes_to_owning_connection() -> None:

@@ -6,10 +6,18 @@ import strawberry
 
 
 @strawberry.type
+class MoneyType:
+    amount: float
+    currency: str
+
+
+@strawberry.type
 class OrderLineType:
     product_key: str
     quantity: float
     unit_of_measure: str
+    unit_price: MoneyType | None
+    line_total: MoneyType | None
 
 
 @strawberry.type
@@ -25,6 +33,7 @@ class ResellerOrder:
     status: str
     lines: list[OrderLineType]
     timeline: list[TimelineEntryType]
+    subtotal: MoneyType | None
 
 
 @strawberry.input

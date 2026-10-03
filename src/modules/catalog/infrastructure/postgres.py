@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import Column, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.shared.money import Money
 from src.shared.types import ConnectionId, ItemId
 
 from ..domain.models import Item
@@ -20,15 +23,19 @@ items_table = Table(
     Column("sku", String, nullable=False, unique=True),
     Column("name", String, nullable=False),
     Column("owning_connection_id", String, nullable=False),
+    Column("unit_price", String),  # str(Decimal) — never a float column, see money.py
+    Column("currency", String),
 )
 
 
 def _to_model(row: Row) -> Item:
+    unit_price = Money(Decimal(row.unit_price), row.currency) if row.unit_price is not None else None
     return Item(
         item_id=ItemId(row.item_id),
         sku=row.sku,
         name=row.name,
         owning_connection_id=ConnectionId(row.owning_connection_id),
+        unit_price=unit_price,
     )
 
 
@@ -45,6 +52,8 @@ class PostgresItemRepository:
             "sku": item.sku,
             "name": item.name,
             "owning_connection_id": str(item.owning_connection_id),
+            "unit_price": str(item.unit_price.amount) if item.unit_price is not None else None,
+            "currency": item.unit_price.currency if item.unit_price is not None else None,
         }
         session = self._session_factory()
         try:

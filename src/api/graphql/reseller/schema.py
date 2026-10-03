@@ -14,10 +14,12 @@ from src.modules.ordering.domain.models import OrderLine
 from src.modules.ordering.projections.read_models import ResellerOrderView
 from src.modules.webhooks_outbound.application.service import WebhookEndpointService
 from src.modules.webhooks_outbound.domain.models import WebhookDelivery, WebhookEndpoint
+from src.shared.money import Money
 from src.shared.types import OrderId, TenantId, WebhookEndpointId
 
 from ..context import GraphQLContext
 from .types import (
+    MoneyType,
     OrderLineInput,
     OrderLineType,
     ResellerOrder,
@@ -28,16 +30,27 @@ from .types import (
 )
 
 
+def _money_to_gql(money: Money | None) -> MoneyType | None:
+    return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
+
+
 def _to_gql(view: ResellerOrderView) -> ResellerOrder:
     return ResellerOrder(
         order_id=view.order_id,
         client_reference=view.client_reference,
         status=view.status,
         lines=[
-            OrderLineType(product_key=l.product_key, quantity=l.quantity, unit_of_measure=l.unit_of_measure)
+            OrderLineType(
+                product_key=l.product_key,
+                quantity=l.quantity,
+                unit_of_measure=l.unit_of_measure,
+                unit_price=_money_to_gql(l.unit_price),
+                line_total=_money_to_gql(l.line_total),
+            )
             for l in view.lines
         ],
         timeline=[TimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline],
+        subtotal=_money_to_gql(view.subtotal),
     )
 
 

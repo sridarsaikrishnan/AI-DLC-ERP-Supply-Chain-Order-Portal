@@ -8,6 +8,8 @@ only had a Python-script/raw-SQL entry point (`scripts/seed_demo.py`).
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 from strawberry.types import Info
@@ -19,6 +21,7 @@ from src.modules.connections.domain.models import ErpConnection, ErpType
 from src.modules.ordering.projections.read_models import OperatorOrderView
 from src.modules.tenancy.application.service import BindingService
 from src.modules.tenancy.domain.models import TenantConnectionBinding
+from src.shared.money import Money
 from src.shared.types import BindingId, ConnectionId, TenantId
 
 from ..context import GraphQLContext
@@ -26,11 +29,17 @@ from .types import (
     BindingType,
     ConnectionType,
     ItemType,
+    MoneyType,
     OperatorOrder,
     OperatorOrderLineType,
     OperatorTimelineEntryType,
     OrderEventType,
 )
+
+
+def _money_to_gql(money: Money | None) -> MoneyType | None:
+    return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
+
 
 def _order_to_gql(view: OperatorOrderView) -> OperatorOrder:
     return OperatorOrder(
@@ -41,10 +50,17 @@ def _order_to_gql(view: OperatorOrderView) -> OperatorOrder:
         owning_connection_id=view.owning_connection_id,
         erp_order_id=view.erp_order_id,
         lines=[
-            OperatorOrderLineType(product_key=l.product_key, quantity=l.quantity, unit_of_measure=l.unit_of_measure)
+            OperatorOrderLineType(
+                product_key=l.product_key,
+                quantity=l.quantity,
+                unit_of_measure=l.unit_of_measure,
+                unit_price=_money_to_gql(l.unit_price),
+                line_total=_money_to_gql(l.line_total),
+            )
             for l in view.lines
         ],
         timeline=[OperatorTimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline],
+        subtotal=_money_to_gql(view.subtotal),
     )
 
 
@@ -74,7 +90,11 @@ def _binding_to_gql(binding: TenantConnectionBinding) -> BindingType:
 
 def _item_to_gql(item: Item) -> ItemType:
     return ItemType(
-        item_id=str(item.item_id), sku=item.sku, name=item.name, owning_connection_id=str(item.owning_connection_id)
+        item_id=str(item.item_id),
+        sku=item.sku,
+        name=item.name,
+        owning_connection_id=str(item.owning_connection_id),
+        unit_price=_money_to_gql(item.unit_price),
     )
 
 
@@ -185,12 +205,21 @@ class Mutation:
 
     @strawberry.mutation
     def sync_item(
-        self, info: Info[GraphQLContext, None], sku: str, name: str, owning_connection_id: str
+        self,
+        info: Info[GraphQLContext, None],
+        sku: str,
+        name: str,
+        owning_connection_id: str,
+        unit_price: float | None = None,
+        currency: str | None = None,
     ) -> ItemType:
         ctx = info.context
         ctx.require_role("OPERATOR")
         service = CatalogService(ctx.container.items)
-        item = service.sync_item(sku=sku, name=name, owning_connection_id=ConnectionId(owning_connection_id))
+        price = Money(Decimal(str(unit_price)), currency) if unit_price is not None and currency else None
+        item = service.sync_item(
+            sku=sku, name=name, owning_connection_id=ConnectionId(owning_connection_id), unit_price=price
+        )
         return _item_to_gql(item)
 
     @strawberry.mutation

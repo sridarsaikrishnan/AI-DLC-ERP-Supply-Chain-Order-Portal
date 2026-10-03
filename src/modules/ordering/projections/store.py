@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ..domain.calculations import sum_money
 from ..domain.models import OrderState
 from .read_models import (
     OperatorOrderView,
@@ -17,6 +18,10 @@ from .read_models import (
     TimelineEntry,
     status_label,
 )
+
+
+def _subtotal(lines: list[OrderLineView]):
+    return sum_money([l.line_total for l in lines if l.line_total is not None])
 
 
 @dataclass
@@ -76,6 +81,7 @@ class OrderProjectionStore:
             status=status_label(record.state),
             lines=list(record.lines),
             timeline=list(record.timeline),
+            subtotal=_subtotal(record.lines),
         )
 
     def list_reseller_views(self, tenant_id: str) -> list[ResellerOrderView]:
@@ -102,4 +108,5 @@ class OrderProjectionStore:
             erp_order_id=record.erp_order_id,
             lines=list(record.lines),
             timeline=list(record.timeline),
+            subtotal=_subtotal(record.lines),
         )

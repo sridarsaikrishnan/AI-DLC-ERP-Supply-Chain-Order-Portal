@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.shared.money import Money
 from src.shared.types import ConnectionId, ItemId
 
 
@@ -13,6 +14,7 @@ class Item:
     sku: str
     name: str
     owning_connection_id: ConnectionId
+    unit_price: Money | None = None
 
 
 def detect_ownership_conflict(

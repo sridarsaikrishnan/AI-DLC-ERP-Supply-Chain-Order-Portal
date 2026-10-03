@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from src.modules.ordering.domain.aggregate import Order
 from src.modules.ordering.domain.errors import OrderInvalidTransition
 from src.modules.ordering.domain.models import OrderLine, OrderState
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
+from src.shared.money import Money, TaxRate
 from src.shared.types import ConnectionId, OrderId, TenantId
 
 
@@ -95,6 +98,56 @@ def test_event_sourced_round_trip_via_repository() -> None:
     assert reloaded.owning_connection_id == ConnectionId("conn_1")
     assert reloaded.client_reference == "PO-1"
     assert reloaded.version == order.version
+
+
+def test_quantity_is_decimal_and_survives_event_replay_exactly() -> None:
+    # The bug this guards against: a float round-trip through JSON can perturb a value
+    # like 2.1 (binary float can't represent it exactly). Decimal, serialized as str in
+    # the event payload (aggregate.py), must come back bit-for-bit identical.
+    store = InMemoryEventStore()
+    repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
+    order = Order.submit(
+        order_id=OrderId("ord_2"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-2",
+        lines=[OrderLine(product_key="ANVIL", quantity=Decimal("2.1"), unit_of_measure="EA")],
+    )
+    assert isinstance(order.lines[0].quantity, Decimal)
+    repo.save(order)
+
+    reloaded = repo.get("ord_2")
+    assert reloaded.lines[0].quantity == Decimal("2.1")
+    assert isinstance(reloaded.lines[0].quantity, Decimal)
+
+
+def test_priced_line_survives_event_replay_exactly() -> None:
+    # Phase 2: unit_price/line_discount/tax_rates must round-trip through the JSONB-safe
+    # payload (money_to_payload/from_payload, tax_rate_to_payload/from_payload) exactly
+    # as Decimal, same guard as Phase 1's quantity test but for the new nested fields.
+    store = InMemoryEventStore()
+    repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
+    order = Order.submit(
+        order_id=OrderId("ord_3"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-3",
+        lines=[
+            OrderLine(
+                product_key="ANVIL",
+                quantity=Decimal("2.5"),
+                unit_of_measure="EA",
+                unit_price=Money(Decimal("19.99"), "USD"),
+                line_discount=Money(Decimal("1.50"), "USD"),
+                tax_rates=[TaxRate("VAT", Decimal("0.20"), inclusive=False)],
+            )
+        ],
+    )
+    repo.save(order)
+
+    reloaded = repo.get("ord_3")
+    line = reloaded.lines[0]
+    assert line.unit_price == Money(Decimal("19.99"), "USD")
+    assert line.line_discount == Money(Decimal("1.50"), "USD")
+    assert line.tax_rates == [TaxRate("VAT", Decimal("0.20"), inclusive=False)]
 
 
 def test_snapshot_round_trip() -> None:

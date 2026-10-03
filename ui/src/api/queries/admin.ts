@@ -18,11 +18,17 @@ export interface Binding {
   status: string;
 }
 
+export interface Money {
+  amount: number;
+  currency: string;
+}
+
 export interface Item {
   itemId: string;
   sku: string;
   name: string;
   owningConnectionId: string;
+  unitPrice: Money | null;
 }
 
 export interface OperatorOrder {
@@ -32,8 +38,9 @@ export interface OperatorOrder {
   status: string;
   owningConnectionId: string | null;
   erpOrderId: string | null;
-  lines: { productKey: string; quantity: number; unitOfMeasure: string }[];
+  lines: { productKey: string; quantity: number; unitOfMeasure: string; unitPrice: Money | null; lineTotal: Money | null }[];
   timeline: { status: string; occurredAt: string }[];
+  subtotal: Money | null;
 }
 
 export const CONNECTIONS_QUERY = /* GraphQL */ `
@@ -50,7 +57,7 @@ export const BINDINGS_QUERY = /* GraphQL */ `
 
 export const ITEMS_QUERY = /* GraphQL */ `
   query Items {
-    items { itemId sku name owningConnectionId }
+    items { itemId sku name owningConnectionId unitPrice { amount currency } }
   }
 `;
 
@@ -63,8 +70,9 @@ export const OPERATOR_ORDER_QUERY = /* GraphQL */ `
       status
       owningConnectionId
       erpOrderId
-      lines { productKey quantity unitOfMeasure }
+      lines { productKey quantity unitOfMeasure unitPrice { amount currency } lineTotal { amount currency } }
       timeline { status occurredAt }
+      subtotal { amount currency }
     }
   }
 `;
@@ -78,8 +86,9 @@ export const OPERATOR_ORDERS_QUERY = /* GraphQL */ `
       status
       owningConnectionId
       erpOrderId
-      lines { productKey quantity unitOfMeasure }
+      lines { productKey quantity unitOfMeasure unitPrice { amount currency } lineTotal { amount currency } }
       timeline { status occurredAt }
+      subtotal { amount currency }
     }
   }
 `;
@@ -126,8 +135,8 @@ export const VERIFY_BINDING_MUTATION = /* GraphQL */ `
 `;
 
 export const SYNC_ITEM_MUTATION = /* GraphQL */ `
-  mutation SyncItem($sku: String!, $name: String!, $owningConnectionId: String!) {
-    syncItem(sku: $sku, name: $name, owningConnectionId: $owningConnectionId) {
+  mutation SyncItem($sku: String!, $name: String!, $owningConnectionId: String!, $unitPrice: Float, $currency: String) {
+    syncItem(sku: $sku, name: $name, owningConnectionId: $owningConnectionId, unitPrice: $unitPrice, currency: $currency) {
       itemId
     }
   }

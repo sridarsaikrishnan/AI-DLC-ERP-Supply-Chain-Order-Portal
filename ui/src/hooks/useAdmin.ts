@@ -175,7 +175,7 @@ export function useSyncItem() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { sku: string; name: string; owningConnectionId: string }) =>
+    mutationFn: (input: { sku: string; name: string; owningConnectionId: string; unitPrice?: number | null; currency?: string | null }) =>
       graphqlRequest("operator", SYNC_ITEM_MUTATION, input, idToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["items"] });

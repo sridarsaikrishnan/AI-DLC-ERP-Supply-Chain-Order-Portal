@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.shared.money import Money
+
 from ..domain.models import OrderState
 
 # Internal state -> reseller-facing lifecycle word (design README).
@@ -37,6 +39,8 @@ class OrderLineView:
     product_key: str
     quantity: float
     unit_of_measure: str
+    unit_price: Money | None = None
+    line_total: Money | None = None  # computed once at projection time (calculations.line_total)
 
 
 @dataclass(frozen=True)
@@ -54,6 +58,7 @@ class ResellerOrderView:
     status: str
     lines: list[OrderLineView] = field(default_factory=list)
     timeline: list[TimelineEntry] = field(default_factory=list)
+    subtotal: Money | None = None  # sum of priced lines' line_total; None if none priced
 
 
 @dataclass(frozen=True)
@@ -68,3 +73,4 @@ class OperatorOrderView:
     erp_order_id: str | None
     lines: list[OrderLineView] = field(default_factory=list)
     timeline: list[TimelineEntry] = field(default_factory=list)
+    subtotal: Money | None = None

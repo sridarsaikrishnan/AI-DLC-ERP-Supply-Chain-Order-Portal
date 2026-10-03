@@ -6,7 +6,7 @@ import {
   ORDERS_QUERY,
   ORDER_QUERY,
   PLACE_ORDER_MUTATION,
-  type OrderLine,
+  type OrderLineInput,
   type ResellerOrder,
 } from "../api/queries/orders";
 import { useAuth } from "../auth/AuthContext";
@@ -44,7 +44,7 @@ export function usePlaceOrder() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { ref: string; lines: OrderLine[] }) =>
+    mutationFn: (input: { ref: string; lines: OrderLineInput[] }) =>
       graphqlRequest("reseller", PLACE_ORDER_MUTATION, input, idToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
