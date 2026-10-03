@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1070" viewBox="0 0 1320 1070" font-family="'IBM Plex Sans','Segoe UI',Arial,sans-serif">
+  <rect x="0" y="0" width="1320" height="1070" fill="#ffffff"/>
+  <text x="30" y="30" font-size="20" font-weight="700" fill="#0f172a">ERP &amp; Supply Chain Order Portal — High-Level Design</text>
+  <text x="30" y="50" font-size="12" fill="#475569">Modular monolith (api + worker) · event-sourced Order · single PostgreSQL · outbox → SNS/SQS · ports/adapters to ERPs</text>
+
+  <!-- ============ CLIENTS ============ -->
+  <rect x="30" y="64" width="1260" height="84" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="44" y="82" font-size="12" font-weight="700" fill="#4338ca">CLIENTS · React SPA (self-hosted fonts)</text>
+  <rect x="46" y="92" width="600" height="46" rx="6" fill="#ffffff" stroke="#6366f1"/>
+  <text x="60" y="112" font-size="13" font-weight="600" fill="#0f172a">Reseller portal</text>
+  <text x="60" y="128" font-size="10.5" fill="#475569">orders · quotes · delivery log · webhook endpoints  (never shows ERP identity, FR-19)</text>
+  <rect x="660" y="92" width="594" height="46" rx="6" fill="#ffffff" stroke="#6366f1"/>
+  <text x="674" y="112" font-size="13" font-weight="600" fill="#0f172a">Operator admin</text>
+  <text x="674" y="128" font-size="10.5" fill="#475569">connections · resellers · items · quotes · office cards · all orders</text>
+
+  <!-- ============ API HOST ============ -->
+  <rect x="30" y="160" width="1260" height="104" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="44" y="178" font-size="12" font-weight="700" fill="#047857">API HOST · FastAPI (ECS Fargate) — composition root wires the object graph</text>
+  <g font-size="12.5" font-weight="600" fill="#0f172a">
+    <rect x="46" y="190" width="290" height="60" rx="6" fill="#ffffff" stroke="#10b981"/>
+    <text x="60" y="212">GraphQL /reseller</text>
+    <rect x="352" y="190" width="290" height="60" rx="6" fill="#ffffff" stroke="#10b981"/>
+    <text x="366" y="212">GraphQL /operator</text>
+    <rect x="658" y="190" width="290" height="60" rx="6" fill="#ffffff" stroke="#10b981"/>
+    <text x="672" y="212">HTTP routes</text>
+    <rect x="964" y="190" width="290" height="60" rx="6" fill="#ffffff" stroke="#10b981"/>
+    <text x="978" y="212">Identity</text>
+  </g>
+  <g font-size="10.5" fill="#475569">
+    <text x="60" y="232">tenant-scoped; no ERP identity</text>
+    <text x="366" y="232">role = OPERATOR; ERP identity ok</text>
+    <text x="672" y="232">/erp/webhook (inbound) · /healthz</text>
+    <text x="978" y="232">Cognito verify / header stub</text>
+  </g>
+
+  <!-- ============ DOMAIN MODULES ============ -->
+  <rect x="30" y="276" width="1260" height="150" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="44" y="294" font-size="12" font-weight="700" fill="#b45309">DOMAIN MODULES · src/modules — one deployable; boundaries enforced by import-linter</text>
+  <g font-size="12.5" font-weight="600" fill="#0f172a">
+    <rect x="46" y="302" width="290" height="52" rx="6" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+    <text x="60" y="322">ordering ★</text>
+    <rect x="352" y="302" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="366" y="322">quoting</text>
+    <rect x="658" y="302" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="672" y="322">catalog</text>
+    <rect x="964" y="302" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="978" y="322">tenancy</text>
+    <rect x="46" y="364" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="60" y="384">fulfillment</text>
+    <rect x="352" y="364" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="366" y="384">integration</text>
+    <rect x="658" y="364" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="672" y="384">connections</text>
+    <rect x="964" y="364" width="290" height="52" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+    <text x="978" y="384">webhooks in / out</text>
+  </g>
+  <g font-size="10" fill="#475569">
+    <text x="60" y="340">event-sourced Order + projections</text>
+    <text x="366" y="340">Quote · OperatingCompany (office card)</text>
+    <text x="672" y="340">Item: box | license</text>
+    <text x="978" y="340">bindings · erp_customer_id</text>
+    <text x="60" y="402">Fulfillment·Invoice·Payment·Return</text>
+    <text x="366" y="402">ERP adapters · registry · status map</text>
+    <text x="672" y="402">ERP connection config</text>
+    <text x="978" y="402">inbound ingress · outbound dispatch</text>
+  </g>
+
+  <!-- ============ SHARED KERNEL ============ -->
+  <rect x="30" y="438" width="1260" height="92" rx="8" fill="#faf5ff" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="44" y="456" font-size="12" font-weight="700" fill="#7e22ce">SHARED KERNEL · src/shared — framework-free (no boto3 / fastapi / strawberry)</text>
+  <g font-size="12" font-weight="600" fill="#0f172a">
+    <rect x="42" y="466" width="196" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="54" y="486">eventsourcing</text>
+    <rect x="250" y="466" width="196" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="262" y="486">messaging</text>
+    <rect x="458" y="466" width="196" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="470" y="486">persistence</text>
+    <rect x="666" y="466" width="196" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="678" y="486">secrets</text>
+    <rect x="874" y="466" width="196" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="886" y="486">identity</text>
+    <rect x="1082" y="466" width="172" height="52" rx="6" fill="#ffffff" stroke="#a855f7"/>
+    <text x="1094" y="486">money</text>
+  </g>
+  <g font-size="9.5" fill="#475569">
+    <text x="54" y="504">aggregate·repo·store·outbox</text>
+    <text x="262" y="504">bus · SNS/SQS · facts</text>
+    <text x="470" y="504">engine · event store · UoW</text>
+    <text x="678" y="504">port · env / SecretsMgr</text>
+    <text x="886" y="504">Cognito / stub</text>
+    <text x="1094" y="504">Decimal value object</text>
+  </g>
+
+  <!-- ============ WORKER + MESSAGING ============ -->
+  <rect x="30" y="542" width="1260" height="150" rx="8" fill="#ecfeff" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="44" y="560" font-size="12" font-weight="700" fill="#0e7490">WORKER HOST · src/worker (role-splittable) + ASYNC MESSAGING</text>
+  <g font-size="12" font-weight="600" fill="#0f172a">
+    <rect x="46" y="570" width="290" height="48" rx="6" fill="#ffffff" stroke="#06b6d4"/>
+    <text x="60" y="589">order-processing</text>
+    <rect x="352" y="570" width="290" height="48" rx="6" fill="#ffffff" stroke="#06b6d4"/>
+    <text x="366" y="589">order-delivery</text>
+    <rect x="658" y="570" width="290" height="48" rx="6" fill="#ffffff" stroke="#06b6d4"/>
+    <text x="672" y="589">projections</text>
+    <rect x="964" y="570" width="290" height="48" rx="6" fill="#ffffff" stroke="#06b6d4"/>
+    <text x="978" y="589">relay + schedulers</text>
+  </g>
+  <g font-size="9.5" fill="#475569">
+    <text x="60" y="606">ownership routing</text>
+    <text x="366" y="606">submit to ERP adapter</text>
+    <text x="672" y="606">build read models</text>
+    <text x="978" y="606">outbox relay · reconcile · webhook-dispatch</text>
+  </g>
+  <rect x="46" y="628" width="1208" height="50" rx="6" fill="#cffafe" stroke="#0891b2"/>
+  <text x="60" y="650" font-size="12" font-weight="600" fill="#0f172a">ASYNC pipeline:  outbox  →  SNS FIFO topic  →  SQS FIFO queues (+ DLQ)  →  consumers</text>
+  <text x="60" y="667" font-size="10" fill="#475569">floci locally / AWS in prod · at-least-once + per-consumer dedupe on event_id (ADR-0007)</text>
+
+  <!-- ============ DATA ============ -->
+  <rect x="30" y="704" width="1260" height="104" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="44" y="722" font-size="12" font-weight="700" fill="#334155">DATA · single PostgreSQL (Aurora) — event store + outbox + projections + CRUD, one transaction (ADR-0004)</text>
+  <g font-size="12" font-weight="600" fill="#0f172a">
+    <rect x="46" y="732" width="290" height="62" rx="6" fill="#ffffff" stroke="#64748b"/>
+    <text x="60" y="752">Event store</text>
+    <rect x="352" y="732" width="290" height="62" rx="6" fill="#ffffff" stroke="#64748b"/>
+    <text x="366" y="752">Projections</text>
+    <rect x="658" y="732" width="290" height="62" rx="6" fill="#ffffff" stroke="#64748b"/>
+    <text x="672" y="752">Reference / CRUD</text>
+    <rect x="964" y="732" width="290" height="62" rx="6" fill="#ffffff" stroke="#64748b"/>
+    <text x="978" y="752">Webhooks + dedupe</text>
+  </g>
+  <g font-size="9.5" fill="#475569">
+    <text x="60" y="770">events · outbox · snapshots</text>
+    <text x="366" y="770">orders · order_status_history</text>
+    <text x="672" y="770">items · connections · bindings ·</text>
+    <text x="672" y="783">quotes · operating_companies</text>
+    <text x="978" y="770">webhook_endpoints · deliveries ·</text>
+    <text x="978" y="783">processed_events · RLS tenant scoping</text>
+  </g>
+
+  <!-- ============ EXTERNAL ============ -->
+  <rect x="30" y="820" width="1260" height="92" rx="8" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="44" y="838" font-size="12" font-weight="700" fill="#b91c1c">EXTERNAL</text>
+  <g font-size="12.5" font-weight="600" fill="#0f172a">
+    <rect x="46" y="848" width="290" height="52" rx="6" fill="#ffffff" stroke="#ef4444"/>
+    <text x="60" y="868">ERP — Odoo</text>
+    <rect x="352" y="848" width="290" height="52" rx="6" fill="#ffffff" stroke="#ef4444"/>
+    <text x="366" y="868">Inbound ERP webhooks</text>
+    <rect x="658" y="848" width="290" height="52" rx="6" fill="#ffffff" stroke="#ef4444"/>
+    <text x="672" y="868">Outbound webhooks</text>
+    <rect x="964" y="848" width="290" height="52" rx="6" fill="#ffffff" stroke="#ef4444"/>
+    <text x="978" y="868">AWS managed</text>
+  </g>
+  <g font-size="10" fill="#475569">
+    <text x="60" y="886">JSON-RPC via OdooAdapter</text>
+    <text x="366" y="886">shared-secret / HMAC</text>
+    <text x="672" y="886">→ reseller endpoints (HMAC)</text>
+    <text x="978" y="886">Secrets Manager · Cognito</text>
+  </g>
+
+  <!-- ============ FLOWS LEGEND ============ -->
+  <rect x="30" y="924" width="1260" height="128" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="44" y="944" font-size="12" font-weight="700" fill="#0f172a">PRIMARY FLOWS</text>
+  <circle cx="50" cy="962" r="8" fill="#2563eb"/><text x="47" y="966" font-size="11" font-weight="700" fill="#fff">1</text>
+  <text x="66" y="966" font-size="11" fill="#1e293b">Place order (reply to a quote): Reseller → GraphQL placeOrder(quoteId) → Order events + outbox (one txn) → relay → SNS/SQS →</text>
+  <text x="66" y="981" font-size="11" fill="#1e293b">order-processing (route by item ownership + verified binding) → order-delivery → OdooAdapter (customer = erp_customer_id; idempotency key = platform order id) → Odoo</text>
+  <circle cx="50" cy="1000" r="8" fill="#059669"/><text x="47" y="1004" font-size="11" font-weight="700" fill="#fff">2</text>
+  <text x="66" y="1004" font-size="11" fill="#1e293b">ERP status back: Odoo → /erp/webhook (auth + dedupe) → StatusApplier → Order events → projections (reseller/operator read models) → webhook-dispatch → reseller endpoint</text>
+  <text x="66" y="1024" font-size="11" fill="#1e293b">Order shows derived facts, orthogonal to lifecycle: fulfillment (shipped) · delivery (box needs carrier/POD; license on ship) · invoice.</text>
+  <text x="66" y="1040" font-size="11" fill="#64748b">Lifecycle: Submitted → Validated → Accepted → Sent to ERP → Confirmed → Closed   ·   ★ ordering is the only event-sourced aggregate (ADR-0002)</text>
+</svg>
