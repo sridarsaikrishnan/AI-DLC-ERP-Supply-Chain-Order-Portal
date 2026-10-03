@@ -1,104 +1,148 @@
 <mxfile host="app.diagrams.net" type="device">
-  <diagram id="hld-container" name="HLD - Container view">
-    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1360" pageHeight="800" math="0" shadow="0">
+  <diagram id="hld-containers" name="1 · Container view (C4)">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="860" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <!-- Title -->
-        <mxCell id="title" value="ERP &amp; Supply Chain Order Portal — High-Level Design (C4 container view)" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="40" y="24" width="900" height="26" as="geometry" />
-        </mxCell>
+        <mxCell id="title" value="ERP &amp; Supply Chain Order Portal — HLD (C4 container view)" style="text;html=1;fontSize=17;fontStyle=1;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="20" width="820" height="26" as="geometry"/></mxCell>
+        <mxCell id="subtitle" value="Modular monolith · two deployables (API + Worker) sharing one codebase · event-sourced Order · single PostgreSQL · outbox → SNS/SQS" style="text;html=1;fontSize=11;align=left;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="40" y="46" width="1000" height="18" as="geometry"/></mxCell>
 
-        <!-- ===== Boundaries (background) ===== -->
-        <mxCell id="b_product" value="Product boundary — ERP &amp; Supply Chain Order Portal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;strokeWidth=2;verticalAlign=top;fontColor=#3b5a86;fontStyle=1;dashed=0;" vertex="1" parent="1">
-          <mxGeometry x="160" y="70" width="610" height="480" as="geometry" />
-        </mxCell>
-        <mxCell id="b_server" value="Trusted server zone (not reachable directly by browsers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;strokeWidth=1;dashed=1;verticalAlign=top;fontColor=#7a5a95;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="445" y="100" width="310" height="435" as="geometry" />
-        </mxCell>
-        <mxCell id="b_aws" value="Cloud — AWS managed services and data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#d79b00;strokeWidth=2;verticalAlign=top;fontColor=#a9741a;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="160" y="580" width="1120" height="170" as="geometry" />
-        </mxCell>
-        <mxCell id="b_ext" value="External systems" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;strokeWidth=2;verticalAlign=top;fontColor=#8a3b38;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="1050" y="110" width="230" height="350" as="geometry" />
-        </mxCell>
+        <!-- Boundaries -->
+        <mxCell id="b_product" value="PRODUCT BOUNDARY" style="rounded=1;html=1;fillColor=none;strokeColor=#6c8ebf;strokeWidth=2;verticalAlign=top;align=left;fontColor=#3b5a86;fontStyle=1;fontSize=11;spacingLeft=10;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="150" y="80" width="650" height="520" as="geometry"/></mxCell>
+        <mxCell id="b_server" value="Trusted server zone — [runs on AWS ECS Fargate]" style="rounded=1;html=1;fillColor=none;strokeColor=#9673a6;strokeWidth=1;dashed=1;verticalAlign=top;align=left;fontColor=#7a5a95;fontSize=10;spacingLeft=10;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="430" y="110" width="360" height="480" as="geometry"/></mxCell>
+        <mxCell id="b_aws" value="CLOUD — AWS managed services &amp; data" style="rounded=1;html=1;fillColor=#fff8e1;strokeColor=#d79b00;strokeWidth=2;verticalAlign=top;align=left;fontColor=#a9741a;fontStyle=1;fontSize=11;spacingLeft=10;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="150" y="620" width="1200" height="200" as="geometry"/></mxCell>
+        <mxCell id="b_ext" value="EXTERNAL SYSTEMS" style="rounded=1;html=1;fillColor=none;strokeColor=#b85450;strokeWidth=2;verticalAlign=top;align=left;fontColor=#8a3b38;fontStyle=1;fontSize=11;spacingLeft=10;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="1130" y="110" width="340" height="360" as="geometry"/></mxCell>
 
-        <!-- ===== Legend ===== -->
-        <mxCell id="legend" value="Legend&#10;──────  synchronous request/response&#10;– – –   asynchronous event / message&#10;·······   uses (dependency)&#10;──▷     data read / write&#10;red       external API call&#10;blue      authentication (JWT)" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=11;strokeColor=#b0b0b0;fillColor=#ffffff;rounded=1;spacing=8;" vertex="1" parent="1">
-          <mxGeometry x="800" y="92" width="240" height="150" as="geometry" />
-        </mxCell>
+        <!-- Legend -->
+        <mxCell id="legend" value="LEGEND&#10;──────  synchronous request / response&#10;– – – –  asynchronous event / message&#10;·······   uses (dependency)&#10;──▷      data read / write&#10;red       external API call&#10;blue      authentication (JWT)" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=11;strokeColor=#b0b0b0;fillColor=#ffffff;rounded=1;spacing=8;" vertex="1" parent="1"><mxGeometry x="830" y="120" width="270" height="150" as="geometry"/></mxCell>
 
-        <!-- ===== Actors ===== -->
-        <mxCell id="a_res" value="Reseller" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="70" y="175" width="34" height="64" as="geometry" />
-        </mxCell>
-        <mxCell id="a_op" value="Operator /&#10;distributor admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="70" y="385" width="34" height="64" as="geometry" />
-        </mxCell>
+        <!-- Actors -->
+        <mxCell id="a_res" value="Reseller" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.user;" vertex="1" parent="1"><mxGeometry x="70" y="190" width="50" height="50" as="geometry"/></mxCell>
+        <mxCell id="a_op" value="Operator /&#10;distributor admin" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.user;" vertex="1" parent="1"><mxGeometry x="70" y="400" width="50" height="50" as="geometry"/></mxCell>
 
-        <!-- ===== Clients (SPAs) ===== -->
-        <mxCell id="spa_res" value="&lt;b&gt;Reseller portal (SPA)&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;Browse quotes, place orders, track status, manage webhook endpoints&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="185" y="160" width="175" height="80" as="geometry" />
-        </mxCell>
-        <mxCell id="spa_op" value="&lt;b&gt;Operator admin (SPA)&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;Manage connections, resellers, items, quotes, office cards; view all orders&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="185" y="370" width="175" height="80" as="geometry" />
-        </mxCell>
+        <!-- SPAs (client icon + C4 box) -->
+        <mxCell id="ic_spa_res" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;shape=mxgraph.aws4.client;" vertex="1" parent="1"><mxGeometry x="186" y="182" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="spa_res" value="&lt;b&gt;Reseller portal&lt;/b&gt;  [SPA · React]&lt;br&gt;&lt;font color=&quot;#555&quot; style=&quot;font-size:10px&quot;&gt;Browse quotes, place orders, track status, manage webhooks. No ERP identity (FR-19).&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=middle;spacingTop=10;" vertex="1" parent="1"><mxGeometry x="170" y="175" width="210" height="86" as="geometry"/></mxCell>
+        <mxCell id="ic_spa_op" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;shape=mxgraph.aws4.client;" vertex="1" parent="1"><mxGeometry x="186" y="392" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="spa_op" value="&lt;b&gt;Operator admin&lt;/b&gt;  [SPA · React]&lt;br&gt;&lt;font color=&quot;#555&quot; style=&quot;font-size:10px&quot;&gt;Manage connections, resellers, items, quotes, office cards; view all orders.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=middle;spacingTop=10;" vertex="1" parent="1"><mxGeometry x="170" y="385" width="210" height="86" as="geometry"/></mxCell>
 
-        <!-- ===== API host ===== -->
-        <mxCell id="api" value="&lt;b&gt;API host (FastAPI)&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#444&quot;&gt;GraphQL (reseller + operator), inbound ERP webhook endpoint, request auth. Reseller surface never exposes ERP identity (FR-19).&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-          <mxGeometry x="470" y="130" width="255" height="120" as="geometry" />
-        </mxCell>
+        <!-- API host (FastAPI) -->
+        <mxCell id="ic_api" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fargate;" vertex="1" parent="1"><mxGeometry x="446" y="150" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="api" value="&lt;b&gt;API host&lt;/b&gt;  [Container · Python / FastAPI · HTTP]&lt;br&gt;&lt;font color=&quot;#444&quot; style=&quot;font-size:10px&quot;&gt;The only HTTP server: GraphQL (reseller + operator), inbound ERP webhook route, request auth. Reseller surface hides ERP identity (FR-19).&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;spacingLeft=28;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="445" y="145" width="330" height="110" as="geometry"/></mxCell>
 
-        <!-- ===== Worker host ===== -->
-        <mxCell id="worker" value="&lt;b&gt;Worker host&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#444&quot;&gt;Async consumers (order routing, ERP delivery, projections, outbound webhook dispatch), outbox relay, reconciliation scheduler.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-          <mxGeometry x="470" y="300" width="255" height="120" as="geometry" />
-        </mxCell>
+        <!-- Worker host (NOT FastAPI) -->
+        <mxCell id="ic_wk" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fargate;" vertex="1" parent="1"><mxGeometry x="446" y="310" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="worker" value="&lt;b&gt;Worker host&lt;/b&gt;  [Container · Python process — NOT HTTP / not FastAPI]&lt;br&gt;&lt;font color=&quot;#444&quot; style=&quot;font-size:10px&quot;&gt;Background consumers: order routing, ERP delivery, projections, outbound webhook dispatch; outbox relay; reconciliation scheduler. Role-splittable.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;spacingLeft=28;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="445" y="305" width="330" height="110" as="geometry"/></mxCell>
 
-        <!-- ===== Domain modules (shared) ===== -->
-        <mxCell id="domain" value="&lt;b&gt;Domain modules (shared library, used by API + Worker)&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#444&quot;&gt;ordering (event-sourced) · quoting · catalog · tenancy · connections · fulfillment · integration (ERP adapters) · webhooks&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="460" y="458" width="275" height="66" as="geometry" />
-        </mxCell>
+        <!-- Domain modules -->
+        <mxCell id="ic_dom" style="html=1;shape=component;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="450" y="462" width="24" height="22" as="geometry"/></mxCell>
+        <mxCell id="domain" value="&lt;b&gt;Domain modules&lt;/b&gt;  [shared library · used by API + Worker]&lt;br&gt;&lt;font color=&quot;#444&quot; style=&quot;font-size:10px&quot;&gt;ordering (event-sourced) · quoting · catalog · tenancy · connections · fulfillment · integration (ERP adapters) · webhooks_inbound · webhooks_outbound&lt;br&gt;&lt;i&gt;see page 2 for module → table ownership&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=middle;spacingLeft=22;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="445" y="455" width="330" height="110" as="geometry"/></mxCell>
 
-        <!-- ===== AWS managed services + data ===== -->
-        <mxCell id="cognito" value="&lt;b&gt;AWS Cognito&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;Identity provider (JWT). Header stub for local dev.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-          <mxGeometry x="185" y="620" width="200" height="70" as="geometry" />
-        </mxCell>
-        <mxCell id="secrets" value="&lt;b&gt;AWS Secrets Manager&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;ERP login + webhook signing secrets (never stored in DB).&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-          <mxGeometry x="410" y="620" width="210" height="70" as="geometry" />
-        </mxCell>
-        <mxCell id="bus" value="&lt;b&gt;Message bus&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;SNS FIFO topic → SQS FIFO queues (+ DLQ). floci locally / AWS in prod.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
-          <mxGeometry x="650" y="615" width="250" height="80" as="geometry" />
-        </mxCell>
-        <mxCell id="db" value="&lt;b&gt;PostgreSQL (Aurora)&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;Event store + outbox + snapshots · order projections · reference/CRUD data. Owned by the domain via API + Worker.&lt;/div&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="980" y="598" width="260" height="118" as="geometry" />
-        </mxCell>
+        <!-- AWS managed services -->
+        <mxCell id="cognito" value="Cognito&#10;(identity · JWT)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;" vertex="1" parent="1"><mxGeometry x="210" y="660" width="58" height="58" as="geometry"/></mxCell>
+        <mxCell id="secrets" value="Secrets Manager&#10;(ERP + webhook secrets)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.secrets_manager;" vertex="1" parent="1"><mxGeometry x="380" y="660" width="58" height="58" as="geometry"/></mxCell>
+        <mxCell id="sns" value="SNS FIFO&#10;(topic)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_notification_service;" vertex="1" parent="1"><mxGeometry x="585" y="660" width="58" height="58" as="geometry"/></mxCell>
+        <mxCell id="sqs" value="SQS FIFO&#10;(queues + DLQ)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="740" y="660" width="58" height="58" as="geometry"/></mxCell>
+        <mxCell id="aurora" value="PostgreSQL / Aurora&#10;event store · outbox · projections · reference data" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#2E27AD;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.aurora;" vertex="1" parent="1"><mxGeometry x="1120" y="660" width="64" height="64" as="geometry"/></mxCell>
+        <mxCell id="awsnote" value="single datastore owned by the domain (ADR-0004) — see page 2" style="text;html=1;fontSize=9;fontColor=#777;align=center;" vertex="1" parent="1"><mxGeometry x="1030" y="736" width="250" height="16" as="geometry"/></mxCell>
 
-        <!-- ===== External systems ===== -->
-        <mxCell id="erp" value="&lt;b&gt;ERP — Odoo&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;System of record for orders. Receives orders (JSON-RPC); pushes status via webhooks. Other ERPs: TBD.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
-          <mxGeometry x="1070" y="165" width="190" height="115" as="geometry" />
-        </mxCell>
-        <mxCell id="whep" value="&lt;b&gt;Reseller webhook endpoints&lt;/b&gt;&lt;div style=&quot;font-size:10px;color:#555&quot;&gt;Reseller-operated receivers for order status notifications (HMAC-signed).&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
-          <mxGeometry x="1070" y="320" width="190" height="100" as="geometry" />
-        </mxCell>
+        <!-- External systems -->
+        <mxCell id="ic_erp" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#5A6B86;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;shape=mxgraph.aws4.traditional_server;" vertex="1" parent="1"><mxGeometry x="1156" y="166" width="24" height="26" as="geometry"/></mxCell>
+        <mxCell id="erp" value="&lt;b&gt;ERP — Odoo&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#555&quot; style=&quot;font-size:10px&quot;&gt;System of record for orders. Receives orders (JSON-RPC); pushes status via webhooks.&lt;br&gt;Other ERPs: &lt;b&gt;TBD&lt;/b&gt;.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=middle;spacingLeft=24;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="1150" y="160" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="whep" value="&lt;b&gt;Reseller webhook endpoints&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#555&quot; style=&quot;font-size:10px&quot;&gt;Reseller-operated receivers for order-status notifications (HMAC-signed).&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=middle;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="1150" y="290" width="300" height="90" as="geometry"/></mxCell>
 
         <!-- ===== Edges ===== -->
-        <mxCell id="e1" value="uses" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#333333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="a_res" target="spa_res"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" value="uses" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#333333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="a_op" target="spa_op"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e3" value="GraphQL /reseller (HTTPS, sync)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#333333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" edge="1" parent="1" source="spa_res" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e4" value="GraphQL /operator (HTTPS, sync)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#333333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" edge="1" parent="1" source="spa_op" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e5" value="verify JWT (sync)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;strokeColor=#2d6cdf;fontColor=#2d6cdf;fontSize=10;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="api" target="cognito"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e7" value="write Order events + outbox;&#10;read projections" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=1;exitY=0.9;entryX=0;entryY=0.2;" edge="1" parent="1" source="api" target="db"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e8" value="read aggregates;&#10;write projections" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=1;exitY=0.6;entryX=0;entryY=0.6;" edge="1" parent="1" source="worker" target="db"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" value="resolve secret" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="api" target="secrets"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e16" value="resolve ERP + webhook secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=0.25;exitY=1;entryX=0.75;entryY=0;" edge="1" parent="1" source="worker" target="secrets"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e9" value="outbox relay publishes (async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#9673a6;fontColor=#6a4b86;fontSize=10;exitX=0.5;exitY=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="db" target="bus"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e10" value="consume events (async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#9673a6;fontColor=#6a4b86;fontSize=10;exitX=0.5;exitY=1;entryX=0.3;entryY=1;" edge="1" parent="1" source="worker" target="bus"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e11" value="submit order (JSON-RPC, sync)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=1;exitY=0.3;entryX=0;entryY=0.8;" edge="1" parent="1" source="worker" target="erp"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e12" value="status webhook (HTTPS POST, async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=0;exitY=0.3;entryX=1;entryY=0.2;" edge="1" parent="1" source="erp" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e13" value="deliver webhook (HTTPS, HMAC, async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=1;exitY=0.4;entryX=0;entryY=0.5;" edge="1" parent="1" source="worker" target="whep"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e14" value="uses" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;dashPattern=1 4;strokeColor=#999999;fontSize=9;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="api" target="domain"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e15" value="uses" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;dashPattern=1 4;strokeColor=#999999;fontSize=9;exitX=0.3;exitY=1;entryX=0.7;entryY=0;" edge="1" parent="1" source="worker" target="domain"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e1" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="a_res" target="spa_res"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="a_op" target="spa_op"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="GraphQL /reseller (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" edge="1" parent="1" source="spa_res" target="api"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="GraphQL /operator (HTTPS)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.7;" edge="1" parent="1" source="spa_op" target="api"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="verify JWT" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#2d6cdf;fontColor=#2d6cdf;fontSize=10;exitX=0.2;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="api" target="cognito"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="resolve secret" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=0.35;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="api" target="secrets"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="write events + outbox;&#10;read projections" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=1;exitY=0.85;entryX=0;entryY=0.3;" edge="1" parent="1" source="api" target="aurora"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="read aggregates;&#10;write projections" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=1;exitY=0.6;entryX=0.1;entryY=0;" edge="1" parent="1" source="worker" target="aurora"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="resolve ERP + webhook secrets" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#6b6b6b;fontSize=10;exitX=0.25;exitY=1;entryX=0.7;entryY=0;" edge="1" parent="1" source="worker" target="secrets"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="relay publishes (async)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#9673a6;fontColor=#6a4b86;fontSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=1;" edge="1" parent="1" source="worker" target="sns"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" value="fan-out (filtered)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#9673a6;fontColor=#6a4b86;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="sns" target="sqs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" value="consume (async)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#9673a6;fontColor=#6a4b86;fontSize=10;exitX=0.5;exitY=1;entryX=0.6;entryY=1;" edge="1" parent="1" source="worker" target="sqs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" value="submit order (JSON-RPC)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=1;exitY=0.25;entryX=0;entryY=0.8;" edge="1" parent="1" source="worker" target="erp"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" value="status webhook (async)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=0;exitY=0.4;entryX=1;entryY=0.2;" edge="1" parent="1" source="erp" target="api"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" value="deliver webhook (HMAC, async)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;dashPattern=8 6;strokeColor=#b85450;fontColor=#8a3b38;fontSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="worker" target="whep"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;dashPattern=1 4;strokeColor=#999;exitX=0.25;exitY=1;entryX=0.25;entryY=0;" edge="1" parent="1" source="api" target="domain"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" value="uses" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;dashPattern=1 4;strokeColor=#999;fontSize=9;exitX=0.75;exitY=1;entryX=0.75;entryY=0;" edge="1" parent="1" source="worker" target="domain"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="hld-data" name="2 · Modules → tables (data ownership)">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="960" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="t" value="Modules → PostgreSQL tables (data ownership)" style="text;html=1;fontSize=16;fontStyle=1;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="20" width="700" height="24" as="geometry"/></mxCell>
+        <mxCell id="lg" value="LEGEND:   ──▶ owns (writes)      – – ▷ reads      ★ event-sourced aggregate persists through the shared event store (kernel)" style="text;html=1;fontSize=11;align=left;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="40" y="46" width="1000" height="18" as="geometry"/></mxCell>
+
+        <!-- Module column -->
+        <mxCell id="m_hdr" value="DOMAIN MODULES (src/modules)" style="text;html=1;fontStyle=1;fontSize=11;fontColor=#7a5a95;align=left;" vertex="1" parent="1"><mxGeometry x="60" y="80" width="260" height="18" as="geometry"/></mxCell>
+        <mxCell id="m_kernel" value="shared event-sourcing kernel" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="100" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_ordering" value="ordering ★" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="150" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_fulfil" value="fulfillment ★" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="200" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_quoting" value="quoting" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="250" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_catalog" value="catalog" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="300" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_tenancy" value="tenancy" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="350" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_conn" value="connections" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="400" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_integ" value="integration (ERP adapters)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="450" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_whin" value="webhooks_inbound" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="500" width="240" height="40" as="geometry"/></mxCell>
+        <mxCell id="m_whout" value="webhooks_outbound" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="60" y="550" width="240" height="40" as="geometry"/></mxCell>
+
+        <!-- Table clusters -->
+        <mxCell id="cl_es" value="Event store (shared kernel)" style="rounded=1;html=1;fillColor=none;strokeColor=#9673a6;dashed=1;verticalAlign=top;align=left;fontSize=10;fontColor=#7a5a95;spacingLeft=8;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="640" y="90" width="300" height="150" as="geometry"/></mxCell>
+        <mxCell id="t_events" value="events" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="660" y="118" width="120" height="46" as="geometry"/></mxCell>
+        <mxCell id="t_outbox" value="outbox" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="800" y="118" width="120" height="46" as="geometry"/></mxCell>
+        <mxCell id="t_snap" value="snapshots" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="660" y="178" width="120" height="46" as="geometry"/></mxCell>
+
+        <mxCell id="cl_proj" value="Order read models (ordering)" style="rounded=1;html=1;fillColor=none;strokeColor=#d79b00;dashed=1;verticalAlign=top;align=left;fontSize=10;fontColor=#a9741a;spacingLeft=8;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="640" y="256" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="t_orders" value="orders" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="660" y="284" width="120" height="46" as="geometry"/></mxCell>
+        <mxCell id="t_osh" value="order_status_history" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="800" y="284" width="120" height="46" as="geometry"/></mxCell>
+
+        <mxCell id="cl_ref" value="Reference / CRUD data" style="rounded=1;html=1;fillColor=none;strokeColor=#82b366;dashed=1;verticalAlign=top;align=left;fontSize=10;fontColor=#5a8a3a;spacingLeft=8;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="980" y="256" width="280" height="300" as="geometry"/></mxCell>
+        <mxCell id="t_quotes" value="quotes" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="1000" y="284" width="110" height="44" as="geometry"/></mxCell>
+        <mxCell id="t_oc" value="operating_companies" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="1130" y="284" width="110" height="44" as="geometry"/></mxCell>
+        <mxCell id="t_items" value="items" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=11;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="1000" y="344" width="110" height="44" as="geometry"/></mxCell>
+        <mxCell id="t_bind" value="tenant_connection_bindings" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=9;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="1130" y="344" width="110" height="44" as="geometry"/></mxCell>
+        <mxCell id="t_erpconn" value="erp_connections" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="1000" y="404" width="110" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="cl_wh" value="Outbound webhooks" style="rounded=1;html=1;fillColor=none;strokeColor=#b85450;dashed=1;verticalAlign=top;align=left;fontSize=10;fontColor=#8a3b38;spacingLeft=8;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="640" y="520" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="t_whep" value="webhook_endpoints" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="660" y="548" width="120" height="46" as="geometry"/></mxCell>
+        <mxCell id="t_whd" value="webhook_deliveries" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="800" y="548" width="120" height="46" as="geometry"/></mxCell>
+
+        <mxCell id="cl_idem" value="Idempotency (dedupe)" style="rounded=1;html=1;fillColor=none;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;align=left;fontSize=10;fontColor=#3b5a86;spacingLeft=8;spacingTop=4;" vertex="1" parent="1"><mxGeometry x="640" y="630" width="300" height="80" as="geometry"/></mxCell>
+        <mxCell id="t_proc" value="processed_events" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="660" y="656" width="130" height="46" as="geometry"/></mxCell>
+        <mxCell id="procnote" value="also used by Worker consumers to dedupe on event_id" style="text;html=1;fontSize=9;fontColor=#777;align=left;" vertex="1" parent="1"><mxGeometry x="800" y="664" width="130" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="t_audit" value="audit_log&#10;(reserved — no module writes it yet · TBD)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fbeaea;strokeColor=#b85450;fontSize=9;dashed=1;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="640" y="740" width="300" height="54" as="geometry"/></mxCell>
+
+        <!-- ownership edges (owns = solid) -->
+        <mxCell id="o1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#9673a6;" edge="1" parent="1" source="m_kernel" target="t_events"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#9673a6;" edge="1" parent="1" source="m_kernel" target="t_outbox"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#9673a6;" edge="1" parent="1" source="m_kernel" target="t_snap"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_ordering" target="t_orders"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o5" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_ordering" target="t_osh"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o6" value="writes ★" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_ordering" target="t_events"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o7" value="writes ★" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_fulfil" target="t_events"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o8" value="updates" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_fulfil" target="t_orders"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o9" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_quoting" target="t_quotes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o10" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_quoting" target="t_oc"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o11" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_catalog" target="t_items"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o12" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_tenancy" target="t_bind"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o13" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#d79b00;" edge="1" parent="1" source="m_conn" target="t_erpconn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o14" value="reads" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_integ" target="t_erpconn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o15" value="reads payload" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_integ" target="t_orders"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o16" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#6c8ebf;" edge="1" parent="1" source="m_whin" target="t_proc"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o17" value="reads (locator)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;dashed=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="m_whin" target="t_orders"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o18" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#b85450;" edge="1" parent="1" source="m_whout" target="t_whep"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="o19" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#b85450;" edge="1" parent="1" source="m_whout" target="t_whd"><mxGeometry relative="1" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
