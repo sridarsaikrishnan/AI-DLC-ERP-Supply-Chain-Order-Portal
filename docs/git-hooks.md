@@ -17,12 +17,17 @@ Undo with `git config --unset core.hooksPath`.
 
 | Check | Scope | Blocks on |
 |---|---|---|
-| **ruff** | staged `*.py` | lint errors against `pyproject.toml`'s rule set |
+| **ruff** | staged `*.py` | auto-fixes + formats first (`ruff check --fix` + `ruff format`, re-staged), then blocks on anything left (e.g. undefined names) |
 | **import-linter** | whole repo (when Python is staged) | a broken architecture contract (layering, domain-is-framework-free) |
 | **tsc** | `ui/` (when `ui/**/*.ts[x]` is staged) | TypeScript type errors |
 | **mypy** | `src` (opt-in: `RUN_MYPY=1`) | type errors — off by default; declared in `pyproject.toml` |
 
 Design choices:
+- **Auto-format on commit.** The hook runs `ruff check --fix` + `ruff format` on the
+  staged Python files and re-stages them, so your commit lands already-clean. It only
+  touches *fully* staged files — a file with both staged and unstaged edits is left alone
+  (re-adding it would pull the unstaged hunks into your commit); fix those by hand.
+  Disable with `NO_FIX=1` to only check.
 - **ruff runs only on the files you're committing** (boy-scout rule). The repo carries
   pre-existing lint debt in untouched files; that is deliberately not your commit's
   problem. Clean up a legacy file's warnings when you touch it.
@@ -33,7 +38,11 @@ Design choices:
 ## Fixing / bypassing
 
 ```bash
-python -m ruff check --fix <files>   # auto-fix most ruff findings, then re-stage
+# the hook already runs these on staged files and re-stages the result:
+python -m ruff check --fix <files>   # auto-fix lint findings
+python -m ruff format <files>        # auto-format
+
+NO_FIX=1 git commit ...              # check only; don't auto-fix/format
 git commit --no-verify               # emergency bypass — explain why in the message
 SKIP_LINT=1 git commit ...           # same, honored by the hook
 RUN_MYPY=1 git commit ...            # also run mypy this time

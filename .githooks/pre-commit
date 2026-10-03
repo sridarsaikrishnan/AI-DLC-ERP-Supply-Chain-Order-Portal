@@ -46,15 +46,40 @@ UI_STAGED="$(printf '%s\n' "$STAGED_ALL" | grep -E '^ui/.*\.(ts|tsx)$' || true)"
 
 status=0
 
-# --- 1. ruff: lint staged Python against the project config -----------------
+# --- 1. ruff: auto-fix + format staged Python, then block on the rest -------
+# By default the hook AUTO-FIXES and FORMATS the files you're committing (ruff check
+# --fix + ruff format) and re-stages them, so the commit contains the clean version.
+# It only touches fully-staged files — a file with both staged and unstaged edits is
+# left alone (re-adding it would sweep the unstaged hunks into your commit).
+#   NO_FIX=1  -> don't auto-fix/format, just check and block.
 if [ -n "$PY_STAGED" ]; then
   if python -m ruff --version >/dev/null 2>&1; then
-    # --force-exclude so pyproject's exclude list is honored even with explicit paths.
+    UNSTAGED="$(git diff --name-only)"
+    FIXABLE=""; PARTIAL=""
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      if printf '%s\n' "$UNSTAGED" | grep -qxF "$f"; then
+        PARTIAL="${PARTIAL}${f} "
+      else
+        FIXABLE="${FIXABLE}${f}"$'\n'
+      fi
+    done <<EOF
+$PY_STAGED
+EOF
+
+    if [ "${NO_FIX:-0}" != "1" ] && [ -n "$FIXABLE" ]; then
+      printf '%s' "$FIXABLE" | sed '/^$/d' | xargs python -m ruff check --force-exclude --fix-only --quiet 2>/dev/null || true
+      printf '%s' "$FIXABLE" | sed '/^$/d' | xargs python -m ruff format --quiet 2>/dev/null || true
+      printf '%s' "$FIXABLE" | sed '/^$/d' | xargs git add
+    fi
+    [ -n "$PARTIAL" ] && skip "auto-fix skipped (partially staged — fix by hand): $PARTIAL"
+
+    # Block on anything auto-fix couldn't resolve (e.g. undefined names, unused vars).
     if printf '%s\n' "$PY_STAGED" | xargs python -m ruff check --force-exclude; then
-      ok "ruff (staged Python)"
+      [ "${NO_FIX:-0}" = "1" ] && ok "ruff (staged Python)" || ok "ruff (staged Python — auto-fixed + formatted)"
     else
-      bad "ruff found lint errors in staged Python"
-      printf "    %sfix with: python -m ruff check --fix %s<files>%s   (then re-stage)%s\n" "$DIM" "" "" "$OFF"
+      bad "ruff found issues it could not auto-fix"
+      printf "    %sfix by hand, re-stage, and commit again%s\n" "$DIM" "$OFF"
       status=1
     fi
   else
