@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import random
-import socket
 import urllib.error
 import urllib.request
 from typing import Any
@@ -77,8 +76,12 @@ class OdooAdapter:
             order_id = order_payload.get("order_id")
             if order_id:
                 existing = self._execute(
-                    target, uid, "sale.order", "search_read",
-                    [[["client_order_ref", "=", str(order_id)]]], {"fields": ["name"], "limit": 1},
+                    target,
+                    uid,
+                    "sale.order",
+                    "search_read",
+                    [[["client_order_ref", "=", str(order_id)]]],
+                    {"fields": ["name"], "limit": 1},
                 )
                 if existing:
                     return SubmissionResult(success=True, erp_order_id=existing[0]["name"])
@@ -88,7 +91,10 @@ class OdooAdapter:
             order_lines = []
             for line in build_sale_order_lines(order_payload):
                 product_id = self._resolve_product(target, uid, line["product_key"])
-                line_vals: dict[str, Any] = {"product_id": product_id, "product_uom_qty": line["quantity"]}
+                line_vals: dict[str, Any] = {
+                    "product_id": product_id,
+                    "product_uom_qty": line["quantity"],
+                }
                 if line["unit_price"] is not None:
                     # Net of any flat per-unit discount already subtracted in
                     # build_sale_order_lines — Odoo's own `discount` field is a
@@ -99,7 +105,9 @@ class OdooAdapter:
                     line_vals["product_uom"] = uom_id
                 tax_ids = [
                     tax_id
-                    for tax_id in (self._resolve_tax(target, uid, code) for code in line["tax_codes"])
+                    for tax_id in (
+                        self._resolve_tax(target, uid, code) for code in line["tax_codes"]
+                    )
                     if tax_id is not None
                 ]
                 if tax_ids:
@@ -119,8 +127,12 @@ class OdooAdapter:
         try:
             uid = self._authenticate(target)
             rows = self._execute(
-                target, uid, "sale.order", "search_read",
-                [[["name", "=", erp_order_id]]], {"fields": ["state", "invoice_status"], "limit": 1},
+                target,
+                uid,
+                "sale.order",
+                "search_read",
+                [[["name", "=", erp_order_id]]],
+                {"fields": ["state", "invoice_status"], "limit": 1},
             )
             if not rows:
                 return None
@@ -135,8 +147,12 @@ class OdooAdapter:
         try:
             uid = self._authenticate(target)
             rows = self._execute(
-                target, uid, "sale.order", "search_read",
-                [[["name", "=", erp_order_id]]], {"fields": ["id"], "limit": 1},
+                target,
+                uid,
+                "sale.order",
+                "search_read",
+                [[["name", "=", erp_order_id]]],
+                {"fields": ["id"], "limit": 1},
             )
             if not rows:
                 return SubmissionResult(success=False, error="order not found", terminal=True)
@@ -149,18 +165,27 @@ class OdooAdapter:
     def _authenticate(self, target: ErpTarget) -> int:
         database = target.credentials.get("database", "")
         username = target.credentials.get("username", "")
-        uid = self._jsonrpc(target, "common", "authenticate", [database, username, target.secret, {}])
+        uid = self._jsonrpc(
+            target, "common", "authenticate", [database, username, target.secret, {}]
+        )
         if not uid:
             raise _OdooError("authentication failed", terminal=True)
         return int(uid)
 
     def _execute(
-        self, target: ErpTarget, uid: int, model: str, method: str,
-        args: list[Any], kwargs: dict[str, Any] | None = None,
+        self,
+        target: ErpTarget,
+        uid: int,
+        model: str,
+        method: str,
+        args: list[Any],
+        kwargs: dict[str, Any] | None = None,
     ) -> Any:
         database = target.credentials.get("database", "")
         return self._jsonrpc(
-            target, "object", "execute_kw",
+            target,
+            "object",
+            "execute_kw",
             [database, uid, target.secret, model, method, args, kwargs or {}],
         )
 
@@ -172,11 +197,16 @@ class OdooAdapter:
         silent invention of a new partner."""
         raw = order_payload.get("erp_customer_id")
         if raw in (None, ""):
-            raise _OdooError("no erp_customer_id on the order — the reseller is not linked to an ERP customer", terminal=True)
+            raise _OdooError(
+                "no erp_customer_id on the order — the reseller is not linked to an ERP customer",
+                terminal=True,
+            )
         try:
             return int(raw)
         except (TypeError, ValueError) as exc:
-            raise _OdooError(f"erp_customer_id {raw!r} is not a valid Odoo partner id", terminal=True) from exc
+            raise _OdooError(
+                f"erp_customer_id {raw!r} is not a valid Odoo partner id", terminal=True
+            ) from exc
 
     def _resolve_product(self, target: ErpTarget, uid: int, code: str) -> int:
         """Fail closed, not silent auto-create: by the time this runs, `routing.py` has
@@ -184,11 +214,14 @@ class OdooAdapter:
         check). If it still has no matching Odoo product, that's catalog drift between
         our system and Odoo worth a human looking at — not something to paper over by
         inventing a new Odoo product with no price, no category, no real setup."""
-        found = self._execute(target, uid, "product.product", "search", [[["default_code", "=", code]]], {"limit": 1})
+        found = self._execute(
+            target, uid, "product.product", "search", [[["default_code", "=", code]]], {"limit": 1}
+        )
         if found:
             return int(found[0])
         raise _OdooError(
-            f"no Odoo product with default_code '{code}' — sync it in Odoo before retrying", terminal=True
+            f"no Odoo product with default_code '{code}' — sync it in Odoo before retrying",
+            terminal=True,
         )
 
     def _resolve_uom(self, target: ErpTarget, uid: int, name: str) -> int | None:
@@ -198,7 +231,9 @@ class OdooAdapter:
         stopping delivery for."""
         if not name:
             return None
-        found = self._execute(target, uid, "uom.uom", "search", [[["name", "=", name]]], {"limit": 1})
+        found = self._execute(
+            target, uid, "uom.uom", "search", [[["name", "=", name]]], {"limit": 1}
+        )
         return int(found[0]) if found else None
 
     def _resolve_tax(self, target: ErpTarget, uid: int, code: str) -> int | None:
@@ -207,7 +242,9 @@ class OdooAdapter:
         Odoo is visible in Odoo itself, not silently invented here."""
         if not code:
             return None
-        found = self._execute(target, uid, "account.tax", "search", [[["name", "=", code]]], {"limit": 1})
+        found = self._execute(
+            target, uid, "account.tax", "search", [[["name", "=", code]]], {"limit": 1}
+        )
         return int(found[0]) if found else None
 
     def _jsonrpc(self, target: ErpTarget, service: str, method: str, args: list[Any]) -> Any:
@@ -230,11 +267,13 @@ class OdooAdapter:
                 parsed = json.loads(response.read())
         except urllib.error.HTTPError as exc:
             raise _OdooError(f"HTTP {exc.code}", terminal=not (500 <= exc.code < 600)) from exc
-        except (urllib.error.URLError, socket.timeout, TimeoutError, OSError) as exc:
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise _OdooError(f"cannot reach Odoo: {exc}", terminal=False) from exc
 
         if parsed.get("error"):
             error = parsed["error"]
-            message = (error.get("data") or {}).get("message") or error.get("message") or "Odoo error"
+            message = (
+                (error.get("data") or {}).get("message") or error.get("message") or "Odoo error"
+            )
             raise _OdooError(str(message), terminal=True)
         return parsed.get("result")

@@ -24,12 +24,15 @@ trust a token that failed one check.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 import jwt
 from jwt import PyJWKClient
 
 from .provider import Principal
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 log = logging.getLogger(__name__)
 
@@ -106,9 +109,16 @@ class CognitoIdentityProvider:
 
         scopes = claims.get("scope", "").split()
         prefix = f"{self._resource_server_id}/"
-        tenant_scopes = [s[len(prefix) + len("tenant.") :] for s in scopes if s.startswith(f"{prefix}tenant.")]
+        tenant_scopes = [
+            s[len(prefix) + len("tenant.") :] for s in scopes if s.startswith(f"{prefix}tenant.")
+        ]
         if len(tenant_scopes) != 1:
-            log.info("access token rejected: expected exactly one tenant scope, found %d", len(tenant_scopes))
+            log.info(
+                "access token rejected: expected exactly one tenant scope, found %d",
+                len(tenant_scopes),
+            )
             return None
-        roles = tuple(s[len(prefix) + len("role.") :] for s in scopes if s.startswith(f"{prefix}role."))
+        roles = tuple(
+            s[len(prefix) + len("role.") :] for s in scopes if s.startswith(f"{prefix}role.")
+        )
         return Principal(tenant_id=tenant_scopes[0], roles=roles)

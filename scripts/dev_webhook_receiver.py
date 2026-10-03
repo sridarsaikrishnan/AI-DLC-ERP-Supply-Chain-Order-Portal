@@ -21,10 +21,11 @@ including when the signature is wrong, so unsigned-endpoint testing works too.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -34,7 +35,9 @@ def _verify(secret: str, signature_header: str, body: bytes) -> bool:
         timestamp, provided = parts["t"], parts["v1"]
     except (KeyError, ValueError):
         return False
-    expected = hmac.new(secret.encode("utf-8"), f"{timestamp}.".encode("utf-8") + body, hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        secret.encode("utf-8"), f"{timestamp}.".encode() + body, hashlib.sha256
+    ).hexdigest()
     return hmac.compare_digest(expected, provided)
 
 
@@ -43,10 +46,10 @@ def _make_handler(secret: str | None) -> type[BaseHTTPRequestHandler]:
         def log_message(self, *_args: object) -> None:  # silence the default access log
             pass
 
-        def do_POST(self) -> None:  # noqa: N802 - stdlib's required method name
+        def do_POST(self) -> None:
             length = int(self.headers.get("Content-Length", "0"))
             body = self.rfile.read(length)
-            received_at = datetime.now(timezone.utc).strftime("%H:%M:%S")
+            received_at = datetime.now(UTC).strftime("%H:%M:%S")
 
             signature_header = self.headers.get("X-Signature", "")
             if secret is None:
@@ -60,7 +63,9 @@ def _make_handler(secret: str | None) -> type[BaseHTTPRequestHandler]:
                 payload = json.loads(body)
                 event = payload.get("event", "?")
                 order = payload.get("order", {})
-                summary = f"{event}  order={order.get('id', '?')}  status={order.get('status', '?')}"
+                summary = (
+                    f"{event}  order={order.get('id', '?')}  status={order.get('status', '?')}"
+                )
             except json.JSONDecodeError:
                 summary = "(body is not valid JSON)"
 
@@ -77,20 +82,25 @@ def _make_handler(secret: str | None) -> type[BaseHTTPRequestHandler]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--port", type=int, default=8090)
-    parser.add_argument("--secret", default=None, help="the endpoint's signing secret, to verify X-Signature")
+    parser.add_argument(
+        "--secret", default=None, help="the endpoint's signing secret, to verify X-Signature"
+    )
     args = parser.parse_args()
 
     server = ThreadingHTTPServer(("0.0.0.0", args.port), _make_handler(args.secret))
     print(f"dev webhook receiver listening on http://localhost:{args.port}/hooks", flush=True)
-    print("(not part of the app — dev testing aid only, per scripts/dev_webhook_receiver.py)", flush=True)
+    print(
+        "(not part of the app — dev testing aid only, per scripts/dev_webhook_receiver.py)",
+        flush=True,
+    )
     if args.secret is None:
         print("no --secret given: signatures will be shown as UNVERIFIED, not checked", flush=True)
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         server.serve_forever()
-    except KeyboardInterrupt:
-        pass
 
 
 if __name__ == "__main__":

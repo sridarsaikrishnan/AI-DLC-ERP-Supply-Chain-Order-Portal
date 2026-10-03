@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from src.modules.integration.application.reconcile import ReconcileSweeper
-from src.shared.types import ConnectionId
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-from .connection_lock import ConnectionLock
+    from src.modules.integration.application.reconcile import ReconcileSweeper
+    from src.shared.types import ConnectionId
+
+    from .connection_lock import ConnectionLock
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +43,7 @@ class ReconcileScheduler:
         for connection_id in self._connections_provider():
             try:
                 self._sweep_one(connection_id)
-            except Exception:  # noqa: BLE001 - one connection's failure (bad secret,
+            except Exception:
                 # unreachable ERP) must not stop the sweep for every other connection,
                 # or kill this loop until the next scheduler restart.
                 log.exception("reconcile sweep failed for connection_id=%s", connection_id)
@@ -51,6 +54,9 @@ class ReconcileScheduler:
             return
         with self._lock.try_acquire(str(connection_id)) as acquired:
             if not acquired:
-                log.info("skip connection_id=%s — already being swept by another worker replica", connection_id)
+                log.info(
+                    "skip connection_id=%s — already being swept by another worker replica",
+                    connection_id,
+                )
                 return
             self._sweeper.run(connection_id, self._open_orders_provider(connection_id))

@@ -7,15 +7,18 @@ are the fast path; this guarantees eventual correctness.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-from src.shared.types import ConnectionId
-
-from ..domain.status_mapping import map_native_status
-from .ports import ConnectionResolver, ErpAdapter
+from typing import TYPE_CHECKING
 
 # reuse the inbound status port shape (order_id, CanonicalStatus)
-from src.modules.webhooks_inbound.application.ports import OrderLocator, OrderStatusPort
+from ..domain.status_mapping import map_native_status
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from src.modules.webhooks_inbound.application.ports import OrderLocator, OrderStatusPort
+    from src.shared.types import ConnectionId
+
+    from .ports import ConnectionResolver, ErpAdapter
 
 
 class ReconcileSweeper:

@@ -7,9 +7,10 @@ outbox; tests/local use the in-memory one.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from .events import StoredEvent
+if TYPE_CHECKING:
+    from .events import StoredEvent
 
 
 @runtime_checkable

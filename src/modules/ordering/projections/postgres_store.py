@@ -10,10 +10,11 @@ that column.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import BigInteger, Column, DateTime, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.money import (
     money_from_payload,
@@ -35,6 +36,9 @@ from .read_models import (
     invoice_status,
     status_label,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 
@@ -118,17 +122,21 @@ class PostgresOrderProjectionStore:
         parties = parties or Parties()
         session = self._session_factory()
         try:
-            stmt = pg_insert(orders_table).values(
-                order_id=order_id,
-                tenant_id=tenant_id,
-                client_reference=client_reference,
-                state=OrderState.SUBMITTED.value,
-                lines=[_line_to_json(line) for line in lines],
-                quote_id=parties.quote_id,
-                operating_company_id=parties.operating_company_id,
-                end_customer_name=parties.end_customer_name,
-                ship_to=parties.ship_to,
-            ).on_conflict_do_nothing(index_elements=["order_id"])
+            stmt = (
+                pg_insert(orders_table)
+                .values(
+                    order_id=order_id,
+                    tenant_id=tenant_id,
+                    client_reference=client_reference,
+                    state=OrderState.SUBMITTED.value,
+                    lines=[_line_to_json(line) for line in lines],
+                    quote_id=parties.quote_id,
+                    operating_company_id=parties.operating_company_id,
+                    end_customer_name=parties.end_customer_name,
+                    ship_to=parties.ship_to,
+                )
+                .on_conflict_do_nothing(index_elements=["order_id"])
+            )
             session.execute(stmt)
             session.commit()
         except Exception:
@@ -147,7 +155,9 @@ class PostgresOrderProjectionStore:
                 session.commit()
                 return
             session.execute(
-                orders_table.update().where(orders_table.c.order_id == order_id).values(state=state.value)
+                orders_table.update()
+                .where(orders_table.c.order_id == order_id)
+                .values(state=state.value)
             )
             label = status_label(state)
             last_label = session.execute(
@@ -178,7 +188,9 @@ class PostgresOrderProjectionStore:
     def _set(self, order_id: str, **values: object) -> None:
         session = self._session_factory()
         try:
-            session.execute(orders_table.update().where(orders_table.c.order_id == order_id).values(**values))
+            session.execute(
+                orders_table.update().where(orders_table.c.order_id == order_id).values(**values)
+            )
             session.commit()
         except Exception:
             session.rollback()
@@ -200,7 +212,9 @@ class PostgresOrderProjectionStore:
                 if str(line.get("line_id") or line.get("product_key")) == line_id:
                     lines[i] = mutate(dict(line))
                     break
-            session.execute(orders_table.update().where(orders_table.c.order_id == order_id).values(lines=lines))
+            session.execute(
+                orders_table.update().where(orders_table.c.order_id == order_id).values(lines=lines)
+            )
             session.commit()
         except Exception:
             session.rollback()
@@ -209,7 +223,12 @@ class PostgresOrderProjectionStore:
             session.close()
 
     def record_fulfillment(
-        self, order_id: str, line_id: str, quantity: float, carrier: str | None, proof_of_delivery: str | None
+        self,
+        order_id: str,
+        line_id: str,
+        quantity: float,
+        carrier: str | None,
+        proof_of_delivery: str | None,
     ) -> None:
         def mutate(line: dict) -> dict:
             line["shipped_quantity"] = float(line.get("shipped_quantity") or 0.0) + quantity
@@ -240,7 +259,7 @@ class PostgresOrderProjectionStore:
 
     @staticmethod
     def _subtotal(lines: list[OrderLineView]):
-        return sum_money([l.line_total for l in lines if l.line_total is not None])
+        return sum_money([line.line_total for line in lines if line.line_total is not None])
 
     def _timeline(self, session: Session, order_id: str) -> list[TimelineEntry]:
         rows = session.execute(
@@ -248,7 +267,9 @@ class PostgresOrderProjectionStore:
             .where(order_status_history_table.c.order_id == order_id)
             .order_by(order_status_history_table.c.id)
         ).all()
-        return [TimelineEntry(status=row.state, occurred_at=row.occurred_at.isoformat()) for row in rows]
+        return [
+            TimelineEntry(status=row.state, occurred_at=row.occurred_at.isoformat()) for row in rows
+        ]
 
     @staticmethod
     def _parties(row) -> Parties:
@@ -288,7 +309,9 @@ class PostgresOrderProjectionStore:
     def list_reseller_views(self, tenant_id: str) -> list[ResellerOrderView]:
         session = self._session_factory()
         try:
-            rows = session.execute(select(orders_table).where(orders_table.c.tenant_id == tenant_id)).all()
+            rows = session.execute(
+                select(orders_table).where(orders_table.c.tenant_id == tenant_id)
+            ).all()
             views = []
             for row in rows:
                 lines = self._lines(row.lines)
@@ -313,7 +336,9 @@ class PostgresOrderProjectionStore:
     def get_operator_view(self, order_id: str) -> OperatorOrderView | None:
         session = self._session_factory()
         try:
-            row = session.execute(select(orders_table).where(orders_table.c.order_id == order_id)).first()
+            row = session.execute(
+                select(orders_table).where(orders_table.c.order_id == order_id)
+            ).first()
             if row is None:
                 return None
             lines = self._lines(row.lines)
@@ -330,7 +355,9 @@ class PostgresOrderProjectionStore:
         finally:
             session.close()
 
-    def _operator_view(self, session: Session, row, lines: list[OrderLineView]) -> OperatorOrderView:
+    def _operator_view(
+        self, session: Session, row, lines: list[OrderLineView]
+    ) -> OperatorOrderView:
         return OperatorOrderView(
             order_id=row.order_id,
             tenant_id=row.tenant_id,

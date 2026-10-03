@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.types import BindingId, ConnectionId, TenantId
+if TYPE_CHECKING:
+    from src.shared.types import BindingId, ConnectionId, TenantId
 
-from ..domain.models import TenantConnectionBinding
+    from ..domain.models import TenantConnectionBinding
 
 
 class BindingRepository(Protocol):

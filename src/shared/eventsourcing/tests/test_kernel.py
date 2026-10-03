@@ -48,7 +48,7 @@ class Counter(Aggregate):
 
     # behavior (invariants live here, not in a service)
     @classmethod
-    def create(cls, id: str, name: str) -> "Counter":
+    def create(cls, id: str, name: str) -> Counter:
         c = cls(id)
         c.emit(Created(name=name))
         return c
@@ -179,5 +179,5 @@ def test_unknown_event_type_on_deserialize() -> None:
 
 def test_events_are_immutable() -> None:
     e = Incremented(by=1)
-    with pytest.raises(Exception):
+    with pytest.raises(AttributeError):  # frozen dataclass -> FrozenInstanceError
         e.by = 2  # type: ignore[misc]

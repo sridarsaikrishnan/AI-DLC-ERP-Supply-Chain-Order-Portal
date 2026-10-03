@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.types import TenantId
+if TYPE_CHECKING:
+    from src.shared.types import TenantId
 
-from ..domain.models import OperatingCompany, Quote
+    from ..domain.models import OperatingCompany, Quote
 
 
 class QuoteRepository(Protocol):

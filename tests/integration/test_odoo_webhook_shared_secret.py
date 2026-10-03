@@ -21,7 +21,6 @@ pytest.importorskip("sqlalchemy")
 pytest.importorskip("httpx")
 
 from sqlalchemy import text  # noqa: E402
-
 from src.shared.config import get_settings  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 from src.shared.persistence.event_store import PostgresEventStore  # noqa: E402
@@ -37,7 +36,9 @@ _AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL")
 if not _AWS_ENDPOINT_URL:
     # This test creates/deletes real Secrets Manager secrets. Without an explicit
     # endpoint_url, boto3 falls back to REAL AWS — never let that happen implicitly.
-    pytest.skip("AWS_ENDPOINT_URL not set (must point at floci, not real AWS)", allow_module_level=True)
+    pytest.skip(
+        "AWS_ENDPOINT_URL not set (must point at floci, not real AWS)", allow_module_level=True
+    )
 
 try:
     import boto3
@@ -63,7 +64,6 @@ def _app():
 
 def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
     from fastapi.testclient import TestClient
-
     from src.modules.catalog.domain.models import Item
     from src.modules.connections.domain.models import ErpConnection, ErpType
     from src.modules.tenancy.domain.models import BindingStatus, TenantConnectionBinding
@@ -93,7 +93,11 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             webhook_secret_ref=webhook_secret_name,
         )
     )
-    container.items.add(Item(item_id=ItemId(_id("item")), sku=sku, name="Widget", owning_connection_id=connection_id))
+    container.items.add(
+        Item(
+            item_id=ItemId(_id("item")), sku=sku, name="Widget", owning_connection_id=connection_id
+        )
+    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId(_id("bind")),
@@ -104,14 +108,44 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
         )
     )
 
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    from src.modules.quoting.domain.models import EndCustomer, QuoteLine
+    from src.shared.money import Money
+
+    company = container.quote_service.create_operating_company(
+        name="Webhook Co", country="US", language="en"
+    )
+    quote = container.quote_service.issue_quote(
+        tenant_id=TenantId(tenant),
+        operating_company_id=company.operating_company_id,
+        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
+        currency="USD",
+        valid_from=date.today() - timedelta(days=1),
+        valid_until=date.today() + timedelta(days=30),
+        lines=[
+            QuoteLine(
+                product_key=sku, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA"
+            )
+        ],
+    )
+
     client = TestClient(app)
     order_id = None
     try:
         resp = client.post(
             "/graphql/reseller",
             json={
-                "query": "mutation($ref:String!,$lines:[OrderLineInput!]!){ placeOrder(clientReference:$ref, lines:$lines) }",
-                "variables": {"ref": "PO-WEBHOOK", "lines": [{"productKey": sku, "quantity": 1, "unitOfMeasure": "EA"}]},
+                "query": (
+                    "mutation($quoteId:String!,$ref:String!,$lines:[OrderLineInput!]!)"
+                    "{ placeOrder(quoteId:$quoteId, clientReference:$ref, lines:$lines) }"
+                ),
+                "variables": {
+                    "quoteId": quote.quote_id,
+                    "ref": "PO-WEBHOOK",
+                    "lines": [{"productKey": sku, "quantity": 1}],
+                },
             },
             headers={"x-tenant-id": tenant},
         )
@@ -160,13 +194,32 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
         _floci.delete_secret(SecretId=login_secret_name, ForceDeleteWithoutRecovery=True)
         if order_id is not None:
             with _factory() as session, session.begin():
-                session.execute(text("DELETE FROM outbox WHERE stream_id = :oid"), {"oid": order_id})
-                session.execute(text("DELETE FROM events WHERE stream_id = :oid"), {"oid": order_id})
-                session.execute(text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id})
+                session.execute(
+                    text("DELETE FROM outbox WHERE stream_id = :oid"), {"oid": order_id}
+                )
+                session.execute(
+                    text("DELETE FROM events WHERE stream_id = :oid"), {"oid": order_id}
+                )
+                session.execute(
+                    text("DELETE FROM order_status_history WHERE order_id = :oid"),
+                    {"oid": order_id},
+                )
                 session.execute(text("DELETE FROM orders WHERE order_id = :oid"), {"oid": order_id})
         with _factory() as session, session.begin():
             session.execute(
-                text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"), {"cid": connection}
+                text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"),
+                {"cid": connection},
             )
-            session.execute(text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection})
-            session.execute(text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection})
+            session.execute(
+                text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection}
+            )
+            session.execute(
+                text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
+            )
+            session.execute(
+                text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote.quote_id}
+            )
+            session.execute(
+                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
+                {"ocid": company.operating_company_id},
+            )

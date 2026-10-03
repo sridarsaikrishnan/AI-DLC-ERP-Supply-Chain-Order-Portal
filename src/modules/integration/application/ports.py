@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from src.shared.types import ConnectionId, OrderId
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId, OrderId
 
 
 class UnknownErpType(Exception):
@@ -39,7 +40,9 @@ class SubmissionResult:
 
 # The vocabulary a capability can name — not enforced (no gating logic reads this yet,
 # ADR-0015), just a declared, inspectable contract instead of implicit per-adapter code.
-KNOWN_CAPABILITIES = frozenset({"tax", "uom", "idempotency", "fail_closed_product", "multi_currency", "partial_fulfillment"})
+KNOWN_CAPABILITIES = frozenset(
+    {"tax", "uom", "idempotency", "fail_closed_product", "multi_currency", "partial_fulfillment"}
+)
 
 
 class ErpAdapter(Protocol):

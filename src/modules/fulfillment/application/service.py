@@ -11,14 +11,16 @@ quantity bump (or the reverse). Lines are keyed by `line_id` now (FR-A3).
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.modules.ordering.domain.aggregate import Order
-from src.shared.eventsourcing import EventSourcedRepository
 from src.shared.types import generate_id
 from src.shared.unit_of_work import NullUnitOfWork, UnitOfWork
 
 from ..domain.aggregates import Fulfillment, Invoice, Payment, Return
+
+if TYPE_CHECKING:
+    from src.modules.ordering.domain.aggregate import Order
+    from src.shared.eventsourcing import EventSourcedRepository
 
 
 def _line_id(line: dict[str, Any]) -> str:
@@ -46,16 +48,22 @@ class FulfillmentService:
         proof_of_delivery: str | None = None,
     ) -> Fulfillment:
         fulfillment = Fulfillment.record(
-            fulfillment_id=generate_id("fulf"), order_id=order_id, lines=lines,
-            carrier=carrier, tracking_number=tracking_number, proof_of_delivery=proof_of_delivery,
+            fulfillment_id=generate_id("fulf"),
+            order_id=order_id,
+            lines=lines,
+            carrier=carrier,
+            tracking_number=tracking_number,
+            proof_of_delivery=proof_of_delivery,
         )
         with self._uow.atomic():
             self._fulfillments.save(fulfillment)
             order = self._orders.get(order_id)
             for line in lines:
                 order.record_fulfillment(
-                    _line_id(line), Decimal(str(line["quantity"])),
-                    carrier=carrier, proof_of_delivery=proof_of_delivery,
+                    _line_id(line),
+                    Decimal(str(line["quantity"])),
+                    carrier=carrier,
+                    proof_of_delivery=proof_of_delivery,
                 )
             self._orders.save(order)
         return fulfillment
@@ -72,8 +80,15 @@ class InvoiceService:
         self._orders = orders
         self._uow = uow or NullUnitOfWork()
 
-    def record(self, *, order_id: str, lines: list[dict[str, Any]], erp_invoice_id: str | None = None) -> Invoice:
-        invoice = Invoice.record(invoice_id=generate_id("inv"), order_id=order_id, lines=lines, erp_invoice_id=erp_invoice_id)
+    def record(
+        self, *, order_id: str, lines: list[dict[str, Any]], erp_invoice_id: str | None = None
+    ) -> Invoice:
+        invoice = Invoice.record(
+            invoice_id=generate_id("inv"),
+            order_id=order_id,
+            lines=lines,
+            erp_invoice_id=erp_invoice_id,
+        )
         with self._uow.atomic():
             self._invoices.save(invoice)
             order = self._orders.get(order_id)
@@ -90,8 +105,16 @@ class PaymentService:
     def __init__(self, payments: EventSourcedRepository[Payment]) -> None:
         self._payments = payments
 
-    def record(self, *, order_id: str, amount: dict[str, str], method: str, invoice_id: str | None = None) -> Payment:
-        payment = Payment.record(payment_id=generate_id("pay"), order_id=order_id, amount=amount, method=method, invoice_id=invoice_id)
+    def record(
+        self, *, order_id: str, amount: dict[str, str], method: str, invoice_id: str | None = None
+    ) -> Payment:
+        payment = Payment.record(
+            payment_id=generate_id("pay"),
+            order_id=order_id,
+            amount=amount,
+            method=method,
+            invoice_id=invoice_id,
+        )
         self._payments.save(payment)
         return payment
 
@@ -104,6 +127,8 @@ class ReturnService:
         self._returns = returns
 
     def record(self, *, order_id: str, lines: list[dict[str, Any]], reason_code: str) -> Return:
-        ret = Return.record(return_id=generate_id("ret"), order_id=order_id, lines=lines, reason_code=reason_code)
+        ret = Return.record(
+            return_id=generate_id("ret"), order_id=order_id, lines=lines, reason_code=reason_code
+        )
         self._returns.save(ret)
         return ret

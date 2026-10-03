@@ -11,14 +11,18 @@ handles outbox, and the relay handles publishing.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.eventsourcing import ConcurrencyError, Snapshot, StoredEvent
 
 from .engine import current_session
 from .tables import events_table, outbox_table, snapshots_table
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session, sessionmaker
 
 
 class PostgresEventStore:
@@ -83,11 +87,18 @@ class PostgresEventStore:
     def load(self, stream_id: str, after_version: int = 0) -> list[StoredEvent]:
         session = self._session_factory()
         try:
-            rows = session.execute(
-                select(events_table)
-                .where(events_table.c.stream_id == stream_id, events_table.c.version > after_version)
-                .order_by(events_table.c.version)
-            ).mappings().all()
+            rows = (
+                session.execute(
+                    select(events_table)
+                    .where(
+                        events_table.c.stream_id == stream_id,
+                        events_table.c.version > after_version,
+                    )
+                    .order_by(events_table.c.version)
+                )
+                .mappings()
+                .all()
+            )
         finally:
             session.close()
         return [
@@ -108,22 +119,35 @@ class PostgresEventStore:
     def load_snapshot(self, stream_id: str) -> Snapshot | None:
         session = self._session_factory()
         try:
-            row = session.execute(
-                select(snapshots_table).where(snapshots_table.c.stream_id == stream_id)
-            ).mappings().first()
+            row = (
+                session.execute(
+                    select(snapshots_table).where(snapshots_table.c.stream_id == stream_id)
+                )
+                .mappings()
+                .first()
+            )
         finally:
             session.close()
         if row is None:
             return None
-        return Snapshot(stream_id=row["stream_id"], version=row["version"], state=row["state"], taken_at=row["taken_at"])
+        return Snapshot(
+            stream_id=row["stream_id"],
+            version=row["version"],
+            state=row["state"],
+            taken_at=row["taken_at"],
+        )
 
     def save_snapshot(self, snapshot: Snapshot) -> None:
         session = self._session_factory()
         try:
-            session.execute(snapshots_table.delete().where(snapshots_table.c.stream_id == snapshot.stream_id))
+            session.execute(
+                snapshots_table.delete().where(snapshots_table.c.stream_id == snapshot.stream_id)
+            )
             session.execute(
                 snapshots_table.insert().values(
-                    stream_id=snapshot.stream_id, version=snapshot.version, state=snapshot.state,
+                    stream_id=snapshot.stream_id,
+                    version=snapshot.version,
+                    state=snapshot.state,
                     taken_at=snapshot.taken_at,
                 )
             )

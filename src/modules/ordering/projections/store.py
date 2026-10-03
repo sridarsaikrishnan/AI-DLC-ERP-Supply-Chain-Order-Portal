@@ -26,7 +26,7 @@ from .read_models import (
 
 
 def _subtotal(lines: list[OrderLineView]):
-    return sum_money([l.line_total for l in lines if l.line_total is not None])
+    return sum_money([line.line_total for line in lines if line.line_total is not None])
 
 
 @dataclass
@@ -94,16 +94,24 @@ class OrderProjectionStore:
                 return
 
     def record_fulfillment(
-        self, order_id: str, line_id: str, quantity: float, carrier: str | None, proof_of_delivery: str | None
+        self,
+        order_id: str,
+        line_id: str,
+        quantity: float,
+        carrier: str | None,
+        proof_of_delivery: str | None,
     ) -> None:
         record = self._records.get(order_id)
         if record is None:
             return
         for line in record.lines:
             if line.line_id == line_id:
-                delivered_delta = quantity if line_is_delivered(line.kind, carrier, proof_of_delivery) else 0.0
+                delivered_delta = (
+                    quantity if line_is_delivered(line.kind, carrier, proof_of_delivery) else 0.0
+                )
                 self._update_line(
-                    order_id, line_id,
+                    order_id,
+                    line_id,
                     shipped_quantity=line.shipped_quantity + quantity,
                     delivered_quantity=line.delivered_quantity + delivered_delta,
                 )
@@ -115,7 +123,9 @@ class OrderProjectionStore:
             return
         for line in record.lines:
             if line.line_id == line_id:
-                self._update_line(order_id, line_id, invoiced_quantity=line.invoiced_quantity + invoiced_delta)
+                self._update_line(
+                    order_id, line_id, invoiced_quantity=line.invoiced_quantity + invoiced_delta
+                )
                 return
 
     def set_scheduled_date(self, order_id: str, line_id: str, scheduled_date: str) -> None:

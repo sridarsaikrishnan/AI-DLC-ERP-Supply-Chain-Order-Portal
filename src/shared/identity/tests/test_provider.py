@@ -4,7 +4,9 @@ from src.shared.identity.provider import HeaderStubIdentityProvider
 
 
 def test_stub_trusts_headers_outright() -> None:
-    principal = HeaderStubIdentityProvider().authenticate({"x-tenant-id": "tnt_1", "x-roles": "OPERATOR,ADMIN"})
+    principal = HeaderStubIdentityProvider().authenticate(
+        {"x-tenant-id": "tnt_1", "x-roles": "OPERATOR,ADMIN"}
+    )
     assert principal is not None
     assert principal.tenant_id == "tnt_1"
     assert principal.roles == ("OPERATOR", "ADMIN")

@@ -12,7 +12,8 @@ class ConcurrencyError(EventSourcingError):
 
     def __init__(self, stream_id: str, expected: int, actual: int) -> None:
         super().__init__(
-            f"concurrency conflict on stream '{stream_id}': expected version {expected}, found {actual}"
+            f"concurrency conflict on stream '{stream_id}': "
+            f"expected version {expected}, found {actual}"
         )
         self.stream_id = stream_id
         self.expected = expected

@@ -8,7 +8,7 @@ price resolution for an order reads a quote through `QuoteRepository` directly (
 
 from __future__ import annotations
 
-from datetime import date
+from typing import TYPE_CHECKING
 
 from src.shared.types import TenantId, generate_id
 
@@ -19,7 +19,11 @@ from ..domain.models import (
     QuoteLine,
     QuoteStatus,
 )
-from .ports import OperatingCompanyRepository, QuoteRepository
+
+if TYPE_CHECKING:
+    from datetime import date
+
+    from .ports import OperatingCompanyRepository, QuoteRepository
 
 
 class QuoteService:
@@ -28,7 +32,9 @@ class QuoteService:
         self._companies = companies
 
     # --- operating company (office card) ---
-    def create_operating_company(self, *, name: str, country: str, language: str) -> OperatingCompany:
+    def create_operating_company(
+        self, *, name: str, country: str, language: str
+    ) -> OperatingCompany:
         company = OperatingCompany(
             operating_company_id=generate_id("oc"), name=name, country=country, language=language
         )

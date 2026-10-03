@@ -10,12 +10,16 @@ payload, submits via the ERP adapter, and drives the order aggregate:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from src.shared.eventsourcing import StoredEvent
 from src.shared.types import ConnectionId, OrderId
 
-from .ports import ConnectionResolver, ErpAdapter, OrderCommandPort, OrderReader
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from src.shared.eventsourcing import StoredEvent
+
+    from .ports import ConnectionResolver, ErpAdapter, OrderCommandPort, OrderReader
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +50,9 @@ class DeliveryHandler:
 
         target = self._connections.resolve(connection_id)
         if target is None:
-            self._orders_cmd.reject(order_id, "connection_unavailable", "target ERP connection unavailable")
+            self._orders_cmd.reject(
+                order_id, "connection_unavailable", "target ERP connection unavailable"
+            )
             return
 
         payload = self._orders_read.read_payload(order_id)
@@ -58,13 +64,19 @@ class DeliveryHandler:
         # Declared, not gated on yet (ADR-0015) — logged so a capability gap (e.g. this
         # ERP doesn't support tax) is visible in context, rather than only inferable
         # from reading the adapter's own source.
-        log.debug("submitting via %s, capabilities=%s", target.erp_type, sorted(getattr(adapter, "capabilities", frozenset())))
+        log.debug(
+            "submitting via %s, capabilities=%s",
+            target.erp_type,
+            sorted(getattr(adapter, "capabilities", frozenset())),
+        )
         result = adapter.submit(target, payload)
         if result.success:
             assert result.erp_order_id is not None
             self._orders_cmd.send_to_erp(order_id, result.erp_order_id)
         elif result.terminal:
-            self._orders_cmd.reject(order_id, "erp_rejected", result.error or "ERP rejected the order")
+            self._orders_cmd.reject(
+                order_id, "erp_rejected", result.error or "ERP rejected the order"
+            )
         else:
             self._orders_cmd.mark_retrying(order_id, attempt=1, next_retry_at="")
             raise DeliveryRetry(result.error or "transient ERP failure")

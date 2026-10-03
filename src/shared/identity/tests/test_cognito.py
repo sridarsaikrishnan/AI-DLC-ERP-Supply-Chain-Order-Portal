@@ -38,7 +38,10 @@ class _FakeJwkClient:
 
 def _provider() -> CognitoIdentityProvider:
     return CognitoIdentityProvider(
-        user_pool_id="us-east-1_test", client_id=_CLIENT_ID, issuer=_ISSUER, jwk_client=_FakeJwkClient()
+        user_pool_id="us-east-1_test",
+        client_id=_CLIENT_ID,
+        issuer=_ISSUER,
+        jwk_client=_FakeJwkClient(),
     )
 
 
@@ -172,7 +175,9 @@ def test_access_token_scope_from_a_different_resource_server_is_ignored() -> Non
 
 
 def test_access_token_with_multiple_role_scopes_captures_all_of_them() -> None:
-    token = _access_token(scope="erp-portal/tenant.tnt_demo erp-portal/role.RESELLER erp-portal/role.BILLING")
+    token = _access_token(
+        scope="erp-portal/tenant.tnt_demo erp-portal/role.RESELLER erp-portal/role.BILLING"
+    )
     principal = _provider().authenticate(_headers(token))
     assert principal is not None
     assert principal.roles == ("RESELLER", "BILLING")

@@ -16,7 +16,6 @@ pytest.importorskip("sqlalchemy")
 pytest.importorskip("httpx")
 
 from sqlalchemy import text  # noqa: E402
-
 from src.shared.config import get_settings  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 
@@ -41,10 +40,17 @@ def _app(profile: str):
     return create_app()
 
 
-def _seed(container, tenant: str, connection: str, sku: str) -> None:
+def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
+    """Seed a connection + item + verified binding + an issued quote. Returns
+    (quote_id, operating_company_id) — an order replies to the quote (Increment 5)."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
     from src.modules.catalog.domain.models import Item
     from src.modules.connections.domain.models import ErpConnection, ErpType
+    from src.modules.quoting.domain.models import EndCustomer, QuoteLine
     from src.modules.tenancy.domain.models import BindingStatus, TenantConnectionBinding
+    from src.shared.money import Money
     from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
 
     os.environ["SMOKE_ODOO_SECRET"] = "local-secret"  # resolved via EnvSecretStore (memory profile)
@@ -59,7 +65,12 @@ def _seed(container, tenant: str, connection: str, sku: str) -> None:
         )
     )
     container.items.add(
-        Item(item_id=ItemId(_id("item")), sku=sku, name="Widget", owning_connection_id=ConnectionId(connection))
+        Item(
+            item_id=ItemId(_id("item")),
+            sku=sku,
+            name="Widget",
+            owning_connection_id=ConnectionId(connection),
+        )
     )
     container.bindings.add(
         TenantConnectionBinding(
@@ -70,17 +81,39 @@ def _seed(container, tenant: str, connection: str, sku: str) -> None:
             status=BindingStatus.VERIFIED,
         )
     )
+    company = container.quote_service.create_operating_company(
+        name="Smoke Co", country="US", language="en"
+    )
+    quote = container.quote_service.issue_quote(
+        tenant_id=TenantId(tenant),
+        operating_company_id=company.operating_company_id,
+        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
+        currency="USD",
+        valid_from=date.today() - timedelta(days=1),
+        valid_until=date.today() + timedelta(days=30),
+        lines=[
+            QuoteLine(
+                product_key=sku, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA"
+            )
+        ],
+    )
+    return quote.quote_id, company.operating_company_id
 
 
 _PLACE_ORDER = """
-mutation($ref: String!, $lines: [OrderLineInput!]!) {
-  placeOrder(clientReference: $ref, lines: $lines)
+mutation($quoteId: String!, $ref: String!, $lines: [OrderLineInput!]!) {
+  placeOrder(quoteId: $quoteId, clientReference: $ref, lines: $lines)
 }
 """
 
 _GET_ORDER = """
 query($id: String!) {
-  order(orderId: $id) { orderId status lines { productKey quantity unitOfMeasure } timeline { status occurredAt } }
+  order(orderId: $id) {
+    orderId
+    status
+    lines { productKey quantity unitOfMeasure }
+    timeline { status occurredAt }
+  }
 }
 """
 
@@ -90,14 +123,21 @@ def test_memory_profile_places_order_and_delivers_inline() -> None:
 
     app = _app("memory")
     tenant, connection, sku = _id("tnt"), _id("conn"), _id("SKU")
-    _seed(app.state.container, tenant, connection, sku)
+    quote_id, _oc_id = _seed(app.state.container, tenant, connection, sku)
 
     client = TestClient(app)
     assert client.get("/livez").status_code == 200
 
     resp = client.post(
         "/graphql/reseller",
-        json={"query": _PLACE_ORDER, "variables": {"ref": "PO-SMOKE", "lines": [{"productKey": sku, "quantity": 1, "unitOfMeasure": "EA"}]}},
+        json={
+            "query": _PLACE_ORDER,
+            "variables": {
+                "quoteId": quote_id,
+                "ref": "PO-SMOKE",
+                "lines": [{"productKey": sku, "quantity": 1}],
+            },
+        },
         headers={"x-tenant-id": tenant},
     )
     assert resp.status_code == 200
@@ -114,12 +154,18 @@ def test_memory_profile_places_order_and_delivers_inline() -> None:
     # Through the actual GraphQL query resolver this time, not just the container — this
     # is what caught `OrderLineType(pos, pos, pos)` breaking under strawberry (types need
     # kwargs), which the container-only checks above never touch.
-    resp = client.post("/graphql/reseller", json={"query": _GET_ORDER, "variables": {"id": order_id}}, headers={"x-tenant-id": tenant})
+    resp = client.post(
+        "/graphql/reseller",
+        json={"query": _GET_ORDER, "variables": {"id": order_id}},
+        headers={"x-tenant-id": tenant},
+    )
     assert resp.status_code == 200
     gql_body = resp.json()
     assert gql_body.get("errors") is None, gql_body
     assert gql_body["data"]["order"]["status"] == "Sent to ERP"
-    assert gql_body["data"]["order"]["lines"] == [{"productKey": sku, "quantity": 1.0, "unitOfMeasure": "EA"}]
+    assert gql_body["data"]["order"]["lines"] == [
+        {"productKey": sku, "quantity": 1.0, "unitOfMeasure": "EA"}
+    ]
 
 
 def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_worker() -> None:
@@ -127,18 +173,27 @@ def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_wo
 
     app = _app("postgres")
     tenant, connection, sku = _id("tnt"), _id("conn"), _id("SKU")
-    _seed(app.state.container, tenant, connection, sku)
+    quote_id, oc_id = _seed(app.state.container, tenant, connection, sku)
     assert app.state.container.bus is None
 
     client = TestClient(app)
     resp = client.post(
         "/graphql/reseller",
-        json={"query": _PLACE_ORDER, "variables": {"ref": "PO-SMOKE", "lines": [{"productKey": sku, "quantity": 1, "unitOfMeasure": "EA"}]}},
+        json={
+            "query": _PLACE_ORDER,
+            "variables": {
+                "quoteId": quote_id,
+                "ref": "PO-SMOKE",
+                "lines": [{"productKey": sku, "quantity": 1}],
+            },
+        },
         headers={"x-tenant-id": tenant},
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body.get("errors") is None, body  # this is exactly what test_memory_profile catches if it regresses
+    assert (
+        body.get("errors") is None
+    ), body  # this is exactly what test_memory_profile catches if it regresses
     order_id = body["data"]["placeOrder"]
 
     try:
@@ -166,10 +221,22 @@ def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_wo
             session.execute(text("DELETE FROM events WHERE stream_id = :oid"), {"oid": order_id})
             # Also clean the projection, in case a worker happens to be running
             # concurrently against this same dev database and already consumed the event.
-            session.execute(text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id})
+            session.execute(
+                text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id}
+            )
             session.execute(text("DELETE FROM orders WHERE order_id = :oid"), {"oid": order_id})
             session.execute(
-                text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"), {"cid": connection}
+                text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"),
+                {"cid": connection},
             )
-            session.execute(text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection})
-            session.execute(text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection})
+            session.execute(
+                text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection}
+            )
+            session.execute(
+                text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
+            )
+            session.execute(text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote_id})
+            session.execute(
+                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
+                {"ocid": oc_id},
+            )

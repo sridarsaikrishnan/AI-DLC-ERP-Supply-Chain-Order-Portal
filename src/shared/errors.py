@@ -18,7 +18,7 @@ class AuthorizationError(PortalError):
 
 
 class NotFoundError(PortalError):
-    """Raised when a resource is not found (also used for cross-tenant access to avoid existence leaks)."""
+    """Not found — also used for cross-tenant access, to avoid leaking that a resource exists."""
 
 
 class ConfigurationError(PortalError):

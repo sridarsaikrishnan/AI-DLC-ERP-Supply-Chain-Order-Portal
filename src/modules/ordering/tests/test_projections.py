@@ -50,7 +50,10 @@ def _wire(items: InMemoryItemRepository | None = None, prices: dict[str, str] | 
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
         valid_until=date.today() + timedelta(days=30),
-        lines=[QuoteLine(product_key=s, unit_price=Money(Decimal(p), "USD"), unit_of_measure="EA") for s, p in prices.items()],
+        lines=[
+            QuoteLine(product_key=s, unit_price=Money(Decimal(p), "USD"), unit_of_measure="EA")
+            for s, p in prices.items()
+        ],
     )
     svc = OrderService(repo, quotes, items, quote_service)
     return svc, repo, bus, projections, quote.quote_id
@@ -59,7 +62,9 @@ def _wire(items: InMemoryItemRepository | None = None, prices: dict[str, str] | 
 def test_reseller_view_reflects_submission_and_hides_erp_identity() -> None:
     svc, _repo, bus, projections, quote_id = _wire()
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-1",
         lines=[OrderLineInput("ANVIL", Decimal(2))],
     )
     bus.run_until_empty()
@@ -68,7 +73,7 @@ def test_reseller_view_reflects_submission_and_hides_erp_identity() -> None:
     assert view is not None
     assert view.client_reference == "PO-1"
     assert view.status == "Submitted"
-    assert [l.product_key for l in view.lines] == ["ANVIL"]
+    assert [line.product_key for line in view.lines] == ["ANVIL"]
     assert view.parties.end_customer_name == "Downstream"  # parties are reseller-safe
     assert view.parties.ship_to == "1 Main St"
     # FR-19: reseller view type has no ERP identity fields at all
@@ -79,14 +84,18 @@ def test_reseller_view_reflects_submission_and_hides_erp_identity() -> None:
 def test_order_resolves_quote_price_and_projection_computes_subtotal() -> None:
     svc, _repo, bus, projections, quote_id = _wire(prices={"ANVIL": "19.99"})
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-1",
         lines=[OrderLineInput("ANVIL", Decimal(2))],
     )
     bus.run_until_empty()
 
     view = projections.get_reseller_view("tnt_a", order_id)
     assert view is not None
-    assert view.lines[0].unit_price == Money(Decimal("19.99"), "USD")  # from the quote, not the catalog
+    assert view.lines[0].unit_price == Money(
+        Decimal("19.99"), "USD"
+    )  # from the quote, not the catalog
     assert view.lines[0].line_total == Money(Decimal("39.98"), "USD")  # 2 * 19.99
     assert view.subtotal == Money(Decimal("39.98"), "USD")
 
@@ -95,7 +104,9 @@ def test_line_not_on_quote_is_refused() -> None:
     svc, _repo, _bus, _projections, quote_id = _wire(prices={"ANVIL": "19.99"})
     with pytest.raises(PriceNotQuoted):
         svc.place_order(
-            tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+            tenant_id=TenantId("tnt_a"),
+            quote_id=quote_id,
+            client_reference="PO-1",
             lines=[OrderLineInput("NOT_QUOTED", Decimal(1))],
         )
 
@@ -103,11 +114,16 @@ def test_line_not_on_quote_is_refused() -> None:
 def test_line_kind_flows_from_catalog_to_projection() -> None:
     items = InMemoryItemRepository()
     CatalogService(items, CollectingFactPublisher()).sync_item(
-        sku="LIC", name="A License", owning_connection_id=ConnectionId("conn_1"), kind=ItemKind.LICENSE
+        sku="LIC",
+        name="A License",
+        owning_connection_id=ConnectionId("conn_1"),
+        kind=ItemKind.LICENSE,
     )
     svc, _repo, bus, projections, quote_id = _wire(items=items, prices={"LIC": "5.00"})
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-1",
         lines=[OrderLineInput("LIC", Decimal(1))],
     )
     bus.run_until_empty()
@@ -119,7 +135,9 @@ def test_line_kind_flows_from_catalog_to_projection() -> None:
 def test_tenant_scoping_blocks_cross_tenant_read() -> None:
     svc, _repo, bus, projections, quote_id = _wire()
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-1",
         lines=[OrderLineInput("ANVIL", Decimal(1))],
     )
     bus.run_until_empty()
@@ -134,7 +152,9 @@ def test_operator_view_exposes_erp_identity_and_timeline() -> None:
     bus.subscribe("projections", OrderProjector(projections).handle)
 
     order = Order.submit(
-        order_id=OrderId("ord_1"), tenant_id=TenantId("tnt_a"), client_reference="PO-1",
+        order_id=OrderId("ord_1"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-1",
         lines=[_line("ANVIL", 1, "l_a")],
     )
     order.validate(ConnectionId("conn_1"))
@@ -165,7 +185,12 @@ def test_projector_feeds_reverse_routing_locator() -> None:
 
     bus.subscribe("projections", OrderProjector(projections, locator=Locator()).handle)
 
-    order = Order.submit(order_id=OrderId("ord_9"), tenant_id=TenantId("t"), client_reference="r", lines=[_line("ANVIL", 1, "l_a")])
+    order = Order.submit(
+        order_id=OrderId("ord_9"),
+        tenant_id=TenantId("t"),
+        client_reference="r",
+        lines=[_line("ANVIL", 1, "l_a")],
+    )
     order.validate(ConnectionId("conn_1"))
     order.accept()
     order.send_to_erp("S00099")

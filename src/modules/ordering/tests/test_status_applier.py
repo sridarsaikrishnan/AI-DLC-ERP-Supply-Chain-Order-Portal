@@ -10,7 +10,9 @@ from src.shared.types import ConnectionId, OrderId, TenantId
 
 def _sent_order(repo: EventSourcedRepository[Order]) -> OrderId:
     order = Order.submit(
-        order_id=OrderId("ord_1"), tenant_id=TenantId("t"), client_reference="r",
+        order_id=OrderId("ord_1"),
+        tenant_id=TenantId("t"),
+        client_reference="r",
         lines=[OrderLine(product_key="ANVIL", quantity=1, unit_of_measure="EA", line_id="l_a")],
     )
     order.validate(ConnectionId("conn_1"))

@@ -8,11 +8,13 @@ domain. `append` enforces optimistic concurrency via the expected version.
 from __future__ import annotations
 
 import threading
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .errors import ConcurrencyError
-from .events import StoredEvent
-from .snapshots import Snapshot
+
+if TYPE_CHECKING:
+    from .events import StoredEvent
+    from .snapshots import Snapshot
 
 
 @runtime_checkable

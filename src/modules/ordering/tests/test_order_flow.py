@@ -51,7 +51,9 @@ def _wire(owners: dict[str, str], bound: set[tuple[str, str]], skus: list[str]):
     quotes = InMemoryQuoteRepository()
     companies = InMemoryOperatingCompanyRepository()
     quote_service = QuoteService(quotes, companies)
-    company = quote_service.create_operating_company(name="Distributor Co", country="US", language="en")
+    company = quote_service.create_operating_company(
+        name="Distributor Co", country="US", language="en"
+    )
     quote = quote_service.issue_quote(
         tenant_id=TenantId("tnt_a"),
         operating_company_id=company.operating_company_id,
@@ -59,7 +61,12 @@ def _wire(owners: dict[str, str], bound: set[tuple[str, str]], skus: list[str]):
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
         valid_until=date.today() + timedelta(days=30),
-        lines=[QuoteLine(product_key=s, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA") for s in skus],
+        lines=[
+            QuoteLine(
+                product_key=s, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA"
+            )
+            for s in skus
+        ],
     )
     service = OrderService(repo, quotes, InMemoryItemRepository(), quote_service)
     return service, repo, bus, quote.quote_id
@@ -68,7 +75,9 @@ def _wire(owners: dict[str, str], bound: set[tuple[str, str]], skus: list[str]):
 def test_place_order_routes_to_owning_connection() -> None:
     svc, repo, bus, quote_id = _wire({"ANVIL": "conn_1"}, {("tnt_a", "conn_1")}, ["ANVIL"])
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-1",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-1",
         lines=[OrderLineInput("ANVIL", Decimal(1))],
     )
     bus.run_until_empty()
@@ -85,7 +94,9 @@ def test_place_order_mixed_erp_is_rejected() -> None:
         ["ANVIL", "ROCKET"],
     )
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-2",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-2",
         lines=[OrderLineInput("ANVIL", Decimal(1)), OrderLineInput("ROCKET", Decimal(1))],
     )
     bus.run_until_empty()
@@ -96,7 +107,9 @@ def test_place_order_mixed_erp_is_rejected() -> None:
 def test_place_order_without_binding_is_rejected() -> None:
     svc, repo, bus, quote_id = _wire({"ANVIL": "conn_1"}, set(), ["ANVIL"])  # no verified binding
     order_id = svc.place_order(
-        tenant_id=TenantId("tnt_a"), quote_id=quote_id, client_reference="PO-3",
+        tenant_id=TenantId("tnt_a"),
+        quote_id=quote_id,
+        client_reference="PO-3",
         lines=[OrderLineInput("ANVIL", Decimal(1))],
     )
     bus.run_until_empty()

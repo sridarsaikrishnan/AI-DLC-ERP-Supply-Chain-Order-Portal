@@ -20,7 +20,6 @@ import pytest
 pytest.importorskip("sqlalchemy")
 
 from sqlalchemy import text  # noqa: E402
-
 from src.composition import build_container  # noqa: E402
 from src.modules.catalog.domain.models import Item  # noqa: E402
 from src.modules.connections.domain.models import ErpConnection, ErpType  # noqa: E402
@@ -83,7 +82,9 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         )
     )
     sku = _id("ANVIL")
-    container.items.add(Item(item_id=ItemId(_id("item")), sku=sku, name="Anvil", owning_connection_id=connection))
+    container.items.add(
+        Item(item_id=ItemId(_id("item")), sku=sku, name="Anvil", owning_connection_id=connection)
+    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId(_id("bind")),
@@ -109,7 +110,11 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         container.order_processor.handle(submitted[0])
 
         events = event_store.load(order_id)
-        assert [e.event_type for e in events] == ["OrderSubmitted", "OrderValidated", "OrderReadyForDelivery"]
+        assert [e.event_type for e in events] == [
+            "OrderSubmitted",
+            "OrderValidated",
+            "OrderReadyForDelivery",
+        ]
         for event in events:
             container.order_projector.handle(event)
 
@@ -126,11 +131,19 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         with _factory() as session, session.begin():
             session.execute(text("DELETE FROM outbox WHERE stream_id = :oid"), {"oid": order_id})
             session.execute(text("DELETE FROM events WHERE stream_id = :oid"), {"oid": order_id})
-            session.execute(text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id})
+            session.execute(
+                text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id}
+            )
             session.execute(text("DELETE FROM orders WHERE order_id = :oid"), {"oid": order_id})
             session.execute(
                 text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"),
                 {"cid": str(connection)},
             )
-            session.execute(text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": str(connection)})
-            session.execute(text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": str(connection)})
+            session.execute(
+                text("DELETE FROM items WHERE owning_connection_id = :cid"),
+                {"cid": str(connection)},
+            )
+            session.execute(
+                text("DELETE FROM erp_connections WHERE connection_id = :cid"),
+                {"cid": str(connection)},
+            )

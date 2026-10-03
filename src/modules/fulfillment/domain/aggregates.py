@@ -40,8 +40,12 @@ class Fulfillment(Aggregate):
         f = cls(fulfillment_id)
         f.emit(
             FulfillmentRecorded(
-                fulfillment_id=fulfillment_id, order_id=order_id, lines=lines,
-                carrier=carrier, tracking_number=tracking_number, proof_of_delivery=proof_of_delivery,
+                fulfillment_id=fulfillment_id,
+                order_id=order_id,
+                lines=lines,
+                carrier=carrier,
+                tracking_number=tracking_number,
+                proof_of_delivery=proof_of_delivery,
             )
         )
         return f
@@ -55,8 +59,11 @@ class Fulfillment(Aggregate):
 
     def snapshot_state(self) -> dict[str, Any]:
         return {
-            "order_id": self.order_id, "lines": self.lines, "carrier": self.carrier,
-            "tracking_number": self.tracking_number, "proof_of_delivery": self.proof_of_delivery,
+            "order_id": self.order_id,
+            "lines": self.lines,
+            "carrier": self.carrier,
+            "tracking_number": self.tracking_number,
+            "proof_of_delivery": self.proof_of_delivery,
         }
 
     def restore(self, state: dict[str, Any]) -> None:
@@ -77,11 +84,22 @@ class Invoice(Aggregate):
         self.erp_invoice_id: str | None = None
 
     @classmethod
-    def record(cls, *, invoice_id: str, order_id: str, lines: list[dict[str, Any]], erp_invoice_id: str | None = None) -> Invoice:
+    def record(
+        cls,
+        *,
+        invoice_id: str,
+        order_id: str,
+        lines: list[dict[str, Any]],
+        erp_invoice_id: str | None = None,
+    ) -> Invoice:
         if not lines:
             raise ValueError("an invoice must have at least one line")
         inv = cls(invoice_id)
-        inv.emit(InvoiceRecorded(invoice_id=invoice_id, order_id=order_id, lines=lines, erp_invoice_id=erp_invoice_id))
+        inv.emit(
+            InvoiceRecorded(
+                invoice_id=invoice_id, order_id=order_id, lines=lines, erp_invoice_id=erp_invoice_id
+            )
+        )
         return inv
 
     def _apply_InvoiceRecorded(self, e: InvoiceRecorded) -> None:
@@ -90,7 +108,11 @@ class Invoice(Aggregate):
         self.erp_invoice_id = e.erp_invoice_id
 
     def snapshot_state(self) -> dict[str, Any]:
-        return {"order_id": self.order_id, "lines": self.lines, "erp_invoice_id": self.erp_invoice_id}
+        return {
+            "order_id": self.order_id,
+            "lines": self.lines,
+            "erp_invoice_id": self.erp_invoice_id,
+        }
 
     def restore(self, state: dict[str, Any]) -> None:
         self.order_id = state["order_id"]
@@ -113,9 +135,25 @@ class Payment(Aggregate):
         self.method: str = ""
 
     @classmethod
-    def record(cls, *, payment_id: str, order_id: str, amount: dict[str, str], method: str, invoice_id: str | None = None) -> Payment:
+    def record(
+        cls,
+        *,
+        payment_id: str,
+        order_id: str,
+        amount: dict[str, str],
+        method: str,
+        invoice_id: str | None = None,
+    ) -> Payment:
         p = cls(payment_id)
-        p.emit(PaymentRecorded(payment_id=payment_id, order_id=order_id, invoice_id=invoice_id, amount=amount, method=method))
+        p.emit(
+            PaymentRecorded(
+                payment_id=payment_id,
+                order_id=order_id,
+                invoice_id=invoice_id,
+                amount=amount,
+                method=method,
+            )
+        )
         return p
 
     def _apply_PaymentRecorded(self, e: PaymentRecorded) -> None:
@@ -125,7 +163,12 @@ class Payment(Aggregate):
         self.method = e.method
 
     def snapshot_state(self) -> dict[str, Any]:
-        return {"order_id": self.order_id, "invoice_id": self.invoice_id, "amount": self.amount, "method": self.method}
+        return {
+            "order_id": self.order_id,
+            "invoice_id": self.invoice_id,
+            "amount": self.amount,
+            "method": self.method,
+        }
 
     def restore(self, state: dict[str, Any]) -> None:
         self.order_id = state["order_id"]
@@ -148,11 +191,17 @@ class Return(Aggregate):
         self.reason_code: str = ""
 
     @classmethod
-    def record(cls, *, return_id: str, order_id: str, lines: list[dict[str, Any]], reason_code: str) -> Return:
+    def record(
+        cls, *, return_id: str, order_id: str, lines: list[dict[str, Any]], reason_code: str
+    ) -> Return:
         if not lines:
             raise ValueError("a return must have at least one line")
         r = cls(return_id)
-        r.emit(ReturnRecorded(return_id=return_id, order_id=order_id, lines=lines, reason_code=reason_code))
+        r.emit(
+            ReturnRecorded(
+                return_id=return_id, order_id=order_id, lines=lines, reason_code=reason_code
+            )
+        )
         return r
 
     def _apply_ReturnRecorded(self, e: ReturnRecorded) -> None:

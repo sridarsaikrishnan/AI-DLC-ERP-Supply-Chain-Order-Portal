@@ -5,7 +5,8 @@ owned items — enough to place an order end-to-end once the api/worker hosts la
 Run after `alembic upgrade head`.
 
 Usage:
-    DATABASE_URL=postgresql+psycopg2://portal:portal@localhost:5432/portal python -m scripts.seed_demo
+    DATABASE_URL=postgresql+psycopg2://portal:portal@localhost:5432/portal \
+        python -m scripts.seed_demo
 """
 
 from __future__ import annotations
@@ -47,7 +48,9 @@ _STATEMENTS = [
 
 
 def main() -> None:
-    url = os.environ.get("DATABASE_URL", "postgresql+psycopg2://portal:portal@localhost:5432/portal")
+    url = os.environ.get(
+        "DATABASE_URL", "postgresql+psycopg2://portal:portal@localhost:5432/portal"
+    )
     engine = create_engine(url, future=True)
     with engine.begin() as connection:
         for statement in _STATEMENTS:

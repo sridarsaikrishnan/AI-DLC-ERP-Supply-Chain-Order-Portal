@@ -27,24 +27,29 @@ from __future__ import annotations
 import logging
 import signal
 import threading
-from types import FrameType
+from typing import TYPE_CHECKING
 
 import boto3
 from sqlalchemy import Column, MetaData, String, Table, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.composition import build_container
 from src.shared.config import get_settings
-from src.shared.eventsourcing import StoredEvent
 from src.shared.messaging.aws import SnsFifoPublisher, SqsConsumerRunner
 from src.shared.persistence.engine import get_session_factory
 from src.shared.persistence.relay import OutboxRelay
-from src.shared.types import ConnectionId
 
 from .connection_lock import PostgresConnectionLock
 from .relay_runner import RelayRunner
 from .scheduler import ReconcileScheduler
+
+if TYPE_CHECKING:
+    from types import FrameType
+
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from src.shared.eventsourcing import StoredEvent
+    from src.shared.types import ConnectionId
 
 log = logging.getLogger("worker")
 
@@ -141,13 +146,17 @@ def main() -> None:  # pragma: no cover - process entrypoint
     session_factory = get_session_factory(settings.database_url)
     assert container.reconcile_sweeper is not None  # guaranteed by the postgres profile
 
-    sqs = boto3.client("sqs", endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region)
+    sqs = boto3.client(
+        "sqs", endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
+    )
 
     threads: list[threading.Thread] = []
 
     if "relay" in roles:
         publisher = SnsFifoPublisher(
-            settings.domain_topic_arn, endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
+            settings.domain_topic_arn,
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
         )
         relay = RelayRunner(OutboxRelay(session_factory, publisher))
         threads.append(threading.Thread(target=relay.run_forever, name="outbox-relay", daemon=True))
@@ -169,17 +178,23 @@ def main() -> None:  # pragma: no cover - process entrypoint
             endpoint_url=settings.aws_endpoint_url,
             region_name=settings.aws_region,
         )
-        threads.append(threading.Thread(target=consumer.run_forever, name=f"consumer-{role}", daemon=True))
+        threads.append(
+            threading.Thread(target=consumer.run_forever, name=f"consumer-{role}", daemon=True)
+        )
 
     if "reconcile" in roles:
         scheduler = ReconcileScheduler(
             container.reconcile_sweeper,
-            connections_provider=lambda: [c.connection_id for c in container.connections.list_active()],
+            connections_provider=lambda: [
+                c.connection_id for c in container.connections.list_active()
+            ],
             open_orders_provider=_open_orders_provider(session_factory),
             interval_seconds=settings.reconcile_interval_seconds,
             lock=PostgresConnectionLock(session_factory),
         )
-        threads.append(threading.Thread(target=scheduler.run_forever, name="reconcile-scheduler", daemon=True))
+        threads.append(
+            threading.Thread(target=scheduler.run_forever, name="reconcile-scheduler", daemon=True)
+        )
 
     stop = threading.Event()
 

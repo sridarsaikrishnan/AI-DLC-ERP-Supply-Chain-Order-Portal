@@ -5,15 +5,18 @@ consumer), and feeds the reverse-routing locator when an order gets its ERP id.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.eventsourcing import StoredEvent
 from src.shared.types import ConnectionId, OrderId
 
 from ..domain.calculations import line_total
 from ..domain.models import OrderLine, OrderState
 from .read_models import OrderLineView, Parties
-from .store import OrderProjectionStore
+
+if TYPE_CHECKING:
+    from src.shared.eventsourcing import StoredEvent
+
+    from .store import OrderProjectionStore
 
 
 class LocatorSink(Protocol):
@@ -76,8 +79,11 @@ class OrderProjector:
         if event.event_type == "OrderLineFulfilled":
             key = str(payload.get("line_id") or payload.get("product_key") or "")
             self._store.record_fulfillment(
-                order_id, key, float(Decimal(str(payload["quantity"]))),
-                payload.get("carrier"), payload.get("proof_of_delivery"),
+                order_id,
+                key,
+                float(Decimal(str(payload["quantity"]))),
+                payload.get("carrier"),
+                payload.get("proof_of_delivery"),
             )
             return
 
@@ -87,7 +93,9 @@ class OrderProjector:
             return
 
         if event.event_type == "OrderLineVendorDateSet":
-            self._store.set_scheduled_date(order_id, str(payload["line_id"]), str(payload["vendor_date"]))
+            self._store.set_scheduled_date(
+                order_id, str(payload["line_id"]), str(payload["vendor_date"])
+            )
             return
 
         state = _STATE_EVENTS.get(event.event_type)

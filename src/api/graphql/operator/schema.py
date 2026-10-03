@@ -9,23 +9,20 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
-from strawberry.types import Info
 
 from src.modules.catalog.application.service import CatalogService
 from src.modules.catalog.domain.models import Item, ItemKind
 from src.modules.connections.application.service import ConnectionService
 from src.modules.connections.domain.models import ErpConnection, ErpType
-from src.modules.ordering.projections.read_models import OperatorOrderView
 from src.modules.quoting.domain.models import EndCustomer, OperatingCompany, Quote, QuoteLine
 from src.modules.tenancy.application.service import BindingService
-from src.modules.tenancy.domain.models import TenantConnectionBinding
 from src.shared.money import Money, TaxRate
 from src.shared.types import BindingId, ConnectionId, TenantId
 
-from ..context import GraphQLContext
 from .types import (
     BindingType,
     ConnectionType,
@@ -47,6 +44,14 @@ from .types import (
     ReturnType,
 )
 
+if TYPE_CHECKING:
+    from strawberry.types import Info
+
+    from src.modules.ordering.projections.read_models import OperatorOrderView
+    from src.modules.tenancy.domain.models import TenantConnectionBinding
+
+    from ..context import GraphQLContext
+
 
 def _money_to_gql(money: Money | None) -> MoneyType | None:
     return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
@@ -62,21 +67,24 @@ def _order_to_gql(view: OperatorOrderView) -> OperatorOrder:
         erp_order_id=view.erp_order_id,
         lines=[
             OperatorOrderLineType(
-                product_key=l.product_key,
-                quantity=l.quantity,
-                unit_of_measure=l.unit_of_measure,
-                line_id=l.line_id,
-                kind=l.kind,
-                unit_price=_money_to_gql(l.unit_price),
-                line_total=_money_to_gql(l.line_total),
-                shipped_quantity=l.shipped_quantity,
-                delivered_quantity=l.delivered_quantity,
-                invoiced_quantity=l.invoiced_quantity,
-                scheduled_date=l.scheduled_date,
+                product_key=line.product_key,
+                quantity=line.quantity,
+                unit_of_measure=line.unit_of_measure,
+                line_id=line.line_id,
+                kind=line.kind,
+                unit_price=_money_to_gql(line.unit_price),
+                line_total=_money_to_gql(line.line_total),
+                shipped_quantity=line.shipped_quantity,
+                delivered_quantity=line.delivered_quantity,
+                invoiced_quantity=line.invoiced_quantity,
+                scheduled_date=line.scheduled_date,
             )
-            for l in view.lines
+            for line in view.lines
         ],
-        timeline=[OperatorTimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline],
+        timeline=[
+            OperatorTimelineEntryType(status=t.status, occurred_at=t.occurred_at)
+            for t in view.timeline
+        ],
         subtotal=_money_to_gql(view.subtotal),
         fulfillment_status=view.fulfillment_status,
         delivery_status=view.delivery_status,
@@ -145,14 +153,16 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
         status=quote.status.value,
         lines=[
             QuoteLineType(
-                product_key=l.product_key,
-                unit_price=MoneyType(amount=float(l.unit_price.amount), currency=l.unit_price.currency),
-                unit_of_measure=l.unit_of_measure,
-                tax_code=l.tax_rate.code if l.tax_rate else None,
-                tax_rate=float(l.tax_rate.rate) if l.tax_rate else None,
-                line_discount=_money_to_gql(l.line_discount),
+                product_key=line.product_key,
+                unit_price=MoneyType(
+                    amount=float(line.unit_price.amount), currency=line.unit_price.currency
+                ),
+                unit_of_measure=line.unit_of_measure,
+                tax_code=line.tax_rate.code if line.tax_rate else None,
+                tax_rate=float(line.tax_rate.rate) if line.tax_rate else None,
+                line_discount=_money_to_gql(line.line_discount),
             )
-            for l in quote.lines
+            for line in quote.lines
         ],
     )
 
@@ -251,13 +261,19 @@ class Mutation:
 
     @strawberry.mutation
     def create_binding(
-        self, info: Info[GraphQLContext, None], tenant_id: str, connection_id: str, erp_customer_id: str
+        self,
+        info: Info[GraphQLContext, None],
+        tenant_id: str,
+        connection_id: str,
+        erp_customer_id: str,
     ) -> BindingType:
         ctx = info.context
         ctx.require_role("OPERATOR")
         service = BindingService(ctx.container.bindings, ctx.container.facts)
         binding = service.create_binding(
-            tenant_id=TenantId(tenant_id), connection_id=ConnectionId(connection_id), erp_customer_id=erp_customer_id
+            tenant_id=TenantId(tenant_id),
+            connection_id=ConnectionId(connection_id),
+            erp_customer_id=erp_customer_id,
         )
         return _binding_to_gql(binding)
 
@@ -292,14 +308,18 @@ class Mutation:
         return _item_to_gql(item)
 
     @strawberry.mutation
-    def pause_connection(self, info: Info[GraphQLContext, None], connection_id: str) -> ConnectionType:
+    def pause_connection(
+        self, info: Info[GraphQLContext, None], connection_id: str
+    ) -> ConnectionType:
         ctx = info.context
         ctx.require_role("OPERATOR")
         service = ConnectionService(ctx.container.connections, ctx.container.facts)
         return _connection_to_gql(service.pause(ConnectionId(connection_id)))
 
     @strawberry.mutation
-    def resume_connection(self, info: Info[GraphQLContext, None], connection_id: str) -> ConnectionType:
+    def resume_connection(
+        self, info: Info[GraphQLContext, None], connection_id: str
+    ) -> ConnectionType:
         ctx = info.context
         ctx.require_role("OPERATOR")
         service = ConnectionService(ctx.container.connections, ctx.container.facts)
@@ -319,7 +339,9 @@ class Mutation:
     ) -> OperatingCompanyType:
         ctx = info.context
         ctx.require_role("OPERATOR")
-        company = ctx.container.quote_service.create_operating_company(name=name, country=country, language=language)
+        company = ctx.container.quote_service.create_operating_company(
+            name=name, country=country, language=language
+        )
         return _company_to_gql(company)
 
     @strawberry.mutation
@@ -343,11 +365,15 @@ class Mutation:
                 unit_price=Money(Decimal(str(li.unit_price)), currency),
                 unit_of_measure=li.unit_of_measure,
                 tax_rate=(
-                    TaxRate(code=li.tax_code, rate=Decimal(str(li.tax_rate)), inclusive=li.tax_inclusive)
+                    TaxRate(
+                        code=li.tax_code, rate=Decimal(str(li.tax_rate)), inclusive=li.tax_inclusive
+                    )
                     if li.tax_code is not None and li.tax_rate is not None
                     else None
                 ),
-                line_discount=Money(Decimal(str(li.line_discount)), currency) if li.line_discount is not None else None,
+                line_discount=Money(Decimal(str(li.line_discount)), currency)
+                if li.line_discount is not None
+                else None,
             )
             for li in lines
         ]
@@ -379,7 +405,7 @@ class Mutation:
         ctx.require_role("OPERATOR")
         fulfillment = ctx.container.fulfillment_service.record(
             order_id=order_id,
-            lines=[{"line_id": l.line_id, "quantity": str(l.quantity)} for l in lines],
+            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             carrier=carrier,
             tracking_number=tracking_number,
             proof_of_delivery=proof_of_delivery,
@@ -395,20 +421,28 @@ class Mutation:
 
     @strawberry.mutation
     def record_invoice(
-        self, info: Info[GraphQLContext, None], order_id: str, lines: list[FulfillmentLineInput], erp_invoice_id: str | None = None
+        self,
+        info: Info[GraphQLContext, None],
+        order_id: str,
+        lines: list[FulfillmentLineInput],
+        erp_invoice_id: str | None = None,
     ) -> InvoiceType:
         ctx = info.context
         ctx.require_role("OPERATOR")
         invoice = ctx.container.invoice_service.record(
             order_id=order_id,
-            lines=[{"line_id": l.line_id, "quantity": str(l.quantity)} for l in lines],
+            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             erp_invoice_id=erp_invoice_id,
         )
         ctx.container.drain()
-        return InvoiceType(invoice_id=invoice.id, order_id=invoice.order_id, erp_invoice_id=invoice.erp_invoice_id)
+        return InvoiceType(
+            invoice_id=invoice.id, order_id=invoice.order_id, erp_invoice_id=invoice.erp_invoice_id
+        )
 
     @strawberry.mutation
-    def set_vendor_date(self, info: Info[GraphQLContext, None], order_id: str, line_id: str, vendor_date: str) -> bool:
+    def set_vendor_date(
+        self, info: Info[GraphQLContext, None], order_id: str, line_id: str, vendor_date: str
+    ) -> bool:
         """Purchasing bought the line from the maker on `vendor_date` — "scheduled" (FR-E1).
         No Vendor Order document yet (FR-E2)."""
         ctx = info.context
@@ -433,26 +467,38 @@ class Mutation:
         ctx = info.context
         ctx.require_role("OPERATOR")
         payment = ctx.container.payment_service.record(
-            order_id=order_id, amount={"amount": str(amount), "currency": currency}, method=method, invoice_id=invoice_id
+            order_id=order_id,
+            amount={"amount": str(amount), "currency": currency},
+            method=method,
+            invoice_id=invoice_id,
         )
         return PaymentType(
-            payment_id=payment.id, order_id=payment.order_id, amount=MoneyType(amount=amount, currency=currency), method=method
+            payment_id=payment.id,
+            order_id=payment.order_id,
+            amount=MoneyType(amount=amount, currency=currency),
+            method=method,
         )
 
     @strawberry.mutation
     def record_return(
-        self, info: Info[GraphQLContext, None], order_id: str, lines: list[FulfillmentLineInput], reason_code: str
+        self,
+        info: Info[GraphQLContext, None],
+        order_id: str,
+        lines: list[FulfillmentLineInput],
+        reason_code: str,
     ) -> ReturnType:
         """Standalone record (ADR-0014) — not yet wired into `fulfillment_status`."""
         ctx = info.context
         ctx.require_role("OPERATOR")
         ret = ctx.container.return_service.record(
             order_id=order_id,
-            lines=[{"line_id": l.line_id, "quantity": str(l.quantity)} for l in lines],
+            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             reason_code=reason_code,
         )
         return ReturnType(return_id=ret.id, order_id=ret.order_id, reason_code=ret.reason_code)
 
 
 def build_operator_schema() -> strawberry.Schema:
-    return strawberry.Schema(query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)])
+    return strawberry.Schema(
+        query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
+    )

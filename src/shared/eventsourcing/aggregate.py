@@ -10,10 +10,12 @@ registry (which would leak handlers across aggregate types).
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from .errors import UnhandledEvent
-from .events import DomainEvent
+
+if TYPE_CHECKING:
+    from .events import DomainEvent
 
 
 class Aggregate:

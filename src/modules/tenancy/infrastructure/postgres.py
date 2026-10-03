@@ -9,15 +9,19 @@ requests race that check, so `add` turns the DB's `IntegrityError` into the same
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Column, MetaData, String, Table, select
-from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.types import BindingId, ConnectionId, TenantId
 
 from ..domain.errors import BindingConflict
 from ..domain.models import BindingStatus, TenantConnectionBinding
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 
@@ -63,7 +67,8 @@ class PostgresBindingRepository:
             session.rollback()
             if getattr(exc.orig, "pgcode", None) == "23505":  # unique_violation only — FK
                 raise BindingConflict(  # violations (e.g. unknown connection_id) are a real error
-                    f"binding for tenant/connection or connection/customer already exists: {exc.orig}"
+                    f"binding for tenant/connection or connection/customer "
+                    f"already exists: {exc.orig}"
                 ) from exc
             raise
         except Exception:

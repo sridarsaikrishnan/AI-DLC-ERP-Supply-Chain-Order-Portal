@@ -5,9 +5,10 @@ Kept as narrow queries so ordering never imports catalog/tenancy internals direc
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.types import ConnectionId, TenantId
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId, TenantId
 
 
 class OwnershipQuery(Protocol):

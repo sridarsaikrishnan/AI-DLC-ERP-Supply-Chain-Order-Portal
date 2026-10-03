@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -27,7 +27,11 @@ class _FakeSender:
 
     def send(self, url, headers, body):
         self.calls.append((url, headers, body))
-        return WebhookSendResult(success=self.success, status_code=200 if self.success else 503, error=None if self.success else "boom")
+        return WebhookSendResult(
+            success=self.success,
+            status_code=200 if self.success else 503,
+            error=None if self.success else "boom",
+        )
 
 
 class _FakeOrders:
@@ -42,13 +46,15 @@ def _event(event_type: str = "OrderSentToErp", tenant_id: str = "tnt_demo") -> S
         version=4,
         event_type=event_type,
         event_id=generate_id("evt"),
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         payload={"order_id": "ord_1"},
         tenant_id=tenant_id,
     )
 
 
-def _register_endpoint(endpoints: InMemoryWebhookEndpointRepository, secrets: EnvSecretStore, **overrides) -> WebhookEndpoint:
+def _register_endpoint(
+    endpoints: InMemoryWebhookEndpointRepository, secrets: EnvSecretStore, **overrides
+) -> WebhookEndpoint:
     endpoint = WebhookEndpoint(
         endpoint_id=WebhookEndpointId(generate_id("whep")),
         tenant_id=TenantId("tnt_demo"),
@@ -82,7 +88,11 @@ def test_ignores_non_dispatchable_event_types() -> None:
     _register_endpoint(endpoints, secrets)
     sender = _FakeSender(success=True)
     service = WebhookDispatchService(
-        endpoints=endpoints, deliveries=InMemoryWebhookDeliveryRepository(), secrets=secrets, sender=sender, orders=_FakeOrders()
+        endpoints=endpoints,
+        deliveries=InMemoryWebhookDeliveryRepository(),
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
     )
     service.handle(_event(event_type="OrderSubmitted"))
     assert sender.calls == []
@@ -94,7 +104,13 @@ def test_successful_delivery_signs_and_records_delivered() -> None:
     endpoint = _register_endpoint(endpoints, secrets)
     deliveries = InMemoryWebhookDeliveryRepository()
     sender = _FakeSender(success=True)
-    service = WebhookDispatchService(endpoints=endpoints, deliveries=deliveries, secrets=secrets, sender=sender, orders=_FakeOrders())
+    service = WebhookDispatchService(
+        endpoints=endpoints,
+        deliveries=deliveries,
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
+    )
 
     event = _event()
     service.handle(event)  # must not raise
@@ -119,7 +135,11 @@ def test_endpoint_not_subscribed_to_event_type_is_skipped() -> None:
     _register_endpoint(endpoints, secrets, event_types=frozenset({"OrderConfirmed"}))
     sender = _FakeSender(success=True)
     service = WebhookDispatchService(
-        endpoints=endpoints, deliveries=InMemoryWebhookDeliveryRepository(), secrets=secrets, sender=sender, orders=_FakeOrders()
+        endpoints=endpoints,
+        deliveries=InMemoryWebhookDeliveryRepository(),
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
     )
     service.handle(_event(event_type="OrderSentToErp"))
     assert sender.calls == []
@@ -131,7 +151,11 @@ def test_paused_endpoint_is_skipped() -> None:
     _register_endpoint(endpoints, secrets, is_active=False)
     sender = _FakeSender(success=True)
     service = WebhookDispatchService(
-        endpoints=endpoints, deliveries=InMemoryWebhookDeliveryRepository(), secrets=secrets, sender=sender, orders=_FakeOrders()
+        endpoints=endpoints,
+        deliveries=InMemoryWebhookDeliveryRepository(),
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
     )
     service.handle(_event())
     assert sender.calls == []
@@ -143,7 +167,13 @@ def test_transient_failure_raises_for_redrive_and_stays_retrying() -> None:
     endpoint = _register_endpoint(endpoints, secrets)
     deliveries = InMemoryWebhookDeliveryRepository()
     sender = _FakeSender(success=False)
-    service = WebhookDispatchService(endpoints=endpoints, deliveries=deliveries, secrets=secrets, sender=sender, orders=_FakeOrders())
+    service = WebhookDispatchService(
+        endpoints=endpoints,
+        deliveries=deliveries,
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
+    )
 
     event = _event()
     with pytest.raises(WebhookDeliveryRetry):
@@ -162,7 +192,13 @@ def test_exhausted_retries_marks_failed_and_stops_raising() -> None:
     endpoint = _register_endpoint(endpoints, secrets)
     deliveries = InMemoryWebhookDeliveryRepository()
     sender = _FakeSender(success=False)
-    service = WebhookDispatchService(endpoints=endpoints, deliveries=deliveries, secrets=secrets, sender=sender, orders=_FakeOrders())
+    service = WebhookDispatchService(
+        endpoints=endpoints,
+        deliveries=deliveries,
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
+    )
 
     event = _event()
     for _ in range(MAX_ATTEMPTS - 1):

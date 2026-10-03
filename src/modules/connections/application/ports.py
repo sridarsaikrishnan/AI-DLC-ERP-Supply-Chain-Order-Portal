@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.types import ConnectionId
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId
 
-from ..domain.models import ErpConnection
+    from ..domain.models import ErpConnection
 
 
 class ConnectionRepository(Protocol):

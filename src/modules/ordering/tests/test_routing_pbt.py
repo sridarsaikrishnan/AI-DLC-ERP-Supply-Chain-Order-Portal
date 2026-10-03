@@ -30,9 +30,7 @@ def _owner_of(product_key: str) -> ConnectionId | None:
 
 @given(keys=product_keys, bound_all=st.booleans())
 def test_routing_is_total(keys: list[str], bound_all: bool) -> None:
-    decision = resolve_owning_connection(
-        keys, owner_of=_owner_of, is_bound=lambda _c: bound_all
-    )
+    decision = resolve_owning_connection(keys, owner_of=_owner_of, is_bound=lambda _c: bound_all)
     assert isinstance(decision, RoutingDecision)
     if decision.routed:
         assert decision.connection_id is not None

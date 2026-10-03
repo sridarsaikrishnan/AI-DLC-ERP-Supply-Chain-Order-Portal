@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-from src.modules.integration.application.reconcile import ReconcileSweeper
 from src.worker.scheduler import ReconcileScheduler
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class _FakeLock:

@@ -70,7 +70,12 @@ class FakeConnections:
     def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
         if str(connection_id) != _CONN:
             return None
-        return ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
+        return ErpTarget(
+            erp_type="ODOO",
+            base_url="http://odoo",
+            credentials={"database": "odoo", "username": "admin"},
+            secret="x",
+        )
 
 
 class FakeSecrets:
@@ -110,7 +115,11 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
         valid_until=date.today() + timedelta(days=30),
-        lines=[QuoteLine(product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA")],
+        lines=[
+            QuoteLine(
+                product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA"
+            )
+        ],
     )
 
     # --- place an order and drain the pipeline ---

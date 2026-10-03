@@ -7,16 +7,25 @@ dedupe on event_id, so this is safe.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select, text
-from sqlalchemy.orm import sessionmaker, Session
 
 from src.shared.eventsourcing import EventPublisher, StoredEvent
 
 from .tables import outbox_table
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session, sessionmaker
+
 
 class OutboxRelay:
-    def __init__(self, session_factory: sessionmaker[Session], publisher: EventPublisher, batch_size: int = 100) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        publisher: EventPublisher,
+        batch_size: int = 100,
+    ) -> None:
         self._session_factory = session_factory
         self._publisher = publisher
         self._batch_size = batch_size
@@ -25,13 +34,17 @@ class OutboxRelay:
         """Publish one batch of pending events. Returns the number published."""
         session = self._session_factory()
         try:
-            rows = session.execute(
-                select(outbox_table)
-                .where(outbox_table.c.published_at.is_(None))
-                .order_by(outbox_table.c.id)
-                .limit(self._batch_size)
-                .with_for_update(skip_locked=True)
-            ).mappings().all()
+            rows = (
+                session.execute(
+                    select(outbox_table)
+                    .where(outbox_table.c.published_at.is_(None))
+                    .order_by(outbox_table.c.id)
+                    .limit(self._batch_size)
+                    .with_for_update(skip_locked=True)
+                )
+                .mappings()
+                .all()
+            )
 
             if not rows:
                 session.commit()

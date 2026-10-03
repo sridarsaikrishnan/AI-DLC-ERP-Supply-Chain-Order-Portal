@@ -8,16 +8,20 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+import contextlib
+from typing import TYPE_CHECKING, Any, Protocol
 
 from src.modules.integration.domain.status_mapping import CanonicalStatus
-from src.shared.eventsourcing import EventSourcedRepository
 from src.shared.money import money_to_payload, tax_rate_to_payload
 from src.shared.types import ConnectionId, OrderId, TenantId
 
-from ..domain.aggregate import Order
 from ..domain.errors import OrderInvalidTransition
-from ..projections.store import OrderProjectionStore
+
+if TYPE_CHECKING:
+    from src.shared.eventsourcing import EventSourcedRepository
+
+    from ..domain.aggregate import Order
+    from ..projections.store import OrderProjectionStore
 
 
 class CustomerDirectory(Protocol):
@@ -25,7 +29,9 @@ class CustomerDirectory(Protocol):
     order can be sent to the ERP as that customer (FR-A1). Operator-only data — never put
     on a reseller view."""
 
-    def erp_customer_id_for(self, tenant_id: TenantId, connection_id: ConnectionId) -> str | None: ...
+    def erp_customer_id_for(
+        self, tenant_id: TenantId, connection_id: ConnectionId
+    ) -> str | None: ...
 
 
 class OrderCommandAdapter:
@@ -49,7 +55,9 @@ class OrderCommandAdapter:
 
 
 class OrderReaderAdapter:
-    def __init__(self, projections: OrderProjectionStore, customers: CustomerDirectory | None = None) -> None:
+    def __init__(
+        self, projections: OrderProjectionStore, customers: CustomerDirectory | None = None
+    ) -> None:
         self._projections = projections
         self._customers = customers
 
@@ -107,7 +115,7 @@ class StatusApplier:
 
     @staticmethod
     def _try(fn: Any, *args: Any) -> None:
-        try:
+        # stale / out-of-order ERP update — lifecycle is monotonic, so a transition that
+        # no longer applies is simply ignored.
+        with contextlib.suppress(OrderInvalidTransition):
             fn(*args)
-        except OrderInvalidTransition:
-            pass  # stale / out-of-order ERP update — lifecycle is monotonic

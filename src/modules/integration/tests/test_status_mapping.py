@@ -9,14 +9,20 @@ def test_odoo_status_mapping() -> None:
     # status (FR-A6); FULFILLED left the lifecycle entirely.
     assert map_native_status("ODOO", {"state": "done"}) is CanonicalStatus.CONFIRMED
     assert map_native_status("ODOO", {"state": "cancel"}) is CanonicalStatus.CANCELLED
-    assert map_native_status("ODOO", {"state": "sale", "invoice_status": "invoiced"}) is CanonicalStatus.CLOSED
+    assert (
+        map_native_status("ODOO", {"state": "sale", "invoice_status": "invoiced"})
+        is CanonicalStatus.CLOSED
+    )
     assert map_native_status("ODOO", {"state": "draft"}) is None
 
 
 def test_mapper_signature_is_a_field_bag_not_a_fixed_arity() -> None:
     """The generic signature must not force every ERP into Odoo's 2-field shape — a
     1-field ERP (just `status`) and an unused extra field must both be handled fine."""
-    assert map_native_status("ODOO", {"state": "sale", "unrelated_field": "whatever"}) is CanonicalStatus.CONFIRMED
+    assert (
+        map_native_status("ODOO", {"state": "sale", "unrelated_field": "whatever"})
+        is CanonicalStatus.CONFIRMED
+    )
     assert map_native_status("ODOO", {}) is None
 
 

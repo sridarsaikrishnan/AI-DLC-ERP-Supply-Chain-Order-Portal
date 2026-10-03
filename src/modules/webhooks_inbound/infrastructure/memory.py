@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from src.shared.types import ConnectionId, OrderId
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId, OrderId
 
 
 class InMemoryDedupStore:

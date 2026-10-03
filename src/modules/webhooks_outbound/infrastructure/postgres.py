@@ -4,16 +4,19 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Row
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.types import TenantId, WebhookEndpointId
 
 from ..domain.models import DeliveryStatus, WebhookDelivery, WebhookEndpoint
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 
@@ -88,7 +91,9 @@ class PostgresWebhookEndpointRepository:
                     name=endpoint.name,
                     url=endpoint.url,
                     secret_ref=endpoint.secret_ref,
-                    event_types=list(endpoint.event_types) if endpoint.event_types is not None else None,
+                    event_types=list(endpoint.event_types)
+                    if endpoint.event_types is not None
+                    else None,
                     is_active=endpoint.is_active,
                 )
             )
@@ -103,7 +108,9 @@ class PostgresWebhookEndpointRepository:
         session = self._session_factory()
         try:
             row = session.execute(
-                select(webhook_endpoints_table).where(webhook_endpoints_table.c.endpoint_id == str(endpoint_id))
+                select(webhook_endpoints_table).where(
+                    webhook_endpoints_table.c.endpoint_id == str(endpoint_id)
+                )
             ).first()
         finally:
             session.close()
@@ -128,7 +135,9 @@ class PostgresWebhookEndpointRepository:
         session = self._session_factory()
         try:
             rows = session.execute(
-                select(webhook_endpoints_table).where(webhook_endpoints_table.c.tenant_id == str(tenant_id))
+                select(webhook_endpoints_table).where(
+                    webhook_endpoints_table.c.tenant_id == str(tenant_id)
+                )
             ).all()
         finally:
             session.close()
@@ -169,7 +178,9 @@ class PostgresWebhookDeliveryRepository:
         session = self._session_factory()
         try:
             stmt = pg_insert(webhook_deliveries_table).values(**values)
-            stmt = stmt.on_conflict_do_update(index_elements=["endpoint_id", "event_id"], set_=values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["endpoint_id", "event_id"], set_=values
+            )
             session.execute(stmt)
             session.commit()
         except Exception:
@@ -182,7 +193,9 @@ class PostgresWebhookDeliveryRepository:
         session = self._session_factory()
         try:
             rows = session.execute(
-                select(webhook_deliveries_table).where(webhook_deliveries_table.c.tenant_id == str(tenant_id))
+                select(webhook_deliveries_table).where(
+                    webhook_deliveries_table.c.tenant_id == str(tenant_id)
+                )
             ).all()
         finally:
             session.close()

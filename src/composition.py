@@ -17,15 +17,11 @@ except the api/worker hosts.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-log = logging.getLogger(__name__)
-
-from src.modules.catalog.application.ports import ItemRepository
 from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.catalog.infrastructure.postgres import PostgresItemRepository
-from src.modules.connections.application.ports import ConnectionRepository
 from src.modules.connections.infrastructure.memory import InMemoryConnectionRepository
 from src.modules.connections.infrastructure.postgres import PostgresConnectionRepository
 from src.modules.fulfillment.application.service import (
@@ -51,7 +47,6 @@ from src.modules.ordering.domain.aggregate import Order
 from src.modules.ordering.projections.postgres_store import PostgresOrderProjectionStore
 from src.modules.ordering.projections.projector import OrderProjector
 from src.modules.ordering.projections.store import OrderProjectionStore
-from src.modules.quoting.application.ports import OperatingCompanyRepository, QuoteRepository
 from src.modules.quoting.application.service import QuoteService
 from src.modules.quoting.infrastructure.memory import (
     InMemoryOperatingCompanyRepository,
@@ -61,7 +56,6 @@ from src.modules.quoting.infrastructure.postgres import (
     PostgresOperatingCompanyRepository,
     PostgresQuoteRepository,
 )
-from src.modules.tenancy.application.ports import BindingRepository
 from src.modules.tenancy.infrastructure.memory import InMemoryBindingRepository
 from src.modules.tenancy.infrastructure.postgres import PostgresBindingRepository
 from src.modules.webhooks_inbound.application.ingress import InboundWebhookService
@@ -74,10 +68,6 @@ from src.modules.webhooks_inbound.infrastructure.postgres import (
     PostgresOrderLocator,
 )
 from src.modules.webhooks_outbound.application.dispatch import WebhookDispatchService
-from src.modules.webhooks_outbound.application.ports import (
-    WebhookDeliveryRepository,
-    WebhookEndpointRepository,
-)
 from src.modules.webhooks_outbound.domain.models import DISPATCHABLE_EVENT_TYPES
 from src.modules.webhooks_outbound.infrastructure.http_sender import HttpWebhookSender
 from src.modules.webhooks_outbound.infrastructure.memory import (
@@ -102,8 +92,23 @@ from src.shared.persistence.engine import PostgresUnitOfWork, get_session_factor
 from src.shared.persistence.event_store import PostgresEventStore
 from src.shared.secrets import EnvSecretStore, SecretStore
 from src.shared.secrets.aws import SecretsManagerSecretStore
-from src.shared.types import ConnectionId, TenantId
 from src.shared.unit_of_work import NullUnitOfWork
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from src.modules.catalog.application.ports import ItemRepository
+    from src.modules.connections.application.ports import ConnectionRepository
+    from src.modules.quoting.application.ports import OperatingCompanyRepository, QuoteRepository
+    from src.modules.tenancy.application.ports import BindingRepository
+    from src.modules.webhooks_outbound.application.ports import (
+        WebhookDeliveryRepository,
+        WebhookEndpointRepository,
+    )
+    from src.shared.types import ConnectionId, TenantId
+
+
+log = logging.getLogger(__name__)
 
 
 # --- bridge adapters: other modules' repos -> the ports ordering/integration expect ---
@@ -191,17 +196,23 @@ class Container:
     order_projector: OrderProjector
     reconcile_sweeper: ReconcileSweeper | None  # None in the memory profile (worker-only)
     identity: IdentityProvider
-    event_store: EventStore  # raw event access — the operator "order events" dev view reads this directly
+    event_store: (
+        EventStore  # raw event access — the operator "order events" dev view reads this directly
+    )
     webhook_endpoints: WebhookEndpointRepository
     webhook_deliveries: WebhookDeliveryRepository
     webhook_dispatcher: WebhookDispatchService
-    secrets: SecretStore  # exposed so WebhookEndpointService (GraphQL layer) can generate+store signing secrets
-    facts: FactPublisher  # catalog/connections/tenancy publish notifications through this, see src/shared/messaging/facts.py
+    # exposed so WebhookEndpointService (GraphQL layer) can generate+store signing secrets
+    secrets: SecretStore
+    # catalog/connections/tenancy publish notifications through this (src/shared/messaging/facts.py)
+    facts: FactPublisher
     fulfillment_service: FulfillmentService
     invoice_service: InvoiceService
     payment_service: PaymentService
     return_service: ReturnService
-    orders: EventSourcedRepository[Order]  # exposed so GraphQL can read fulfillment_status/invoice_status (derived, aggregate-only)
+    orders: EventSourcedRepository[
+        Order
+    ]  # exposed so GraphQL can read fulfillment_status/invoice_status (derived, aggregate-only)
     quote_service: QuoteService
     quotes: QuoteRepository
     operating_companies: OperatingCompanyRepository
@@ -221,7 +232,9 @@ def _build_memory_container(settings: Settings) -> Container:
     # Same event store as Order — one `events` table in Postgres too, differentiated by
     # aggregate_type + stream_id, not a separate store per aggregate type.
     uow = NullUnitOfWork()  # memory can't partially fail across appends (FR-A4 is a no-op here)
-    fulfillment_service = FulfillmentService(EventSourcedRepository(event_store, Fulfillment), repo, uow)
+    fulfillment_service = FulfillmentService(
+        EventSourcedRepository(event_store, Fulfillment), repo, uow
+    )
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))
@@ -238,7 +251,9 @@ def _build_memory_container(settings: Settings) -> Container:
     locator = InMemoryOrderLocator()
 
     erp_adapter: ErpAdapter = StubErpAdapter()
-    adapter_for = lambda _erp_type: erp_adapter
+
+    def adapter_for(_erp_type):
+        return erp_adapter
 
     processor = OrderProcessor(repo, CatalogOwnershipQuery(items), TenancyBindingQuery(bindings))
     delivery = DeliveryHandler(
@@ -262,7 +277,9 @@ def _build_memory_container(settings: Settings) -> Container:
     bus.subscribe("projections", projector.handle)
     bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
     bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
-    bus.subscribe("webhook-dispatch", webhook_dispatcher.handle, event_types=set(DISPATCHABLE_EVENT_TYPES))
+    bus.subscribe(
+        "webhook-dispatch", webhook_dispatcher.handle, event_types=set(DISPATCHABLE_EVENT_TYPES)
+    )
 
     ingress = InboundWebhookService(
         secrets=ConnectionWebhookSecretResolver(connections, secrets),
@@ -329,7 +346,9 @@ def _resolve_identity_provider(settings: Settings) -> IdentityProvider:
     pool set up yet — without hard-failing container construction). Set both env vars to
     turn on real verification; nothing else changes."""
     if not settings.cognito_user_pool_id or not settings.cognito_client_id:
-        log.warning("COGNITO_USER_POOL_ID/COGNITO_CLIENT_ID not set — using the header stub, not real auth")
+        log.warning(
+            "COGNITO_USER_POOL_ID/COGNITO_CLIENT_ID not set — using the header stub, not real auth"
+        )
         return HeaderStubIdentityProvider()
     issuer = issuer_url(
         aws_endpoint_url=settings.aws_endpoint_url,
@@ -355,7 +374,9 @@ def _build_postgres_container(settings: Settings) -> Container:
     # by aggregate_type + stream_id — these 4 aren't a separate Postgres setup.
     # One UoW so a fulfillment/invoice + its order quantity update commit together (FR-A4).
     uow = PostgresUnitOfWork(session_factory)
-    fulfillment_service = FulfillmentService(EventSourcedRepository(event_store, Fulfillment), repo, uow)
+    fulfillment_service = FulfillmentService(
+        EventSourcedRepository(event_store, Fulfillment), repo, uow
+    )
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))

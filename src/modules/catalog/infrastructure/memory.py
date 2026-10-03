@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from ..domain.models import Item
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..domain.models import Item
 
 
 class InMemoryItemRepository:

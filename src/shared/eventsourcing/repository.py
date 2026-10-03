@@ -11,16 +11,18 @@ transaction as the append (the Postgres store adapter owns that transaction).
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from .aggregate import Aggregate
 from .errors import AggregateNotFound
 from .events import StoredEvent
-from .outbox import Outbox
-from .publisher import EventPublisher
 from .serialization import event_from_stored, event_type_name, to_payload
 from .snapshots import Snapshot
-from .store import EventStore
+
+if TYPE_CHECKING:
+    from .outbox import Outbox
+    from .publisher import EventPublisher
+    from .store import EventStore
 
 A = TypeVar("A", bound=Aggregate)
 

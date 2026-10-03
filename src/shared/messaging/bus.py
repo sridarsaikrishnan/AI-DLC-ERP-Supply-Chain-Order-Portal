@@ -96,7 +96,7 @@ class InMemoryMessageBus:
         try:
             consumer.subscription.handler(event)
             consumer.processed.add(event.event_id)
-        except Exception:  # noqa: BLE001 - the bus mirrors SQS: failures retry then DLQ
+        except Exception:
             attempts = consumer.attempts.get(event.event_id, 0) + 1
             consumer.attempts[event.event_id] = attempts
             if attempts >= consumer.subscription.max_receive:

@@ -13,16 +13,19 @@ construction: a Quote carries no ERP identity — `erp_customer_id` stays on the
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from src.shared.money import Money, TaxRate
-from src.shared.types import TenantId
+if TYPE_CHECKING:
+    from datetime import date
+
+    from src.shared.money import Money, TaxRate
+    from src.shared.types import TenantId
 
 
 class QuoteStatus(str, Enum):
     DRAFT = "DRAFT"
-    ISSUED = "ISSUED"      # live: an order can be placed against it while in its window
+    ISSUED = "ISSUED"  # live: an order can be placed against it while in its window
     EXPIRED = "EXPIRED"
     ACCEPTED = "ACCEPTED"  # an order has been placed against it
 
@@ -48,8 +51,8 @@ class QuoteLine:
 @dataclass
 class Quote:
     quote_id: str
-    tenant_id: TenantId                 # the reseller this quote is for (FR-B1)
-    operating_company_id: str           # which operating company issued it (FR-C3)
+    tenant_id: TenantId  # the reseller this quote is for (FR-B1)
+    operating_company_id: str  # which operating company issued it (FR-C3)
     end_customer: EndCustomer
     currency: str
     valid_from: date
@@ -58,7 +61,7 @@ class Quote:
     status: QuoteStatus = QuoteStatus.DRAFT
 
     def is_valid_on(self, on: date) -> bool:
-        """"How long the prices hold" — the quote must be ISSUED and `on` within its
+        """ "How long the prices hold" — the quote must be ISSUED and `on` within its
         window. EXPIRED/DRAFT/ACCEPTED quotes cannot price a new order."""
         return self.status is QuoteStatus.ISSUED and self.valid_from <= on <= self.valid_until
 

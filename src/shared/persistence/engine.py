@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from sqlalchemy.engine import Engine
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
@@ -27,7 +31,9 @@ def current_session() -> Session | None:
 
 
 def database_url() -> str:
-    return os.environ.get("DATABASE_URL", "postgresql+psycopg2://portal:portal@localhost:5432/portal")
+    return os.environ.get(
+        "DATABASE_URL", "postgresql+psycopg2://portal:portal@localhost:5432/portal"
+    )
 
 
 def get_engine(url: str | None = None) -> Engine:
@@ -42,7 +48,9 @@ def get_engine(url: str | None = None) -> Engine:
 def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     global _session_factory
     if _session_factory is None:
-        _session_factory = sessionmaker(bind=get_engine(url), autoflush=False, expire_on_commit=False, future=True)
+        _session_factory = sessionmaker(
+            bind=get_engine(url), autoflush=False, expire_on_commit=False, future=True
+        )
     return _session_factory
 
 

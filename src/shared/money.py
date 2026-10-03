@@ -43,25 +43,25 @@ class Money:
         amount = self.amount if isinstance(self.amount, Decimal) else Decimal(str(self.amount))
         object.__setattr__(self, "amount", round_money(amount, self.currency))
 
-    def __add__(self, other: "Money") -> "Money":
+    def __add__(self, other: Money) -> Money:
         self._require_same_currency(other)
         return Money(self.amount + other.amount, self.currency)
 
-    def __sub__(self, other: "Money") -> "Money":
+    def __sub__(self, other: Money) -> Money:
         self._require_same_currency(other)
         return Money(self.amount - other.amount, self.currency)
 
-    def _require_same_currency(self, other: "Money") -> None:
+    def _require_same_currency(self, other: Money) -> None:
         if self.currency != other.currency:
             raise ValueError(f"currency mismatch: {self.currency} vs {other.currency}")
 
 
-def money_to_payload(money: "Money | None") -> dict[str, str] | None:
+def money_to_payload(money: Money | None) -> dict[str, str] | None:
     """JSON-safe form for an event/snapshot payload (JSONB can't hold Decimal)."""
     return None if money is None else {"amount": str(money.amount), "currency": money.currency}
 
 
-def money_from_payload(data: dict[str, Any] | None) -> "Money | None":
+def money_from_payload(data: dict[str, Any] | None) -> Money | None:
     return None if data is None else Money(Decimal(data["amount"]), data["currency"])
 
 
@@ -84,4 +84,6 @@ def tax_rate_to_payload(tax_rate: TaxRate) -> dict[str, Any]:
 
 
 def tax_rate_from_payload(data: dict[str, Any]) -> TaxRate:
-    return TaxRate(code=data["code"], rate=data["rate"], inclusive=bool(data.get("inclusive", False)))
+    return TaxRate(
+        code=data["code"], rate=data["rate"], inclusive=bool(data.get("inclusive", False))
+    )

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from src.shared.types import TenantId
+from typing import TYPE_CHECKING
 
-from ..domain.models import OperatingCompany, Quote
+if TYPE_CHECKING:
+    from src.shared.types import TenantId
+
+    from ..domain.models import OperatingCompany, Quote
 
 
 class InMemoryQuoteRepository:

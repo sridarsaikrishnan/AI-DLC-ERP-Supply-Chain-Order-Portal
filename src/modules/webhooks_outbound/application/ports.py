@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.shared.types import TenantId, WebhookEndpointId
+if TYPE_CHECKING:
+    from src.shared.types import TenantId, WebhookEndpointId
 
-from ..domain.models import WebhookDelivery, WebhookEndpoint
+    from ..domain.models import WebhookDelivery, WebhookEndpoint
 
 
 class WebhookEndpointRepository(Protocol):

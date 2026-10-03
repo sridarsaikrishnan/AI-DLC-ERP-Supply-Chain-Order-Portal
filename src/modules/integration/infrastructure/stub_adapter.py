@@ -12,7 +12,9 @@ from ..application.ports import ErpTarget, SubmissionResult
 class StubErpAdapter:
     """Accepts every submission and returns a generated erp order id."""
 
-    capabilities = frozenset()  # deliberately none — this is a deterministic fake, not a real integration
+    capabilities = (
+        frozenset()
+    )  # deliberately none — this is a deterministic fake, not a real integration
 
     def __init__(self) -> None:
         self._status: dict[str, str] = {}

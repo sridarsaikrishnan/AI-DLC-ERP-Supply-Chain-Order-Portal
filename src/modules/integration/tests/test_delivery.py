@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -9,7 +9,9 @@ from src.modules.integration.application.delivery import DeliveryHandler, Delive
 from src.modules.integration.application.ports import ErpTarget, SubmissionResult
 from src.modules.integration.infrastructure.stub_adapter import StubErpAdapter
 from src.shared.eventsourcing import StoredEvent
-from src.shared.types import ConnectionId, OrderId
+
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId, OrderId
 
 
 def _ready_event(order_id: str = "ord_1", connection_id: str = "conn_1") -> StoredEvent:
@@ -19,14 +21,19 @@ def _ready_event(order_id: str = "ord_1", connection_id: str = "conn_1") -> Stor
         version=3,
         event_type="OrderReadyForDelivery",
         event_id="e1",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         payload={"order_id": order_id, "owning_connection_id": connection_id},
     )
 
 
 class FakeConnections:
     def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
-        return ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
+        return ErpTarget(
+            erp_type="ODOO",
+            base_url="http://odoo",
+            credentials={"database": "odoo", "username": "admin"},
+            secret="x",
+        )
 
 
 class FakeOrders:

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.shared.messaging.facts import FactPublisher, make_fact
 from src.shared.types import ConnectionId, generate_id
 
 from ..domain.errors import ConnectionNotFound
 from ..domain.events import CONNECTION_PAUSED, CONNECTION_REGISTERED, CONNECTION_RESUMED
 from ..domain.models import ConnectionStatus, ErpConnection, ErpType
-from .ports import ConnectionRepository
+
+if TYPE_CHECKING:
+    from .ports import ConnectionRepository
 
 
 class ConnectionService:

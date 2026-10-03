@@ -7,9 +7,12 @@ never broadcast.
 
 from __future__ import annotations
 
-from src.shared.types import TenantId
+from typing import TYPE_CHECKING
 
-from .models import TenantConnectionBinding
+if TYPE_CHECKING:
+    from src.shared.types import TenantId
+
+    from .models import TenantConnectionBinding
 
 
 def resolve_tenant_for_customer(binding: TenantConnectionBinding | None) -> TenantId | None:

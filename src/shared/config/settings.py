@@ -21,8 +21,10 @@ class Settings:
     aws_endpoint_url: str | None
     aws_region: str
     domain_topic_arn: str
-    erp_adapter_mode: str  # "real" (dispatch via the adapter registry) | "stub" (force StubErpAdapter for every ERP type)
-    erp_odoo_timeout_seconds: float  # OdooAdapter-specific; a new ERP adapter gets its own timeout setting if it needs one
+    # "real" (dispatch via the adapter registry) | "stub" (force StubErpAdapter for every ERP type)
+    erp_adapter_mode: str
+    # OdooAdapter-specific; a new ERP adapter gets its own timeout setting if it needs one
+    erp_odoo_timeout_seconds: float
     log_level: str
     reconcile_interval_seconds: int
     worker_roles: frozenset[str]  # which of {order-processing, order-delivery, projections,
@@ -30,7 +32,9 @@ class Settings:
     # every one, matching today's single-process behavior (ADR-0010's role split, Part 1)
     cognito_user_pool_id: str | None
     cognito_client_id: str | None
-    cognito_resource_server_id: str  # OAuth scope namespace for client_credentials (M2M) tokens — {this}/tenant.<id>, {this}/role.<ROLE>
+    # OAuth scope namespace for client_credentials (M2M) tokens:
+    # {this}/tenant.<id>, {this}/role.<ROLE>
+    cognito_resource_server_id: str
     cors_allowed_origins: list[str]  # the UI's origin(s) — e.g. an S3/CloudFront URL in prod
 
 
@@ -40,7 +44,9 @@ def _parse_worker_roles(raw: str) -> frozenset[str]:
     roles = frozenset(r.strip() for r in raw.split(",") if r.strip())
     unknown = roles - _ALL_WORKER_ROLES
     if unknown:
-        raise ValueError(f"unknown WORKER_ROLE value(s): {sorted(unknown)} — valid: {sorted(_ALL_WORKER_ROLES)}")
+        raise ValueError(
+            f"unknown WORKER_ROLE value(s): {sorted(unknown)} — valid: {sorted(_ALL_WORKER_ROLES)}"
+        )
     return roles
 
 

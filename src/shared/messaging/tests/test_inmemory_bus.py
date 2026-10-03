@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.shared.eventsourcing import StoredEvent
 from src.shared.messaging import InMemoryMessageBus
 
 
-def _event(event_type: str, stream_id: str = "s1", version: int = 1, event_id: str | None = None) -> StoredEvent:
+def _event(
+    event_type: str, stream_id: str = "s1", version: int = 1, event_id: str | None = None
+) -> StoredEvent:
     return StoredEvent(
         stream_id=stream_id,
         aggregate_type="T",
         version=version,
         event_type=event_type,
         event_id=event_id or f"{event_type}-{version}",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         payload={},
     )
 

@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from src.shared.types import TenantId, WebhookEndpointId
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from src.shared.types import TenantId, WebhookEndpointId
 
 # The only event types actually routed to webhook-dispatch.fifo (messaging-topology.md's
 # locked SNS filter policy) — an endpoint's `event_types` is a subset of this, or None
 # for "all of these".
 DISPATCHABLE_EVENT_TYPES = frozenset(
-    {"OrderSentToErp", "OrderConfirmed", "OrderFulfilled", "OrderClosed", "OrderRejected", "OrderRetrying"}
+    {
+        "OrderSentToErp",
+        "OrderConfirmed",
+        "OrderFulfilled",
+        "OrderClosed",
+        "OrderRejected",
+        "OrderRetrying",
+    }
 )
 
 

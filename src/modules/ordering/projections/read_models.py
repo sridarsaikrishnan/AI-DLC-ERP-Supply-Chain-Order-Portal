@@ -12,10 +12,12 @@ plus the named parties and the per-line vendor/"scheduled" date — all reseller
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-
-from src.shared.money import Money, TaxRate
+from typing import TYPE_CHECKING
 
 from ..domain.models import DeliveryStatus, FulfillmentStatus, InvoiceStatus, OrderState
+
+if TYPE_CHECKING:
+    from src.shared.money import Money, TaxRate
 
 # Internal state -> reseller-facing lifecycle word (design README). ACCEPTED (formerly
 # READY_FOR_DELIVERY) keeps the "Validated" reseller label (Q2=A); FULFILLED is gone.
@@ -54,13 +56,15 @@ class OrderLineView:
     scheduled_date: str | None = None  # vendor date (FR-E1), None until purchasing sets it
 
 
-def _aggregate_status(lines: list[OrderLineView], recorded: str, none_s: str, partial_s: str, full_s: str) -> str:
+def _aggregate_status(
+    lines: list[OrderLineView], recorded: str, none_s: str, partial_s: str, full_s: str
+) -> str:
     """Roll per-line recorded quantities up to one of none/partial/full."""
-    relevant = [l for l in lines if l.quantity > 0]
+    relevant = [line for line in lines if line.quantity > 0]
     if not relevant:
         return none_s
-    got = [getattr(l, recorded) for l in relevant]
-    if all(g >= l.quantity for g, l in zip(got, relevant, strict=False)):
+    got = [getattr(line, recorded) for line in relevant]
+    if all(g >= line.quantity for g, line in zip(got, relevant, strict=False)):
         return full_s
     if any(g > 0 for g in got):
         return partial_s
@@ -69,22 +73,31 @@ def _aggregate_status(lines: list[OrderLineView], recorded: str, none_s: str, pa
 
 def fulfillment_status(lines: list[OrderLineView]) -> str:
     return _aggregate_status(
-        lines, "shipped_quantity",
-        FulfillmentStatus.UNFULFILLED.value, FulfillmentStatus.PARTIALLY_FULFILLED.value, FulfillmentStatus.FULFILLED.value,
+        lines,
+        "shipped_quantity",
+        FulfillmentStatus.UNFULFILLED.value,
+        FulfillmentStatus.PARTIALLY_FULFILLED.value,
+        FulfillmentStatus.FULFILLED.value,
     )
 
 
 def delivery_status(lines: list[OrderLineView]) -> str:
     return _aggregate_status(
-        lines, "delivered_quantity",
-        DeliveryStatus.NOT_DELIVERED.value, DeliveryStatus.PARTIALLY_DELIVERED.value, DeliveryStatus.DELIVERED.value,
+        lines,
+        "delivered_quantity",
+        DeliveryStatus.NOT_DELIVERED.value,
+        DeliveryStatus.PARTIALLY_DELIVERED.value,
+        DeliveryStatus.DELIVERED.value,
     )
 
 
 def invoice_status(lines: list[OrderLineView]) -> str:
     return _aggregate_status(
-        lines, "invoiced_quantity",
-        InvoiceStatus.NOT_INVOICED.value, InvoiceStatus.PARTIALLY_INVOICED.value, InvoiceStatus.INVOICED.value,
+        lines,
+        "invoiced_quantity",
+        InvoiceStatus.NOT_INVOICED.value,
+        InvoiceStatus.PARTIALLY_INVOICED.value,
+        InvoiceStatus.INVOICED.value,
     )
 
 

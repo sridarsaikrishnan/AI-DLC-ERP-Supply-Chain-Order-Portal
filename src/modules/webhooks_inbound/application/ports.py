@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from src.modules.integration.domain.status_mapping import CanonicalStatus
-from src.shared.types import ConnectionId, OrderId
+if TYPE_CHECKING:
+    from src.modules.integration.domain.status_mapping import CanonicalStatus
+    from src.shared.types import ConnectionId, OrderId
 
 
 class SecretResolver(Protocol):

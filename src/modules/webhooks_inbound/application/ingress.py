@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from src.modules.integration.domain.status_mapping import map_native_status
-from src.shared.types import ConnectionId
 
 from ..domain.signature import verify_shared_secret, verify_signature
-from .ports import DedupStore, OrderLocator, OrderStatusPort, SecretResolver
+
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId
+
+    from .ports import DedupStore, OrderLocator, OrderStatusPort, SecretResolver
 
 
 class IngressOutcome(str, Enum):
@@ -60,7 +64,9 @@ class InboundWebhookService:
         if webhook.auth_mode is WebhookAuthMode.SHARED_SECRET:
             authenticated = secret is not None and verify_shared_secret(secret, webhook.signature)
         else:
-            authenticated = secret is not None and verify_signature(secret, webhook.raw_body, webhook.signature)
+            authenticated = secret is not None and verify_signature(
+                secret, webhook.raw_body, webhook.signature
+            )
         if not authenticated:
             return IngressOutcome.UNAUTHORIZED
 

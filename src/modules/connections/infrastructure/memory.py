@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from src.shared.types import ConnectionId
+from typing import TYPE_CHECKING
 
-from ..domain.models import ErpConnection
+if TYPE_CHECKING:
+    from src.shared.types import ConnectionId
+
+    from ..domain.models import ErpConnection
 
 
 class InMemoryConnectionRepository:

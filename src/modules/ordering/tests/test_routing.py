@@ -30,7 +30,9 @@ def test_single_owner_and_bound_routes() -> None:
 
 
 def test_mixed_erp_is_rejected() -> None:
-    decision = resolve_owning_connection(["ANVIL", "ROCKET"], _owner_of, _bound_to("conn_1", "conn_2"))
+    decision = resolve_owning_connection(
+        ["ANVIL", "ROCKET"], _owner_of, _bound_to("conn_1", "conn_2")
+    )
     assert not decision.routed
     assert decision.reason is RejectionReason.MIXED_ERP
 

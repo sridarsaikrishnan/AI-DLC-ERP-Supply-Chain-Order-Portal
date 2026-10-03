@@ -4,12 +4,17 @@ validates + marks ready, or rejects. This is the `order-processing` consumer's l
 
 from __future__ import annotations
 
-from src.shared.eventsourcing import EventSourcedRepository, StoredEvent
+from typing import TYPE_CHECKING
+
 from src.shared.types import ConnectionId, TenantId
 
-from ..domain.aggregate import Order
 from ..domain.routing import resolve_owning_connection
-from .ports import BindingQuery, OwnershipQuery
+
+if TYPE_CHECKING:
+    from src.shared.eventsourcing import EventSourcedRepository, StoredEvent
+
+    from ..domain.aggregate import Order
+    from .ports import BindingQuery, OwnershipQuery
 
 
 class OrderProcessor:

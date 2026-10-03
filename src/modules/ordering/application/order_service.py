@@ -9,16 +9,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from src.modules.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
-from src.modules.quoting.domain.models import Quote
-from src.shared.eventsourcing import EventSourcedRepository
 from src.shared.types import OrderId, TenantId, generate_id
 
 from ..domain.aggregate import Order
 from ..domain.models import KIND_PHYSICAL, OrderLine
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from src.modules.quoting.domain.models import Quote
+    from src.shared.eventsourcing import EventSourcedRepository
 
 
 @dataclass(frozen=True)

@@ -26,7 +26,12 @@ class FactPublisher(Protocol):
 
 
 def make_fact(
-    *, stream_id: str, aggregate_type: str, event_type: str, payload: dict[str, Any], tenant_id: str | None = None
+    *,
+    stream_id: str,
+    aggregate_type: str,
+    event_type: str,
+    payload: dict[str, Any],
+    tenant_id: str | None = None,
 ) -> StoredEvent:
     return StoredEvent(
         stream_id=stream_id,
@@ -43,7 +48,7 @@ def make_fact(
 class NullFactPublisher:
     """Discards facts. For tests that don't care about them."""
 
-    def publish(self, fact: StoredEvent) -> None:  # noqa: D102
+    def publish(self, fact: StoredEvent) -> None:
         return None
 
 

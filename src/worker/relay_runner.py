@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
-from src.shared.persistence.relay import OutboxRelay
+if TYPE_CHECKING:
+    from src.shared.persistence.relay import OutboxRelay
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ class RelayRunner:
         while True:
             try:
                 published = self._relay.run_once()
-            except Exception:  # noqa: BLE001 - a transient DB/SNS blip must not permanently
+            except Exception:
                 # stop the relay; the unpublished outbox rows are still there next pass.
                 log.exception("outbox relay pass failed; retrying after idle_sleep")
                 time.sleep(self._idle_sleep)

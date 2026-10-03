@@ -9,11 +9,13 @@ short-lived session, then explicitly released — never left to an implicit sess
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from sqlalchemy import text
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class ConnectionLock(Protocol):

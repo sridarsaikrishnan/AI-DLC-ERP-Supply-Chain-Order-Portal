@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from src.shared.types import TenantId, WebhookEndpointId
+from typing import TYPE_CHECKING
 
-from ..domain.models import WebhookDelivery, WebhookEndpoint
+if TYPE_CHECKING:
+    from src.shared.types import TenantId, WebhookEndpointId
+
+    from ..domain.models import WebhookDelivery, WebhookEndpoint
 
 
 class InMemoryWebhookEndpointRepository:

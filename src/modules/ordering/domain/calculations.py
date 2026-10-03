@@ -11,10 +11,12 @@ silently-wrong zero.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from src.shared.money import Money, TaxRate, round_money
 
-from .models import OrderLine
+if TYPE_CHECKING:
+    from .models import OrderLine
 
 
 def line_total(line: OrderLine) -> Money | None:
@@ -24,7 +26,8 @@ def line_total(line: OrderLine) -> Money | None:
     currency = line.unit_price.currency
     if line.line_discount is not None and line.line_discount.currency != currency:
         raise ValueError(
-            f"line_discount currency {line.line_discount.currency!r} != unit_price currency {currency!r}"
+            f"line_discount currency {line.line_discount.currency!r} != "
+            f"unit_price currency {currency!r}"
         )
     discount = line.line_discount.amount if line.line_discount is not None else Decimal(0)
     gross = line.quantity * line.unit_price.amount

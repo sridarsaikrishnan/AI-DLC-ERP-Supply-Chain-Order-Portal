@@ -8,14 +8,16 @@ Routing: eventType message attribute drives SNS subscription filter policies.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from .envelope import from_json, to_json
+
+if TYPE_CHECKING:
+    from src.shared.eventsourcing import StoredEvent
+
+    from .bus import MessageHandler
 
 log = logging.getLogger(__name__)
-
-from src.shared.eventsourcing import StoredEvent
-
-from .bus import MessageHandler
-from .envelope import from_json, to_json
 
 
 class SnsFifoPublisher:
@@ -87,7 +89,7 @@ class SqsConsumerRunner:
             event = from_json(message["Body"])
             try:
                 self._handler(event)
-            except Exception:  # noqa: BLE001 - one bad message must not kill this thread's
+            except Exception:
                 # loop; leaving the message undeleted is what actually triggers SQS
                 # redrive -> DLQ after maxReceiveCount, not the exception propagating.
                 log.exception(
@@ -96,7 +98,9 @@ class SqsConsumerRunner:
                     event.event_type,
                 )
                 continue
-            self._client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=message["ReceiptHandle"])
+            self._client.delete_message(
+                QueueUrl=self._queue_url, ReceiptHandle=message["ReceiptHandle"]
+            )
         return len(messages)
 
     def run_forever(self) -> None:  # pragma: no cover - long-running loop

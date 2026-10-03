@@ -24,7 +24,9 @@ def test_sync_new_item_assigns_owning_connection() -> None:
 def test_resync_from_same_connection_updates_name() -> None:
     svc = _service()
     svc.sync_item(sku="ANVIL", name="Anvil", owning_connection_id=ConnectionId("conn_1"))
-    updated = svc.sync_item(sku="ANVIL", name="Anvil XL", owning_connection_id=ConnectionId("conn_1"))
+    updated = svc.sync_item(
+        sku="ANVIL", name="Anvil XL", owning_connection_id=ConnectionId("conn_1")
+    )
     assert updated.name == "Anvil XL"
 
 

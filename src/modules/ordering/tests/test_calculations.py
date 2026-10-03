@@ -19,7 +19,9 @@ from src.shared.money import Money, TaxRate, round_money
 # --- ordinary unit tests -----------------------------------------------------------
 
 
-def _line(qty: str, price: str | None, discount: str | None = None, tax_rates: list[TaxRate] | None = None) -> OrderLine:
+def _line(
+    qty: str, price: str | None, discount: str | None = None, tax_rates: list[TaxRate] | None = None
+) -> OrderLine:
     return OrderLine(
         product_key="ANVIL",
         quantity=Decimal(qty),
@@ -44,8 +46,11 @@ def test_line_total_with_discount() -> None:
 
 def test_line_discount_currency_mismatch_raises() -> None:
     line = OrderLine(
-        product_key="X", quantity=Decimal(1), unit_of_measure="EA",
-        unit_price=Money(Decimal("10"), "USD"), line_discount=Money(Decimal("1"), "EUR"),
+        product_key="X",
+        quantity=Decimal(1),
+        unit_of_measure="EA",
+        unit_price=Money(Decimal("10"), "USD"),
+        line_discount=Money(Decimal("1"), "EUR"),
     )
     with pytest.raises(ValueError):
         line_total(line)
@@ -76,8 +81,18 @@ def test_order_subtotal_skips_unpriced_lines() -> None:
 
 def test_order_subtotal_currency_mismatch_raises() -> None:
     lines = [
-        OrderLine(product_key="A", quantity=Decimal(1), unit_of_measure="EA", unit_price=Money(Decimal("10"), "USD")),
-        OrderLine(product_key="B", quantity=Decimal(1), unit_of_measure="EA", unit_price=Money(Decimal("10"), "EUR")),
+        OrderLine(
+            product_key="A",
+            quantity=Decimal(1),
+            unit_of_measure="EA",
+            unit_price=Money(Decimal("10"), "USD"),
+        ),
+        OrderLine(
+            product_key="B",
+            quantity=Decimal(1),
+            unit_of_measure="EA",
+            unit_price=Money(Decimal("10"), "EUR"),
+        ),
     ]
     with pytest.raises(ValueError):
         order_subtotal(lines)

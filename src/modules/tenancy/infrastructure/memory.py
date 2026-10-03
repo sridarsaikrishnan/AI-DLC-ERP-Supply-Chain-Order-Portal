@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from src.shared.types import BindingId, ConnectionId, TenantId
+from typing import TYPE_CHECKING
 
-from ..domain.models import TenantConnectionBinding
+if TYPE_CHECKING:
+    from src.shared.types import BindingId, ConnectionId, TenantId
+
+    from ..domain.models import TenantConnectionBinding
 
 
 class InMemoryBindingRepository:

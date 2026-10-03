@@ -13,13 +13,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from strawberry.fastapi import GraphQLRouter
 
-from src.shared.config import get_settings
-
 from src.api.graphql.context import GraphQLContext
 from src.api.graphql.operator.schema import build_operator_schema
 from src.api.graphql.reseller.schema import build_reseller_schema
 from src.api.http import health, webhooks
 from src.composition import build_container
+from src.shared.config import get_settings
 
 _SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'",
@@ -48,16 +47,19 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_allowed_origins,
-        allow_credentials=False,  # auth is a Bearer header, not cookies — no credentials mode needed
+        # auth is a Bearer header, not cookies — no credentials mode needed
+        allow_credentials=False,
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
     app.include_router(
-        GraphQLRouter(build_reseller_schema(), context_getter=_build_context), prefix="/graphql/reseller"
+        GraphQLRouter(build_reseller_schema(), context_getter=_build_context),
+        prefix="/graphql/reseller",
     )
     app.include_router(
-        GraphQLRouter(build_operator_schema(), context_getter=_build_context), prefix="/graphql/operator"
+        GraphQLRouter(build_operator_schema(), context_getter=_build_context),
+        prefix="/graphql/operator",
     )
     app.include_router(webhooks.router)
     app.include_router(health.router)

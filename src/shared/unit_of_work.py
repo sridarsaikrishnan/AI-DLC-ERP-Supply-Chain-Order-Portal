@@ -10,9 +10,11 @@ session.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @runtime_checkable

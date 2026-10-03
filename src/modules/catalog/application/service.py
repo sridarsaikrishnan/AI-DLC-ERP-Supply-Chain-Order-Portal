@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.shared.messaging.facts import FactPublisher, make_fact
 from src.shared.types import ConnectionId, ItemId, generate_id
 
 from ..domain.errors import ItemOwnershipConflict
 from ..domain.events import ITEM_SYNCED
 from ..domain.models import Item, ItemKind, detect_ownership_conflict
-from .ports import ItemRepository
+
+if TYPE_CHECKING:
+    from .ports import ItemRepository
 
 
 class CatalogService:

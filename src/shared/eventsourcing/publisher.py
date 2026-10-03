@@ -6,9 +6,10 @@ SNS-FIFO adapter (see shared/messaging); tests/local use the collecting/null one
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from .events import StoredEvent
+if TYPE_CHECKING:
+    from .events import StoredEvent
 
 
 @runtime_checkable
@@ -19,7 +20,7 @@ class EventPublisher(Protocol):
 class NullEventPublisher:
     """Discards events. Useful when the outbox is the only propagation path."""
 
-    def publish(self, events: list[StoredEvent]) -> None:  # noqa: D102
+    def publish(self, events: list[StoredEvent]) -> None:
         return None
 
 

@@ -18,4 +18,6 @@ class HttpWebhookSender:
             return WebhookSendResult(success=False, status_code=None, error=str(exc))
         if 200 <= response.status_code < 300:
             return WebhookSendResult(success=True, status_code=response.status_code, error=None)
-        return WebhookSendResult(success=False, status_code=response.status_code, error=response.text[:200])
+        return WebhookSendResult(
+            success=False, status_code=response.status_code, error=response.text[:200]
+        )

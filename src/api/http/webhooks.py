@@ -26,7 +26,11 @@ import json
 
 from fastapi import APIRouter, Request, Response
 
-from src.modules.webhooks_inbound.application.ingress import InboundWebhook, IngressOutcome, WebhookAuthMode
+from src.modules.webhooks_inbound.application.ingress import (
+    InboundWebhook,
+    IngressOutcome,
+    WebhookAuthMode,
+)
 from src.shared.types import ConnectionId
 
 router = APIRouter()
@@ -59,7 +63,9 @@ async def _dispatch(request: Request, webhook: InboundWebhook) -> Response:
     container = request.app.state.container
     outcome = container.ingress.handle(webhook)
     container.drain()  # memory profile: drain in-process; postgres: no-op, worker drains
-    return Response(status_code=_STATUS.get(outcome, 200), content=outcome.value, media_type="text/plain")
+    return Response(
+        status_code=_STATUS.get(outcome, 200), content=outcome.value, media_type="text/plain"
+    )
 
 
 @router.post("/erp/webhook/{connection_id}")
@@ -82,7 +88,9 @@ async def erp_webhook_hmac(connection_id: str, request: Request) -> Response:
 
 
 @router.post("/erp/webhook/{connection_id}/{webhook_secret}")
-async def erp_webhook_shared_secret(connection_id: str, webhook_secret: str, request: Request) -> Response:
+async def erp_webhook_shared_secret(
+    connection_id: str, webhook_secret: str, request: Request
+) -> Response:
     """Odoo: the secret is the URL segment itself, not a header — see module docstring."""
     raw = await request.body()
     body = _parse_body(raw)

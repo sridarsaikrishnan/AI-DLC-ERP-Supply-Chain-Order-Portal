@@ -7,10 +7,12 @@ Resolvers read the container from here; they never import infrastructure directl
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from strawberry.fastapi import BaseContext
 
-from src.composition import Container
+if TYPE_CHECKING:
+    from src.composition import Container
 
 
 @dataclass

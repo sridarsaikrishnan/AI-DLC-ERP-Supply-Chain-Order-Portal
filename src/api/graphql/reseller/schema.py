@@ -7,21 +7,16 @@ Every resolver is tenant-scoped via the context.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
-from strawberry.types import Info
 
 from src.modules.ordering.application.order_service import OrderLineInput as OrderLineCommand
-from src.modules.ordering.projections.read_models import ResellerOrderView
 from src.modules.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
-from src.modules.quoting.domain.models import Quote
 from src.modules.webhooks_outbound.application.service import WebhookEndpointService
-from src.modules.webhooks_outbound.domain.models import WebhookDelivery, WebhookEndpoint
-from src.shared.money import Money
 from src.shared.types import OrderId, TenantId, WebhookEndpointId
 
-from ..context import GraphQLContext
 from .types import (
     MoneyType,
     OrderLineInput,
@@ -36,6 +31,16 @@ from .types import (
     WebhookEndpointType,
 )
 
+if TYPE_CHECKING:
+    from strawberry.types import Info
+
+    from src.modules.ordering.projections.read_models import ResellerOrderView
+    from src.modules.quoting.domain.models import Quote
+    from src.modules.webhooks_outbound.domain.models import WebhookDelivery, WebhookEndpoint
+    from src.shared.money import Money
+
+    from ..context import GraphQLContext
+
 
 def _money_to_gql(money: Money | None) -> MoneyType | None:
     return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
@@ -48,21 +53,23 @@ def _to_gql(view: ResellerOrderView) -> ResellerOrder:
         status=view.status,
         lines=[
             OrderLineType(
-                product_key=l.product_key,
-                quantity=l.quantity,
-                unit_of_measure=l.unit_of_measure,
-                line_id=l.line_id,
-                kind=l.kind,
-                unit_price=_money_to_gql(l.unit_price),
-                line_total=_money_to_gql(l.line_total),
-                shipped_quantity=l.shipped_quantity,
-                delivered_quantity=l.delivered_quantity,
-                invoiced_quantity=l.invoiced_quantity,
-                scheduled_date=l.scheduled_date,
+                product_key=line.product_key,
+                quantity=line.quantity,
+                unit_of_measure=line.unit_of_measure,
+                line_id=line.line_id,
+                kind=line.kind,
+                unit_price=_money_to_gql(line.unit_price),
+                line_total=_money_to_gql(line.line_total),
+                shipped_quantity=line.shipped_quantity,
+                delivered_quantity=line.delivered_quantity,
+                invoiced_quantity=line.invoiced_quantity,
+                scheduled_date=line.scheduled_date,
             )
-            for l in view.lines
+            for line in view.lines
         ],
-        timeline=[TimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline],
+        timeline=[
+            TimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline
+        ],
         subtotal=_money_to_gql(view.subtotal),
         fulfillment_status=view.fulfillment_status,
         delivery_status=view.delivery_status,
@@ -88,11 +95,13 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
         status=quote.status.value,
         lines=[
             QuoteLineType(
-                product_key=l.product_key,
-                unit_price=MoneyType(amount=float(l.unit_price.amount), currency=l.unit_price.currency),
-                unit_of_measure=l.unit_of_measure,
+                product_key=line.product_key,
+                unit_price=MoneyType(
+                    amount=float(line.unit_price.amount), currency=line.unit_price.currency
+                ),
+                unit_of_measure=line.unit_of_measure,
             )
-            for l in quote.lines
+            for line in quote.lines
         ],
     )
 
@@ -138,13 +147,18 @@ class Query:
     def quotes(self, info: Info[GraphQLContext, None]) -> list[QuoteType]:
         """Quotes issued to this reseller — what you can place an order against."""
         ctx = info.context
-        return [_quote_to_gql(q) for q in ctx.container.quote_service.list_quotes_for_tenant(TenantId(ctx.tenant_id))]
+        return [
+            _quote_to_gql(q)
+            for q in ctx.container.quote_service.list_quotes_for_tenant(TenantId(ctx.tenant_id))
+        ]
 
     @strawberry.field
     def quote(self, info: Info[GraphQLContext, None], quote_id: str) -> QuoteType | None:
         ctx = info.context
         quote = ctx.container.quote_service.get_quote(quote_id)
-        if quote is None or str(quote.tenant_id) != ctx.tenant_id:  # tenant scoping (FR-19 / fail-closed)
+        if (
+            quote is None or str(quote.tenant_id) != ctx.tenant_id
+        ):  # tenant scoping (FR-19 / fail-closed)
             return None
         return _quote_to_gql(quote)
 
@@ -152,7 +166,8 @@ class Query:
     def webhook_endpoints(self, info: Info[GraphQLContext, None]) -> list[WebhookEndpointType]:
         ctx = info.context
         return [
-            _endpoint_to_gql(e) for e in ctx.container.webhook_endpoints.list_by_tenant(TenantId(ctx.tenant_id))
+            _endpoint_to_gql(e)
+            for e in ctx.container.webhook_endpoints.list_by_tenant(TenantId(ctx.tenant_id))
         ]
 
     @strawberry.field
@@ -161,7 +176,8 @@ class Query:
         endpoints, and whether it arrived."""
         ctx = info.context
         return [
-            _delivery_to_gql(d) for d in ctx.container.webhook_deliveries.list_by_tenant(TenantId(ctx.tenant_id))
+            _delivery_to_gql(d)
+            for d in ctx.container.webhook_deliveries.list_by_tenant(TenantId(ctx.tenant_id))
         ]
 
 
@@ -169,7 +185,11 @@ class Query:
 class Mutation:
     @strawberry.mutation
     def place_order(
-        self, info: Info[GraphQLContext, None], quote_id: str, client_reference: str, lines: list[OrderLineInput]
+        self,
+        info: Info[GraphQLContext, None],
+        quote_id: str,
+        client_reference: str,
+        lines: list[OrderLineInput],
     ) -> str:
         """Place an order as a reply to a quote (FR-B2). Price comes from the quote; a line
         with no quoted price, or a missing/expired quote, is refused (FR-B3)."""
@@ -199,7 +219,11 @@ class Mutation:
 
     @strawberry.mutation
     def register_webhook_endpoint(
-        self, info: Info[GraphQLContext, None], name: str, url: str, event_types: list[str] | None = None
+        self,
+        info: Info[GraphQLContext, None],
+        name: str,
+        url: str,
+        event_types: list[str] | None = None,
     ) -> WebhookEndpointCreatedType:
         ctx = info.context
         service = WebhookEndpointService(ctx.container.webhook_endpoints, ctx.container.secrets)
@@ -209,20 +233,32 @@ class Mutation:
             url=url,
             event_types=frozenset(event_types) if event_types else None,
         )
-        return WebhookEndpointCreatedType(endpoint=_endpoint_to_gql(endpoint), signing_secret=raw_secret)
+        return WebhookEndpointCreatedType(
+            endpoint=_endpoint_to_gql(endpoint), signing_secret=raw_secret
+        )
 
     @strawberry.mutation
-    def pause_webhook_endpoint(self, info: Info[GraphQLContext, None], endpoint_id: str) -> WebhookEndpointType:
+    def pause_webhook_endpoint(
+        self, info: Info[GraphQLContext, None], endpoint_id: str
+    ) -> WebhookEndpointType:
         ctx = info.context
         service = WebhookEndpointService(ctx.container.webhook_endpoints, ctx.container.secrets)
-        return _endpoint_to_gql(service.pause(WebhookEndpointId(endpoint_id), tenant_id=TenantId(ctx.tenant_id)))
+        return _endpoint_to_gql(
+            service.pause(WebhookEndpointId(endpoint_id), tenant_id=TenantId(ctx.tenant_id))
+        )
 
     @strawberry.mutation
-    def resume_webhook_endpoint(self, info: Info[GraphQLContext, None], endpoint_id: str) -> WebhookEndpointType:
+    def resume_webhook_endpoint(
+        self, info: Info[GraphQLContext, None], endpoint_id: str
+    ) -> WebhookEndpointType:
         ctx = info.context
         service = WebhookEndpointService(ctx.container.webhook_endpoints, ctx.container.secrets)
-        return _endpoint_to_gql(service.resume(WebhookEndpointId(endpoint_id), tenant_id=TenantId(ctx.tenant_id)))
+        return _endpoint_to_gql(
+            service.resume(WebhookEndpointId(endpoint_id), tenant_id=TenantId(ctx.tenant_id))
+        )
 
 
 def build_reseller_schema() -> strawberry.Schema:
-    return strawberry.Schema(query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)])
+    return strawberry.Schema(
+        query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
+    )

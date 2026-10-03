@@ -41,7 +41,9 @@ def _service(locator: InMemoryOrderLocator, status: RecordingStatus) -> InboundW
     )
 
 
-def _webhook(native_status: str = "sale", event_ref: str = "evt_1", signature: str | None = None) -> InboundWebhook:
+def _webhook(
+    native_status: str = "sale", event_ref: str = "evt_1", signature: str | None = None
+) -> InboundWebhook:
     return InboundWebhook(
         connection_id=_CONN,
         erp_type="ODOO",

@@ -21,7 +21,9 @@ from src.shared.types import ConnectionId, OrderId, TenantId
 
 
 def _line(product_key: str, qty, line_id: str, kind: str = KIND_PHYSICAL) -> OrderLine:
-    return OrderLine(product_key=product_key, quantity=qty, unit_of_measure="EA", line_id=line_id, kind=kind)
+    return OrderLine(
+        product_key=product_key, quantity=qty, unit_of_measure="EA", line_id=line_id, kind=kind
+    )
 
 
 def _lines() -> list[OrderLine]:
@@ -55,12 +57,16 @@ def test_submit_rejects_empty_or_nonpositive_or_idless_lines() -> None:
         Order.submit(order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r", lines=[])
     with pytest.raises(ValueError):
         Order.submit(
-            order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r",
+            order_id=OrderId("o"),
+            tenant_id=TenantId("t"),
+            client_reference="r",
             lines=[_line("X", 0, "l_x")],
         )
     with pytest.raises(ValueError):
         Order.submit(
-            order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r",
+            order_id=OrderId("o"),
+            tenant_id=TenantId("t"),
+            client_reference="r",
             lines=[OrderLine(product_key="X", quantity=1, unit_of_measure="EA", line_id="")],
         )
 
@@ -126,8 +132,13 @@ def test_legacy_ready_for_delivery_snapshot_restores_as_accepted() -> None:
     order = Order("ord_legacy")
     order.restore(
         {
-            "tenant_id": "tnt_a", "client_reference": "PO", "lines": [], "product_keys": [],
-            "state": "READY_FOR_DELIVERY", "owning_connection_id": "conn_1", "erp_order_id": None,
+            "tenant_id": "tnt_a",
+            "client_reference": "PO",
+            "lines": [],
+            "product_keys": [],
+            "state": "READY_FOR_DELIVERY",
+            "owning_connection_id": "conn_1",
+            "erp_order_id": None,
             "retry_attempt": 0,
         }
     )
@@ -138,7 +149,9 @@ def test_quantity_is_decimal_and_survives_event_replay_exactly() -> None:
     store = InMemoryEventStore()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = Order.submit(
-        order_id=OrderId("ord_2"), tenant_id=TenantId("tnt_a"), client_reference="PO-2",
+        order_id=OrderId("ord_2"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-2",
         lines=[_line("ANVIL", Decimal("2.1"), "l_a")],
     )
     assert isinstance(order.lines[0].quantity, Decimal)
@@ -153,10 +166,15 @@ def test_priced_line_survives_event_replay_exactly() -> None:
     store = InMemoryEventStore()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = Order.submit(
-        order_id=OrderId("ord_3"), tenant_id=TenantId("tnt_a"), client_reference="PO-3",
+        order_id=OrderId("ord_3"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-3",
         lines=[
             OrderLine(
-                product_key="ANVIL", quantity=Decimal("2.5"), unit_of_measure="EA", line_id="l_a",
+                product_key="ANVIL",
+                quantity=Decimal("2.5"),
+                unit_of_measure="EA",
+                line_id="l_a",
                 unit_price=Money(Decimal("19.99"), "USD"),
                 line_discount=Money(Decimal("1.50"), "USD"),
                 tax_rates=[TaxRate("VAT", Decimal("0.20"), inclusive=False)],
@@ -182,8 +200,13 @@ def test_snapshot_round_trip() -> None:
 
 def _confirmed_order_with_two_lines(anvil_kind: str = KIND_PHYSICAL) -> Order:
     order = Order.submit(
-        order_id=OrderId("ord_pf"), tenant_id=TenantId("tnt_a"), client_reference="PO-PF",
-        lines=[_line("ANVIL", Decimal(10), "l_anvil", anvil_kind), _line("SPRING", Decimal(5), "l_spring")],
+        order_id=OrderId("ord_pf"),
+        tenant_id=TenantId("tnt_a"),
+        client_reference="PO-PF",
+        lines=[
+            _line("ANVIL", Decimal(10), "l_anvil", anvil_kind),
+            _line("SPRING", Decimal(5), "l_spring"),
+        ],
     )
     order.validate(ConnectionId("conn_1"))
     order.accept()
@@ -198,7 +221,9 @@ def test_fulfillment_status_is_orthogonal_to_order_state() -> None:
     assert order.state is OrderState.CONFIRMED
 
     order.record_fulfillment("l_anvil", Decimal(10))
-    assert order.fulfillment_status is FulfillmentStatus.PARTIALLY_FULFILLED  # SPRING not yet shipped
+    assert (
+        order.fulfillment_status is FulfillmentStatus.PARTIALLY_FULFILLED
+    )  # SPRING not yet shipped
     assert order.state is OrderState.CONFIRMED  # lifecycle untouched
 
     order.record_fulfillment("l_spring", Decimal(5))
@@ -221,14 +246,18 @@ def test_shipped_and_delivered_are_different_facts_for_a_box() -> None:
     assert order.fulfillment_status is FulfillmentStatus.FULFILLED  # shipped in full
     assert order.delivery_status is DeliveryStatus.NOT_DELIVERED  # but not delivered
 
-    order.record_fulfillment("l_anvil", Decimal(0) + Decimal(10), carrier="DHL")  # now with a carrier
+    order.record_fulfillment(
+        "l_anvil", Decimal(0) + Decimal(10), carrier="DHL"
+    )  # now with a carrier
     # SPRING (physical) still has no carrier -> partially delivered overall
     assert order.delivery_status is DeliveryStatus.PARTIALLY_DELIVERED
 
 
 def test_a_license_is_delivered_on_ship() -> None:
     order = _confirmed_order_with_two_lines(anvil_kind=KIND_LICENSE)
-    order.record_fulfillment("l_anvil", Decimal(10))  # license: delivered on ship, no carrier needed
+    order.record_fulfillment(
+        "l_anvil", Decimal(10)
+    )  # license: delivered on ship, no carrier needed
     assert order.delivered_qty_by_line["l_anvil"] == Decimal(10)
 
 

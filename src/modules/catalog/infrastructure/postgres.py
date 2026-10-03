@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Column, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Row
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.types import ConnectionId, ItemId
 
 from ..domain.models import Item, ItemKind
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 
@@ -20,7 +24,9 @@ items_table = Table(
     Column("sku", String, nullable=False, unique=True),
     Column("name", String, nullable=False),
     Column("owning_connection_id", String, nullable=False),
-    Column("kind", String, nullable=False),  # ItemKind — Increment 5 (price columns dropped, ADR-0016)
+    Column(
+        "kind", String, nullable=False
+    ),  # ItemKind — Increment 5 (price columns dropped, ADR-0016)
 )
 
 
@@ -72,7 +78,9 @@ class PostgresItemRepository:
     def get(self, item_id: str) -> Item | None:
         session = self._session_factory()
         try:
-            row = session.execute(select(items_table).where(items_table.c.item_id == item_id)).first()
+            row = session.execute(
+                select(items_table).where(items_table.c.item_id == item_id)
+            ).first()
         finally:
             session.close()
         return _to_model(row) if row is not None else None

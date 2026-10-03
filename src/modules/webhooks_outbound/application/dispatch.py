@@ -17,15 +17,18 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from src.modules.webhooks_inbound.domain.signature import compute_signature
-from src.shared.eventsourcing import StoredEvent
-from src.shared.secrets import SecretStore
-from src.shared.types import TenantId, WebhookEndpointId, generate_id
+from src.shared.types import TenantId, generate_id
 
 from ..domain.models import DISPATCHABLE_EVENT_TYPES, DeliveryStatus, WebhookDelivery
-from .ports import WebhookDeliveryRepository, WebhookEndpointRepository, WebhookSender
+
+if TYPE_CHECKING:
+    from src.shared.eventsourcing import StoredEvent
+    from src.shared.secrets import SecretStore
+
+    from .ports import WebhookDeliveryRepository, WebhookEndpointRepository, WebhookSender
 
 MAX_ATTEMPTS = 5  # mirrors messaging-topology.md's locked SQS maxReceiveCount
 
@@ -34,7 +37,9 @@ class OrderSummaryReader(Protocol):
     """The one field the webhook body needs beyond what's on the event itself — kept
     narrow so this module doesn't depend on the whole projections store's query surface."""
 
-    def get_operator_view(self, order_id: str) -> object | None: ...  # duck-typed: .client_reference, .status
+    def get_operator_view(
+        self, order_id: str
+    ) -> object | None: ...  # duck-typed: .client_reference, .status
 
 
 class WebhookDeliveryRetry(Exception):
@@ -63,7 +68,11 @@ class WebhookDispatchService:
 
         tenant_id = TenantId(event.tenant_id)
         order_id = str(event.payload.get("order_id") or event.stream_id)
-        targets = [e for e in self._endpoints.list_by_tenant(tenant_id) if e.subscribes_to(event.event_type)]
+        targets = [
+            e
+            for e in self._endpoints.list_by_tenant(tenant_id)
+            if e.subscribes_to(event.event_type)
+        ]
         if not targets:
             return
 
@@ -72,7 +81,9 @@ class WebhookDispatchService:
 
         still_retrying: list[str] = []
         for endpoint in targets:
-            delivery = self._deliveries.find(endpoint.endpoint_id, event.event_id) or WebhookDelivery(
+            delivery = self._deliveries.find(
+                endpoint.endpoint_id, event.event_id
+            ) or WebhookDelivery(
                 delivery_id=generate_id("whdlv"),
                 endpoint_id=endpoint.endpoint_id,
                 tenant_id=tenant_id,
@@ -91,12 +102,16 @@ class WebhookDispatchService:
                 still_retrying.append(endpoint.name)
 
         if still_retrying:
-            raise WebhookDeliveryRetry(f"{len(still_retrying)} endpoint(s) still retrying: {', '.join(still_retrying)}")
+            raise WebhookDeliveryRetry(
+                f"{len(still_retrying)} endpoint(s) still retrying: {', '.join(still_retrying)}"
+            )
 
     def _attempt(self, endpoint, delivery: WebhookDelivery, raw_body: bytes) -> None:
         secret = self._secrets.get_secret(endpoint.secret_ref)
         timestamp = str(int(time.time()))
-        signature = f"t={timestamp},v1={compute_signature(secret, f'{timestamp}.'.encode() + raw_body)}"
+        signature = (
+            f"t={timestamp},v1={compute_signature(secret, f'{timestamp}.'.encode() + raw_body)}"
+        )
         result = self._sender.send(
             endpoint.url,
             {"Content-Type": "application/json", "X-Signature": signature},
@@ -110,7 +125,9 @@ class WebhookDispatchService:
         delivery.last_response = result.error or (
             f"HTTP {result.status_code}" if result.status_code is not None else "network error"
         )
-        delivery.status = DeliveryStatus.FAILED if delivery.attempts >= MAX_ATTEMPTS else DeliveryStatus.RETRYING
+        delivery.status = (
+            DeliveryStatus.FAILED if delivery.attempts >= MAX_ATTEMPTS else DeliveryStatus.RETRYING
+        )
 
     def _build_body(self, event: StoredEvent, order_id: str) -> dict:
         # order.status is the LATEST known status as of dispatch time, not necessarily

@@ -7,13 +7,17 @@ provisioned externally) and returns it once, in the same call, for the UI to sho
 from __future__ import annotations
 
 import secrets as secret_gen
+from typing import TYPE_CHECKING
 
-from src.shared.secrets import SecretStore
 from src.shared.types import TenantId, WebhookEndpointId, generate_id
 
 from ..domain.errors import WebhookEndpointNotFound
 from ..domain.models import WebhookEndpoint
-from .ports import WebhookEndpointRepository
+
+if TYPE_CHECKING:
+    from src.shared.secrets import SecretStore
+
+    from .ports import WebhookEndpointRepository
 
 
 class WebhookEndpointService:

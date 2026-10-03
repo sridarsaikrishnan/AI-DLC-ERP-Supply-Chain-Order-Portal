@@ -16,13 +16,16 @@ import pytest
 pytest.importorskip("sqlalchemy")
 
 from sqlalchemy import text  # noqa: E402
-
 from src.modules.catalog.domain.models import Item  # noqa: E402
 from src.modules.catalog.infrastructure.postgres import PostgresItemRepository  # noqa: E402
 from src.modules.connections.domain.models import ErpConnection, ErpType  # noqa: E402
-from src.modules.connections.infrastructure.postgres import PostgresConnectionRepository  # noqa: E402
+from src.modules.connections.infrastructure.postgres import (  # noqa: E402
+    PostgresConnectionRepository,
+)
 from src.modules.ordering.domain.models import OrderState  # noqa: E402
-from src.modules.ordering.projections.postgres_store import PostgresOrderProjectionStore  # noqa: E402
+from src.modules.ordering.projections.postgres_store import (  # noqa: E402
+    PostgresOrderProjectionStore,
+)
 from src.modules.ordering.projections.read_models import OrderLineView  # noqa: E402
 from src.modules.tenancy.domain.errors import BindingConflict  # noqa: E402
 from src.modules.tenancy.domain.models import TenantConnectionBinding  # noqa: E402
@@ -64,7 +67,9 @@ def _cleanup():
                 text("DELETE FROM order_status_history WHERE order_id = ANY(:ids)"),
                 {"ids": _created_order_ids},
             )
-            session.execute(text("DELETE FROM orders WHERE order_id = ANY(:ids)"), {"ids": _created_order_ids})
+            session.execute(
+                text("DELETE FROM orders WHERE order_id = ANY(:ids)"), {"ids": _created_order_ids}
+            )
         if _created_connection_ids:
             session.execute(
                 text("DELETE FROM tenant_connection_bindings WHERE connection_id = ANY(:ids)"),
@@ -80,7 +85,8 @@ def _cleanup():
             )
         if _created_dedup_keys:
             session.execute(
-                text("DELETE FROM processed_events WHERE event_id = ANY(:ids)"), {"ids": _created_dedup_keys}
+                text("DELETE FROM processed_events WHERE event_id = ANY(:ids)"),
+                {"ids": _created_dedup_keys},
             )
 
 
@@ -111,7 +117,9 @@ def test_connection_repository_roundtrip() -> None:
 def test_item_repository_upserts_on_refresh() -> None:
     repo = PostgresItemRepository(_factory)
     owner = _make_connection().connection_id
-    item = Item(item_id=ItemId(_id("item")), sku=_id("sku"), name="Widget", owning_connection_id=owner)
+    item = Item(
+        item_id=ItemId(_id("item")), sku=_id("sku"), name="Widget", owning_connection_id=owner
+    )
     repo.add(item)
     item.name = "Widget v2"
     repo.add(item)
@@ -127,13 +135,19 @@ def test_binding_repository_enforces_uniqueness_at_db() -> None:
     tenant = TenantId(_id("tnt"))
     connection = _make_connection().connection_id
     binding = TenantConnectionBinding(
-        binding_id=BindingId(_id("bind")), tenant_id=tenant, connection_id=connection, erp_customer_id="cust_1"
+        binding_id=BindingId(_id("bind")),
+        tenant_id=tenant,
+        connection_id=connection,
+        erp_customer_id="cust_1",
     )
     repo.add(binding)
     assert repo.find_by_tenant_and_connection(tenant, connection) == binding
 
     dup = TenantConnectionBinding(
-        binding_id=BindingId(_id("bind")), tenant_id=tenant, connection_id=connection, erp_customer_id="cust_2"
+        binding_id=BindingId(_id("bind")),
+        tenant_id=tenant,
+        connection_id=connection,
+        erp_customer_id="cust_2",
     )
     with pytest.raises(BindingConflict):
         repo.add(dup)

@@ -20,4 +20,7 @@ def readyz() -> dict[str, str]:
 
 @router.get("/metrics")
 def metrics() -> Response:
-    return Response(content="# metrics exposed via OpenTelemetry/CloudWatch in deployment\n", media_type="text/plain")
+    return Response(
+        content="# metrics exposed via OpenTelemetry/CloudWatch in deployment\n",
+        media_type="text/plain",
+    )

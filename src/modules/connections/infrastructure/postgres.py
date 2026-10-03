@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Column, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Row
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.types import ConnectionId
 
 from ..domain.models import ConnectionStatus, ErpConnection, ErpType
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 

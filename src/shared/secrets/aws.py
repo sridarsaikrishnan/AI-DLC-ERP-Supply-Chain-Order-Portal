@@ -17,12 +17,17 @@ class SecretsManagerSecretStore:
     """Resolves an AWS Secrets Manager ARN/name via boto3 (floci locally, AWS in prod)."""
 
     def __init__(
-        self, client: Any | None = None, endpoint_url: str | None = None, region_name: str | None = None
+        self,
+        client: Any | None = None,
+        endpoint_url: str | None = None,
+        region_name: str | None = None,
     ) -> None:
         if client is None:
             import boto3
 
-            client = boto3.client("secretsmanager", endpoint_url=endpoint_url, region_name=region_name)
+            client = boto3.client(
+                "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
+            )
         self._client = client
 
     def get_secret(self, secret_ref: str) -> str:

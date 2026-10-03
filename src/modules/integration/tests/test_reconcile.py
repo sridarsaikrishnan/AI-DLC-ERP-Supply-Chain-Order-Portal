@@ -12,7 +12,12 @@ _CONN = ConnectionId("conn_1")
 
 class FakeConnections:
     def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
-        return ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
+        return ErpTarget(
+            erp_type="ODOO",
+            base_url="http://odoo",
+            credentials={"database": "odoo", "username": "admin"},
+            secret="x",
+        )
 
 
 class RecordingStatus:

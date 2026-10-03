@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from src.modules.connections.application.service import ConnectionService
-from src.modules.connections.domain.events import CONNECTION_PAUSED, CONNECTION_REGISTERED, CONNECTION_RESUMED
+from src.modules.connections.domain.events import (
+    CONNECTION_PAUSED,
+    CONNECTION_REGISTERED,
+    CONNECTION_RESUMED,
+)
 from src.modules.connections.domain.models import ConnectionStatus, ErpType
 from src.modules.connections.infrastructure.memory import InMemoryConnectionRepository
 from src.shared.messaging.facts import CollectingFactPublisher

@@ -13,10 +13,14 @@ registry regardless of how many ERP types are registered.
 
 from __future__ import annotations
 
-from src.shared.config import Settings
+from typing import TYPE_CHECKING
 
-from ..application.ports import ErpAdapter
 from .odoo_adapter import OdooAdapter
+
+if TYPE_CHECKING:
+    from src.shared.config import Settings
+
+    from ..application.ports import ErpAdapter
 
 
 def build_adapter_registry(settings: Settings) -> dict[str, ErpAdapter]:

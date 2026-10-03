@@ -6,13 +6,11 @@ separate table — a quote's lines are only ever read as a whole with the quote.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Column, Date, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Row
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.money import (
     money_from_payload,
@@ -29,6 +27,10 @@ from ..domain.models import (
     QuoteLine,
     QuoteStatus,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+    from sqlalchemy.orm import Session, sessionmaker
 
 _metadata = MetaData()
 
@@ -131,7 +133,9 @@ class PostgresQuoteRepository:
     def get(self, quote_id: str) -> Quote | None:
         session = self._session_factory()
         try:
-            row = session.execute(select(quotes_table).where(quotes_table.c.quote_id == quote_id)).first()
+            row = session.execute(
+                select(quotes_table).where(quotes_table.c.quote_id == quote_id)
+            ).first()
         finally:
             session.close()
         return _to_quote(row) if row is not None else None

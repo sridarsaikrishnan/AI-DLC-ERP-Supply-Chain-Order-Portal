@@ -15,7 +15,12 @@ import pytest
 from src.modules.integration.application.ports import ErpTarget
 from src.modules.integration.infrastructure.odoo_adapter import OdooAdapter, build_sale_order_lines
 
-_TARGET = ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
+_TARGET = ErpTarget(
+    erp_type="ODOO",
+    base_url="http://odoo",
+    credentials={"database": "odoo", "username": "admin"},
+    secret="x",
+)
 
 
 def test_capabilities_are_declared() -> None:
@@ -24,7 +29,9 @@ def test_capabilities_are_declared() -> None:
 
 
 def test_build_sale_order_lines_defaults_bad_quantity_to_one() -> None:
-    lines = build_sale_order_lines({"lines": [{"product_key": "ANVIL", "quantity": "not-a-number"}]})
+    lines = build_sale_order_lines(
+        {"lines": [{"product_key": "ANVIL", "quantity": "not-a-number"}]}
+    )
     assert lines == [
         {
             "product_key": "ANVIL",
@@ -63,21 +70,35 @@ def test_submit_is_idempotent_on_platform_order_id() -> None:
     and searched on `client_order_ref`."""
     calls: list[tuple[str, str, list, dict | None]] = []
 
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         calls.append((model, method, args, kwargs))
         if model == "sale.order" and method == "search_read":
             return [{"name": "S00099"}]
-        raise AssertionError(f"should not reach {model}.{method} once an existing order matches client_order_ref")
+        raise AssertionError(
+            f"should not reach {model}.{method} once an existing order matches client_order_ref"
+        )
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
-        result = adapter.submit(_TARGET, {"order_id": "ord_123", "erp_customer_id": "5", "lines": []})
+        result = adapter.submit(
+            _TARGET, {"order_id": "ord_123", "erp_customer_id": "5", "lines": []}
+        )
 
     assert result.success
     assert result.erp_order_id == "S00099"
-    assert calls == [("sale.order", "search_read", [[["client_order_ref", "=", "ord_123"]]], {"fields": ["name"], "limit": 1})]
+    assert calls == [
+        (
+            "sale.order",
+            "search_read",
+            [[["client_order_ref", "=", "ord_123"]]],
+            {"fields": ["name"], "limit": 1},
+        )
+    ]
 
 
 def test_submit_creates_as_the_erp_customer_without_name_lookup() -> None:
@@ -85,11 +106,15 @@ def test_submit_creates_as_the_erp_customer_without_name_lookup() -> None:
     res.partner search/create by name."""
     created_vals: dict[str, Any] = {}
 
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         if model == "sale.order" and method == "search_read":
             return []  # no existing order for this order_id
         if model == "res.partner":
-            raise AssertionError("must not look up/create a partner by name — use erp_customer_id (FR-A1)")
+            raise AssertionError(
+                "must not look up/create a partner by name — use erp_customer_id (FR-A1)"
+            )
         if model == "product.product" and method == "search":
             return [7]
         if model == "sale.order" and method == "create":
@@ -100,11 +125,17 @@ def test_submit_creates_as_the_erp_customer_without_name_lookup() -> None:
         raise AssertionError(f"unexpected call: {model}.{method}")
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
         result = adapter.submit(
-            _TARGET, {"order_id": "ord_2", "erp_customer_id": "5", "lines": [{"product_key": "ANVIL", "quantity": 2}]}
+            _TARGET,
+            {
+                "order_id": "ord_2",
+                "erp_customer_id": "5",
+                "lines": [{"product_key": "ANVIL", "quantity": 2}],
+            },
         )
 
     assert result.success
@@ -117,16 +148,21 @@ def test_submit_fails_closed_without_an_erp_customer_id() -> None:
     """No binding -> no erp_customer_id -> terminal error, never a nameless auto-created
     partner (FR-A1)."""
 
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         if model == "sale.order" and method == "search_read":
             return []
         raise AssertionError(f"must not proceed without a customer: {model}.{method}")
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
-        result = adapter.submit(_TARGET, {"order_id": "ord_x", "lines": [{"product_key": "ANVIL", "quantity": 1}]})
+        result = adapter.submit(
+            _TARGET, {"order_id": "ord_x", "lines": [{"product_key": "ANVIL", "quantity": 1}]}
+        )
 
     assert not result.success
     assert result.terminal
@@ -135,7 +171,9 @@ def test_submit_fails_closed_without_an_erp_customer_id() -> None:
 def test_submit_resolves_price_uom_and_tax_onto_the_order_line() -> None:
     sent_line_vals: dict[str, Any] = {}
 
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         if model == "sale.order" and method == "search_read":
             return []
         if model == "product.product" and method == "search":
@@ -154,8 +192,9 @@ def test_submit_resolves_price_uom_and_tax_onto_the_order_line() -> None:
         raise AssertionError(f"unexpected call: {model}.{method}")
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
         result = adapter.submit(
             _TARGET,
@@ -185,7 +224,9 @@ def test_submit_omits_uom_and_tax_when_no_odoo_match_instead_of_failing() -> Non
     """Graceful degradation, unlike unknown-product: a UoM/tax naming mismatch doesn't
     block the order — the line just goes out with Odoo's default UoM / no tax."""
 
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         if model == "sale.order" and method == "search_read":
             return []
         if model == "product.product" and method == "search":
@@ -199,8 +240,9 @@ def test_submit_omits_uom_and_tax_when_no_odoo_match_instead_of_failing() -> Non
         raise AssertionError(f"unexpected call: {model}.{method}")
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
         result = adapter.submit(
             _TARGET,
@@ -222,7 +264,9 @@ def test_submit_omits_uom_and_tax_when_no_odoo_match_instead_of_failing() -> Non
 
 
 def test_submit_fails_closed_on_unknown_product_not_silent_auto_create() -> None:
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         if model == "sale.order" and method == "search_read":
             return []
         if model == "product.product" and method == "search":
@@ -230,11 +274,17 @@ def test_submit_fails_closed_on_unknown_product_not_silent_auto_create() -> None
         raise AssertionError(f"must not create a product — unexpected call: {model}.{method}")
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
         result = adapter.submit(
-            _TARGET, {"order_id": "ord_3", "erp_customer_id": "5", "lines": [{"product_key": "TYPO-SKU", "quantity": 1}]}
+            _TARGET,
+            {
+                "order_id": "ord_3",
+                "erp_customer_id": "5",
+                "lines": [{"product_key": "TYPO-SKU", "quantity": 1}],
+            },
         )
 
     assert not result.success
@@ -243,13 +293,16 @@ def test_submit_fails_closed_on_unknown_product_not_silent_auto_create() -> None
 
 
 def test_fetch_status_returns_state_and_invoice_status() -> None:
-    def fake_execute(target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None) -> Any:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
         assert kwargs == {"fields": ["state", "invoice_status"], "limit": 1}
         return [{"state": "sale", "invoice_status": "invoiced"}]
 
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", side_effect=fake_execute
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
     ):
         fields = adapter.fetch_status(_TARGET, "S00001")
 
@@ -258,7 +311,8 @@ def test_fetch_status_returns_state_and_invoice_status() -> None:
 
 def test_fetch_status_returns_none_when_order_not_found() -> None:
     adapter = OdooAdapter()
-    with patch.object(OdooAdapter, "_authenticate", return_value=1), patch.object(
-        OdooAdapter, "_execute", return_value=[]
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", return_value=[]),
     ):
         assert adapter.fetch_status(_TARGET, "S00999") is None

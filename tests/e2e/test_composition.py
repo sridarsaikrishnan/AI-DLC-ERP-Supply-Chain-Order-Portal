@@ -32,7 +32,9 @@ def test_container_places_routes_and_delivers() -> None:
             secret_ref="env:ODOO_SECRET",
         )
     )
-    container.items.add(Item(item_id=ItemId("item_anvil"), sku="ANVIL", name="Anvil", owning_connection_id=conn))
+    container.items.add(
+        Item(item_id=ItemId("item_anvil"), sku="ANVIL", name="Anvil", owning_connection_id=conn)
+    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId("bind_demo"),
@@ -43,7 +45,9 @@ def test_container_places_routes_and_delivers() -> None:
         )
     )
 
-    company = container.quote_service.create_operating_company(name="Distributor Co", country="US", language="en")
+    company = container.quote_service.create_operating_company(
+        name="Distributor Co", country="US", language="en"
+    )
     quote = container.quote_service.issue_quote(
         tenant_id=TenantId("tnt_demo"),
         operating_company_id=company.operating_company_id,
@@ -51,7 +55,11 @@ def test_container_places_routes_and_delivers() -> None:
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
         valid_until=date.today() + timedelta(days=30),
-        lines=[QuoteLine(product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA")],
+        lines=[
+            QuoteLine(
+                product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA"
+            )
+        ],
     )
 
     order_id = container.order_service.place_order(

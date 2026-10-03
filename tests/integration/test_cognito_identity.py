@@ -31,10 +31,11 @@ pytest.importorskip("boto3")
 
 _AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL")
 if not _AWS_ENDPOINT_URL:
-    pytest.skip("AWS_ENDPOINT_URL not set (must point at floci, not real AWS)", allow_module_level=True)
+    pytest.skip(
+        "AWS_ENDPOINT_URL not set (must point at floci, not real AWS)", allow_module_level=True
+    )
 
 import boto3  # noqa: E402
-
 from src.shared.identity.cognito import CognitoIdentityProvider, issuer_url  # noqa: E402
 
 try:
@@ -66,7 +67,9 @@ def pool_and_token() -> tuple[str, str, str, str]:
         MessageAction="SUPPRESS",
         TemporaryPassword="TempPass123!",
     )
-    _cognito.admin_set_user_password(UserPoolId=pool_id, Username=username, Password="RealPass123!", Permanent=True)
+    _cognito.admin_set_user_password(
+        UserPoolId=pool_id, Username=username, Password="RealPass123!", Permanent=True
+    )
     _cognito.create_group(GroupName="OPERATOR", UserPoolId=pool_id)
     _cognito.admin_add_user_to_group(UserPoolId=pool_id, Username=username, GroupName="OPERATOR")
 
@@ -85,11 +88,15 @@ def pool_and_token() -> tuple[str, str, str, str]:
 
 
 def _provider(pool_id: str, client_id: str) -> CognitoIdentityProvider:
-    issuer = issuer_url(aws_endpoint_url=_AWS_ENDPOINT_URL, aws_region="us-east-1", user_pool_id=pool_id)
+    issuer = issuer_url(
+        aws_endpoint_url=_AWS_ENDPOINT_URL, aws_region="us-east-1", user_pool_id=pool_id
+    )
     return CognitoIdentityProvider(user_pool_id=pool_id, client_id=client_id, issuer=issuer)
 
 
-def test_real_cognito_id_token_is_verified_end_to_end(pool_and_token: tuple[str, str, str, str]) -> None:
+def test_real_cognito_id_token_is_verified_end_to_end(
+    pool_and_token: tuple[str, str, str, str],
+) -> None:
     pool_id, client_id, id_token, _access_token = pool_and_token
     principal = _provider(pool_id, client_id).authenticate({"authorization": f"Bearer {id_token}"})
     assert principal is not None
@@ -97,7 +104,9 @@ def test_real_cognito_id_token_is_verified_end_to_end(pool_and_token: tuple[str,
     assert principal.roles == ("OPERATOR",)
 
 
-def test_token_from_a_different_client_id_is_rejected(pool_and_token: tuple[str, str, str, str]) -> None:
+def test_token_from_a_different_client_id_is_rejected(
+    pool_and_token: tuple[str, str, str, str],
+) -> None:
     pool_id, _client_id, id_token, _access_token = pool_and_token
     wrong_provider = _provider(pool_id, "not-the-real-client-id")
     assert wrong_provider.authenticate({"authorization": f"Bearer {id_token}"}) is None
@@ -114,6 +123,8 @@ def test_real_access_token_signature_and_issuer_verify_correctly(
     signature + issuer verification) rather than failing for some unrelated reason."""
     pool_id, client_id, _id_token, access_token = pool_and_token
     with caplog.at_level("INFO"):
-        principal = _provider(pool_id, client_id).authenticate({"authorization": f"Bearer {access_token}"})
+        principal = _provider(pool_id, client_id).authenticate(
+            {"authorization": f"Bearer {access_token}"}
+        )
     assert principal is None
     assert "expected exactly one tenant scope" in caplog.text

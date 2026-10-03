@@ -7,13 +7,17 @@ Enforces the two uniqueness rules that guarantee cross-tenant isolation:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.shared.messaging.facts import FactPublisher, make_fact
 from src.shared.types import BindingId, ConnectionId, TenantId, generate_id
 
 from ..domain.errors import BindingConflict, BindingNotFound
 from ..domain.events import BINDING_CREATED, BINDING_REMOVED, BINDING_VERIFIED
 from ..domain.models import BindingStatus, TenantConnectionBinding
-from .ports import BindingRepository
+
+if TYPE_CHECKING:
+    from .ports import BindingRepository
 
 
 class BindingService:
@@ -28,9 +32,13 @@ class BindingService:
             raise BindingConflict(
                 f"tenant '{tenant_id}' already has a binding to connection '{connection_id}'"
             )
-        if self._repository.find_by_connection_and_customer(connection_id, erp_customer_id) is not None:
+        if (
+            self._repository.find_by_connection_and_customer(connection_id, erp_customer_id)
+            is not None
+        ):
             raise BindingConflict(
-                f"customer '{erp_customer_id}' in connection '{connection_id}' is already bound to a tenant"
+                f"customer '{erp_customer_id}' in connection '{connection_id}' "
+                "is already bound to a tenant"
             )
         binding = TenantConnectionBinding(
             binding_id=BindingId(generate_id("bind")),
