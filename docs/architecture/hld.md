@@ -1,8 +1,7 @@
 # High-Level Design — ERP & Supply Chain Order Portal
 
 C4 **container-level** view. Diagram source: [`hld.drawio`](hld.drawio) (open in
-diagrams.net or the VS Code Draw.io extension). A rendered overview also exists as
-[`hld.svg`](hld.svg).
+diagrams.net or the VS Code Draw.io extension).
 
 Scope: major components, their responsibilities, external dependencies, data stores,
 communication paths, and the significant flows and boundaries. It deliberately omits
