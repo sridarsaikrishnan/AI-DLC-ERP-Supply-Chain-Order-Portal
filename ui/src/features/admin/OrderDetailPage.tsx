@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { InfoTag } from "../../components/InfoTag";
 import { OrderTimeline } from "../../components/OrderTimeline";
 import { StatusBadge } from "../../components/StatusBadge";
-import { useOperatorOrder, useRecordFulfillment, useSetVendorDate } from "../../hooks/useAdmin";
+import { useOperatorOrder, useRecordShipment, useSetVendorDate } from "../../hooks/useAdmin";
 import { formatMoney } from "../../lib/money";
 
 function scoreLabel(value: string): string {
@@ -18,7 +18,7 @@ export function OrderDetailPage() {
   const { orderId = "" } = useParams();
   const navigate = useNavigate();
   const { data: order, isLoading, error } = useOperatorOrder(orderId);
-  const recordFulfillment = useRecordFulfillment(orderId);
+  const recordShipment = useRecordShipment(orderId);
   const setVendorDate = useSetVendorDate(orderId);
 
   const [ship, setShip] = useState({ lineId: "", quantity: 1, carrier: "", proofOfDelivery: "" });
@@ -31,7 +31,7 @@ export function OrderDetailPage() {
   async function submitShipment(e: FormEvent) {
     e.preventDefault();
     if (!ship.lineId) return;
-    await recordFulfillment.mutateAsync({
+    await recordShipment.mutateAsync({
       orderId,
       lines: [{ lineId: ship.lineId, quantity: ship.quantity }],
       carrier: ship.carrier || null,
@@ -144,8 +144,8 @@ export function OrderDetailPage() {
                   <input className="input" id="ship-pod" value={ship.proofOfDelivery} onChange={(e) => setShip({ ...ship, proofOfDelivery: e.target.value })} placeholder="POD reference (optional)" />
                 </div>
                 <div className="actions">
-                  <button className="erp-btn erp-btn--primary" type="submit" disabled={recordFulfillment.isPending}>
-                    {recordFulfillment.isPending ? "Recording…" : "Record shipment"}
+                  <button className="erp-btn erp-btn--primary" type="submit" disabled={recordShipment.isPending}>
+                    {recordShipment.isPending ? "Recording…" : "Record shipment"}
                   </button>
                 </div>
               </form>

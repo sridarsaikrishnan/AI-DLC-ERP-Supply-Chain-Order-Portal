@@ -8,11 +8,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from src.composition import build_container
-from src.modules.catalog.domain.models import Item
-from src.modules.connections.domain.models import ErpConnection, ErpType
-from src.modules.ordering.application.order_service import OrderLineInput
-from src.modules.quoting.domain.models import EndCustomer, QuoteLine
-from src.modules.tenancy.domain.models import BindingStatus, TenantConnectionBinding
+from src.modules.reference.catalog.domain.models import Item
+from src.modules.reference.connections.domain.models import ErpConnection, ErpType
+from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
+from src.modules.sales.ordering.application.order_service import OrderLineInput
+from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
 from src.shared.money import Money
 from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
 

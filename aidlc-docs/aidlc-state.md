@@ -356,3 +356,46 @@
 - **Tooling now runnable + green** (were "could not run" before): `ruff==0.6.9` + `import-linter==2.1` installed. Fixed `pyproject.toml` import-linter config (`include_external_packages=true` required for the external-forbidden contract — a pre-existing config gap). Split `SecretsManagerSecretStore` into `src/shared/secrets/aws.py` so the `SecretStore` port stays SDK-free → both import-linter contracts now **KEPT** (0 broken). Applied safe ruff autofixes (unused imports, import order, modern syntax, stray noqa) to Increment 5 files.
 - **Known lint debt (pre-existing, repo-wide, NOT this increment)**: ~576 ruff findings dominated by E501 (dense line style), TCH typing-import style the repo never adopted, and E402 — all established conventions from before ruff was ever installed. Left as a separate cleanup, not bundled into this increment.
 - **Explicitly deferred, not dropped**: a standalone Vendor Order document (FR-E2); automatic fulfillment/invoice capture from Odoo (operator-entered only today); RLS wiring (unchanged from prior increments).
+
+---
+
+## Increment 6 — Module regrouping + fulfillment split + event-driven saga (extraction-readiness refactor)
+- **Started**: 2026-10-03
+- **Goal**: Make future per-module / microservice extraction low-friction. (1) Regroup the flat `src/modules/*` into subdomain groups by kind. (2) Split the overloaded `fulfillment` module into separate modules + aggregates (`shipment`, `invoicing`, `payments`, `returns`). (3) Convert the shipment/invoice → order cross-aggregate coupling from a synchronous cross-aggregate `UnitOfWork` into an event-driven saga (eventual consistency), so modules no longer share a write transaction.
+- **Lifecycle Phase**: CONSTRUCTION — Code Generation. **Commit 1 (regroup + split) COMPLETE** through all quality gates (recorded in ADR-0017). Commit 2 (event-driven saga) still pending.
+
+### Design decisions (this increment)
+- **Module grouping** (confirmed): `sales/` (order lifecycle: `ordering`, `quoting`, + the new `shipment`/`invoicing`/`payments`/`returns`), `reference/` (master data: `catalog`, `connections`, `tenancy`), `integration/` (edges: ERP connectivity + webhooks). Rejected `order/` as a group name (stutters with `ordering`).
+- **fulfillment split** (confirmed): `fulfillment` → `shipment` + `invoicing` + `payments` + `returns`, each its own module and aggregate. Renames: event `FulfillmentRecorded` → `ShipmentRecorded`; GraphQL mutation `recordFulfillment` → `recordShipment`; `FulfillmentType` → `ShipmentType`; container field `fulfillment_service` → `shipment_service`. Chose `shipment` over `delivery` (delivery is a *status*, to be driven later by AfterShip).
+- **Two commits**: (1) regroup + split — structure/renames only, keep today's synchronous behavior; (2) event-driven saga — drop the cross-aggregate `UnitOfWork`, ordering consumes `ShipmentRecorded`/`InvoiceRecorded`, remove UoW infra, move `CanonicalStatus` to shared. Supersedes FR-A4 (atomic shipment+qty in one transaction) — to be recorded as an ADR in commit 2.
+- **Keep vs drop**: keep the per-aggregate + outbox transaction (correct, not a coupling problem); drop only the cross-aggregate `UnitOfWork` (that is the module-coupling seam).
+- **Nesting (RESOLVED, user-confirmed)** — keep `integration/erp/` as the ERP integration module, with per-ERP code to live under `integration/erp/adapters/<erp>/` (e.g. `adapters/odoo/`) **when a second ERP arrives**; `webhooks_inbound`/`webhooks_outbound` stay under `integration/`. Odoo adapter move **deferred** (option b, YAGNI) — the current nesting already matches this, so no further moves were needed. Full rationale in ADR-0017.
+
+### Action items (Commit 1 — regroup + split)
+- [x] `git mv` module moves into `sales/`, `reference/`, `integration/` groups; group `__init__.py` files created
+- [x] Rewrite import paths to new module locations (double-applied `sed` bug found + corrected; verified no stale `integration.erp.erp` / `integration.erp.webhooks` paths remain)
+- [x] Create `shipment` module `__init__.py` files + `domain/events.py` (`ShipmentRecorded`)
+- [x] **GATE**: nesting resolved (user-confirmed; current layout already matches, no further moves needed)
+- [x] Finish `shipment` module: `domain/aggregate.py` (`Shipment`, aggregate_type `"Shipment"`), `application/service.py` (`ShipmentService`, synchronous UoW kept for commit 1), `tests/test_shipment.py`
+- [x] Create `sales/invoicing`, `sales/payments`, `sales/returns` (aggregate + events + service + tests) from the authoritative `fulfillment` sources (recovered the trimmed events from `git HEAD`)
+- [x] Update `src/composition.py` → 8 imports from the 4 new modules; field `fulfillment_service` → `shipment_service`; both memory + postgres builders
+- [x] `git rm` `src/modules/fulfillment/` (removed tracked files + `rm -rf` the untracked `aggregate.py`/`__pycache__`)
+- [x] Operator GraphQL `types.py` (`ShipmentType`/`shipment_id`; `FulfillmentLineInput` → shared `LineQuantityInput`) + `schema.py` (`record_shipment`/`recordShipment`, `shipment_service`; invoice/return line input retyped)
+- [x] UI renames: `admin.ts` (`RECORD_SHIPMENT_MUTATION`/`recordShipment`/`[LineQuantityInput!]!`/`shipmentId`), `useAdmin.ts` (`useRecordShipment`), `OrderDetailPage.tsx`
+- [x] Add import-linter contract — "Reference is a leaf subdomain" (reference forbidden from importing sales/integration); verified it holds
+- [x] Update HLD (`hld.md` modules row + module→table table), ADR-0017 (new) + README index, `aidlc-state.md`, `audit.md`
+- [x] Quality gates — **all green**: `ruff format` stable; `ruff check` All checks passed (fixed 15 I001/E402 in files the module-path rewrite touched); `lint-imports` **3 kept / 0 broken**; `APP_PROFILE=memory pytest src tests` **174 passed / 5 skipped** (matches baseline); `npm --prefix ui run build` clean
+- [ ] Commit 1 (via message file — terminal hangs on heredoc commits)
+
+**Decisions preserved in commit 1 (not drift):** `Order.record_fulfillment` / `fulfillment_status` / `FulfillmentStatus` / `OrderLineFulfilled` kept — these are the order's *quantity score* (Increment 5), distinct from the `Shipment` *act*; `ShipmentService` records a shipment then bumps that score. Event class renamed `FulfillmentRecorded` → `ShipmentRecorded` (registry is keyed by class name → old stored events wouldn't replay; acceptable only pre-production — noted in ADR-0017).
+
+### Action items (Commit 2 — event-driven saga)
+- [ ] `ShipmentService`/`InvoiceService`: drop the order repo + UoW; publish `ShipmentRecorded`/`InvoiceRecorded` only
+- [ ] New ordering consumer for `ShipmentRecorded`/`InvoiceRecorded`; wire into `composition.py` / `worker/main.py` / messaging topology
+- [ ] Remove `src/shared/unit_of_work.py` + `PostgresUnitOfWork` + event_store ambient-session support
+- [ ] Move `CanonicalStatus` from `integration/erp/domain/status_mapping.py` → `src/shared/` (resolve the cross-group edge from `sales/ordering/application/adapters.py`)
+- [ ] ADR superseding FR-A4 (atomic → eventually consistent); tests for the saga path
+- [ ] Quality gates (as above); commit 2
+
+### Known environment constraint
+- Terminal intermittently hangs/times out on piped or large-output bash commands and `git commit` heredocs. Workaround: commit via message file (`git commit -q -F <file>` then remove it); use the `grep_search` tool instead of bash `grep`.

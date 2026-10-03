@@ -16,35 +16,35 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
-from src.modules.integration.application.delivery import DeliveryHandler
-from src.modules.integration.application.ports import ErpTarget
-from src.modules.integration.infrastructure.stub_adapter import StubErpAdapter
-from src.modules.ordering.application.adapters import (
-    OrderCommandAdapter,
-    OrderReaderAdapter,
-    StatusApplier,
-)
-from src.modules.ordering.application.order_service import OrderLineInput, OrderService
-from src.modules.ordering.application.processing import OrderProcessor
-from src.modules.ordering.domain.aggregate import Order
-from src.modules.ordering.projections.projector import OrderProjector
-from src.modules.ordering.projections.store import OrderProjectionStore
-from src.modules.quoting.application.service import QuoteService
-from src.modules.quoting.domain.models import EndCustomer, QuoteLine
-from src.modules.quoting.infrastructure.memory import (
-    InMemoryOperatingCompanyRepository,
-    InMemoryQuoteRepository,
-)
-from src.modules.webhooks_inbound.application.ingress import (
+from src.modules.integration.erp.application.delivery import DeliveryHandler
+from src.modules.integration.erp.application.ports import ErpTarget
+from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapter
+from src.modules.integration.webhooks_inbound.application.ingress import (
     InboundWebhook,
     InboundWebhookService,
     IngressOutcome,
 )
-from src.modules.webhooks_inbound.domain.signature import compute_signature
-from src.modules.webhooks_inbound.infrastructure.memory import (
+from src.modules.integration.webhooks_inbound.domain.signature import compute_signature
+from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
     InMemoryOrderLocator,
+)
+from src.modules.reference.catalog.infrastructure.memory import InMemoryItemRepository
+from src.modules.sales.ordering.application.adapters import (
+    OrderCommandAdapter,
+    OrderReaderAdapter,
+    StatusApplier,
+)
+from src.modules.sales.ordering.application.order_service import OrderLineInput, OrderService
+from src.modules.sales.ordering.application.processing import OrderProcessor
+from src.modules.sales.ordering.domain.aggregate import Order
+from src.modules.sales.ordering.projections.projector import OrderProjector
+from src.modules.sales.ordering.projections.store import OrderProjectionStore
+from src.modules.sales.quoting.application.service import QuoteService
+from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
+from src.modules.sales.quoting.infrastructure.memory import (
+    InMemoryOperatingCompanyRepository,
+    InMemoryQuoteRepository,
 )
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.messaging import InMemoryMessageBus

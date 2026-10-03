@@ -697,3 +697,23 @@ Follow the AIDLC and make the implementation"
 **Context**: CONSTRUCTION — Increment 5 follow-up. Complete.
 
 ---
+
+---
+
+## Increment 6 — Module refactor: design plans + action items registered
+**Timestamp**: 2026-10-03T03:00:00Z
+**User Input**: "Register the design plans and upcoming action utems"
+**AI Response**: Registered Increment 6 (module regrouping + fulfillment split + event-driven saga) in `aidlc-state.md`: the three design decisions (subdomain grouping `sales`/`reference`/`integration`; split `fulfillment` → `shipment`/`invoicing`/`payments`/`returns` with the `FulfillmentRecorded`→`ShipmentRecorded` / `recordFulfillment`→`recordShipment` / `fulfillment_service`→`shipment_service` renames; two-commit plan where commit 1 is structure-only and commit 2 converts the cross-aggregate `UnitOfWork` to an event-driven saga superseding FR-A4), plus the full Commit 1 and Commit 2 action-item checklists with their current done/pending state. Recorded the open GATE: revised `integration` nesting (retain `integration/erp` with per-ERP code under `adapters/<erp>/`, webhooks under `integration/`; sub-decision a = move Odoo adapter now vs b = defer, recommended b) — awaiting user confirmation before any further module moves, since the working tree is mid-refactor. Also recorded the terminal-hang environment constraint and its commit-via-message-file workaround. No code generated in this interaction — registration only.
+**Context**: CONSTRUCTION — Code Generation (Increment 6), IN PROGRESS. Blocked at the nesting-confirmation gate.
+
+---
+
+---
+
+## Increment 6 — Commit 1 (regroup + fulfillment split) executed
+**Timestamp**: 2026-10-03T04:00:00Z
+**User Input**: "Odoo adapter move — (a) move it into adapters/odoo/ now, or (b) defer until a second ERP shows up (my recommendation)?  this looks good"
+**AI Response**: Took "this looks good" as choosing (b) defer, and since (b) sits inside the "keep `integration/erp` with `adapters/<erp>/` later" recommendation, treated the nesting question as settled too — which already matched the on-disk layout, so no further module moves were needed. Finished Commit 1 of the extraction-readiness refactor: created the four split modules under `sales/` (`shipment` with the `Shipment` aggregate + the already-renamed `ShipmentRecorded` event + `ShipmentService` keeping the synchronous UnitOfWork order-coupling; `invoicing`/`payments`/`returns` with their aggregates + events + services + tests), recovering the trimmed Invoice/Payment/Return event definitions from `git HEAD`. Rewired `src/composition.py` (8 imports from the new modules; `Container.fulfillment_service` → `shipment_service` in both the memory and postgres builders) and deleted `src/modules/fulfillment/` entirely. Renamed the operator GraphQL surface: `FulfillmentType` → `ShipmentType` (`fulfillment_id` → `shipment_id`), the shared line input `FulfillmentLineInput` → `LineQuantityInput` (it is used by record_shipment/record_invoice/record_return), and the mutation `recordFulfillment` → `recordShipment` wired to `shipment_service`. Updated the UI to match (`RECORD_SHIPMENT_MUTATION`, `useRecordShipment`, `OrderDetailPage`). Added a third import-linter contract making `reference` a verified leaf (no imports from `sales`/`integration`). Deliberately KEPT the order's quantity-score vocabulary (`Order.record_fulfillment`, `fulfillment_status`, `OrderLineFulfilled`) — that is the score on the order, distinct from the shipment act; recorded the distinction and the event-rename replay caveat in new **ADR-0017** (+ README index, HLD modules row and module→table table). Quality gates all green: ruff format stable, ruff check "All checks passed!" (fixed 15 I001/E402 the module-path rewrite had introduced), lint-imports 3 kept / 0 broken, `APP_PROFILE=memory pytest` 174 passed / 5 skipped (unchanged baseline), `npm --prefix ui run build` clean.
+**Context**: CONSTRUCTION — Code Generation (Increment 6). Commit 1 structure/renames complete and verified; next is `git` commit via message file, then Commit 2 (event-driven saga: drop the cross-aggregate UnitOfWork, ordering consumes `ShipmentRecorded`/`InvoiceRecorded`, move `CanonicalStatus` to shared, supersede FR-A4).
+
+---

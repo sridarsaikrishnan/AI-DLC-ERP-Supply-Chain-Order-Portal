@@ -20,64 +20,65 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
-from src.modules.catalog.infrastructure.postgres import PostgresItemRepository
-from src.modules.connections.infrastructure.memory import InMemoryConnectionRepository
-from src.modules.connections.infrastructure.postgres import PostgresConnectionRepository
-from src.modules.fulfillment.application.service import (
-    FulfillmentService,
-    InvoiceService,
-    PaymentService,
-    ReturnService,
+from src.modules.integration.erp.application.delivery import DeliveryHandler
+from src.modules.integration.erp.application.ports import ErpAdapter, ErpTarget, UnknownErpType
+from src.modules.integration.erp.application.reconcile import ReconcileSweeper
+from src.modules.integration.erp.infrastructure.registry import build_adapter_registry
+from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapter
+from src.modules.integration.webhooks_inbound.application.ingress import InboundWebhookService
+from src.modules.integration.webhooks_inbound.infrastructure.memory import (
+    InMemoryDedupStore,
+    InMemoryOrderLocator,
 )
-from src.modules.fulfillment.domain.aggregates import Fulfillment, Invoice, Payment, Return
-from src.modules.integration.application.delivery import DeliveryHandler
-from src.modules.integration.application.ports import ErpAdapter, ErpTarget, UnknownErpType
-from src.modules.integration.application.reconcile import ReconcileSweeper
-from src.modules.integration.infrastructure.registry import build_adapter_registry
-from src.modules.integration.infrastructure.stub_adapter import StubErpAdapter
-from src.modules.ordering.application.adapters import (
+from src.modules.integration.webhooks_inbound.infrastructure.postgres import (
+    PostgresDedupStore,
+    PostgresOrderLocator,
+)
+from src.modules.integration.webhooks_outbound.application.dispatch import WebhookDispatchService
+from src.modules.integration.webhooks_outbound.domain.models import DISPATCHABLE_EVENT_TYPES
+from src.modules.integration.webhooks_outbound.infrastructure.http_sender import HttpWebhookSender
+from src.modules.integration.webhooks_outbound.infrastructure.memory import (
+    InMemoryWebhookDeliveryRepository,
+    InMemoryWebhookEndpointRepository,
+)
+from src.modules.integration.webhooks_outbound.infrastructure.postgres import (
+    PostgresWebhookDeliveryRepository,
+    PostgresWebhookEndpointRepository,
+)
+from src.modules.reference.catalog.infrastructure.memory import InMemoryItemRepository
+from src.modules.reference.catalog.infrastructure.postgres import PostgresItemRepository
+from src.modules.reference.connections.infrastructure.memory import InMemoryConnectionRepository
+from src.modules.reference.connections.infrastructure.postgres import PostgresConnectionRepository
+from src.modules.reference.tenancy.infrastructure.memory import InMemoryBindingRepository
+from src.modules.reference.tenancy.infrastructure.postgres import PostgresBindingRepository
+from src.modules.sales.invoicing.application.service import InvoiceService
+from src.modules.sales.invoicing.domain.aggregate import Invoice
+from src.modules.sales.ordering.application.adapters import (
     OrderCommandAdapter,
     OrderReaderAdapter,
     StatusApplier,
 )
-from src.modules.ordering.application.order_service import OrderService
-from src.modules.ordering.application.processing import OrderProcessor
-from src.modules.ordering.domain.aggregate import Order
-from src.modules.ordering.projections.postgres_store import PostgresOrderProjectionStore
-from src.modules.ordering.projections.projector import OrderProjector
-from src.modules.ordering.projections.store import OrderProjectionStore
-from src.modules.quoting.application.service import QuoteService
-from src.modules.quoting.infrastructure.memory import (
+from src.modules.sales.ordering.application.order_service import OrderService
+from src.modules.sales.ordering.application.processing import OrderProcessor
+from src.modules.sales.ordering.domain.aggregate import Order
+from src.modules.sales.ordering.projections.postgres_store import PostgresOrderProjectionStore
+from src.modules.sales.ordering.projections.projector import OrderProjector
+from src.modules.sales.ordering.projections.store import OrderProjectionStore
+from src.modules.sales.payments.application.service import PaymentService
+from src.modules.sales.payments.domain.aggregate import Payment
+from src.modules.sales.quoting.application.service import QuoteService
+from src.modules.sales.quoting.infrastructure.memory import (
     InMemoryOperatingCompanyRepository,
     InMemoryQuoteRepository,
 )
-from src.modules.quoting.infrastructure.postgres import (
+from src.modules.sales.quoting.infrastructure.postgres import (
     PostgresOperatingCompanyRepository,
     PostgresQuoteRepository,
 )
-from src.modules.tenancy.infrastructure.memory import InMemoryBindingRepository
-from src.modules.tenancy.infrastructure.postgres import PostgresBindingRepository
-from src.modules.webhooks_inbound.application.ingress import InboundWebhookService
-from src.modules.webhooks_inbound.infrastructure.memory import (
-    InMemoryDedupStore,
-    InMemoryOrderLocator,
-)
-from src.modules.webhooks_inbound.infrastructure.postgres import (
-    PostgresDedupStore,
-    PostgresOrderLocator,
-)
-from src.modules.webhooks_outbound.application.dispatch import WebhookDispatchService
-from src.modules.webhooks_outbound.domain.models import DISPATCHABLE_EVENT_TYPES
-from src.modules.webhooks_outbound.infrastructure.http_sender import HttpWebhookSender
-from src.modules.webhooks_outbound.infrastructure.memory import (
-    InMemoryWebhookDeliveryRepository,
-    InMemoryWebhookEndpointRepository,
-)
-from src.modules.webhooks_outbound.infrastructure.postgres import (
-    PostgresWebhookDeliveryRepository,
-    PostgresWebhookEndpointRepository,
-)
+from src.modules.sales.returns.application.service import ReturnService
+from src.modules.sales.returns.domain.aggregate import Return
+from src.modules.sales.shipment.application.service import ShipmentService
+from src.modules.sales.shipment.domain.aggregate import Shipment
 from src.shared.config import Settings, get_settings
 from src.shared.eventsourcing import EventSourcedRepository, EventStore, InMemoryEventStore
 from src.shared.identity import (
@@ -97,13 +98,16 @@ from src.shared.unit_of_work import NullUnitOfWork
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from src.modules.catalog.application.ports import ItemRepository
-    from src.modules.connections.application.ports import ConnectionRepository
-    from src.modules.quoting.application.ports import OperatingCompanyRepository, QuoteRepository
-    from src.modules.tenancy.application.ports import BindingRepository
-    from src.modules.webhooks_outbound.application.ports import (
+    from src.modules.integration.webhooks_outbound.application.ports import (
         WebhookDeliveryRepository,
         WebhookEndpointRepository,
+    )
+    from src.modules.reference.catalog.application.ports import ItemRepository
+    from src.modules.reference.connections.application.ports import ConnectionRepository
+    from src.modules.reference.tenancy.application.ports import BindingRepository
+    from src.modules.sales.quoting.application.ports import (
+        OperatingCompanyRepository,
+        QuoteRepository,
     )
     from src.shared.types import ConnectionId, TenantId
 
@@ -206,7 +210,7 @@ class Container:
     secrets: SecretStore
     # catalog/connections/tenancy publish notifications through this (src/shared/messaging/facts.py)
     facts: FactPublisher
-    fulfillment_service: FulfillmentService
+    shipment_service: ShipmentService
     invoice_service: InvoiceService
     payment_service: PaymentService
     return_service: ReturnService
@@ -232,9 +236,7 @@ def _build_memory_container(settings: Settings) -> Container:
     # Same event store as Order — one `events` table in Postgres too, differentiated by
     # aggregate_type + stream_id, not a separate store per aggregate type.
     uow = NullUnitOfWork()  # memory can't partially fail across appends (FR-A4 is a no-op here)
-    fulfillment_service = FulfillmentService(
-        EventSourcedRepository(event_store, Fulfillment), repo, uow
-    )
+    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment), repo, uow)
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))
@@ -309,7 +311,7 @@ def _build_memory_container(settings: Settings) -> Container:
         webhook_dispatcher=webhook_dispatcher,
         secrets=secrets,
         facts=BusFactPublisher(bus),
-        fulfillment_service=fulfillment_service,
+        shipment_service=shipment_service,
         invoice_service=invoice_service,
         payment_service=payment_service,
         return_service=return_service,
@@ -372,11 +374,9 @@ def _build_postgres_container(settings: Settings) -> Container:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(event_store, Order)
     # Same reasoning as the memory profile: one `events` table, one store, differentiated
     # by aggregate_type + stream_id — these 4 aren't a separate Postgres setup.
-    # One UoW so a fulfillment/invoice + its order quantity update commit together (FR-A4).
+    # One UoW so a shipment/invoice + its order quantity update commit together (FR-A4).
     uow = PostgresUnitOfWork(session_factory)
-    fulfillment_service = FulfillmentService(
-        EventSourcedRepository(event_store, Fulfillment), repo, uow
-    )
+    shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment), repo, uow)
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice), repo, uow)
     payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
     return_service = ReturnService(EventSourcedRepository(event_store, Return))
@@ -454,7 +454,7 @@ def _build_postgres_container(settings: Settings) -> Container:
         webhook_dispatcher=webhook_dispatcher,
         secrets=secrets,
         facts=OutboxFactPublisher(session_factory),
-        fulfillment_service=fulfillment_service,
+        shipment_service=shipment_service,
         invoice_service=invoice_service,
         payment_service=payment_service,
         return_service=return_service,

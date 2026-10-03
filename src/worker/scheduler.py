@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from src.modules.integration.application.reconcile import ReconcileSweeper
+    from src.modules.integration.erp.application.reconcile import ReconcileSweeper
     from src.shared.types import ConnectionId
 
     from .connection_lock import ConnectionLock

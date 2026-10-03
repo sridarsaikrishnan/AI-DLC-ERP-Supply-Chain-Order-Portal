@@ -256,22 +256,22 @@ export const ISSUE_QUOTE_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const RECORD_FULFILLMENT_MUTATION = /* GraphQL */ `
-  mutation RecordFulfillment(
+export const RECORD_SHIPMENT_MUTATION = /* GraphQL */ `
+  mutation RecordShipment(
     $orderId: String!
-    $lines: [FulfillmentLineInput!]!
+    $lines: [LineQuantityInput!]!
     $carrier: String
     $trackingNumber: String
     $proofOfDelivery: String
   ) {
-    recordFulfillment(
+    recordShipment(
       orderId: $orderId
       lines: $lines
       carrier: $carrier
       trackingNumber: $trackingNumber
       proofOfDelivery: $proofOfDelivery
     ) {
-      fulfillmentId
+      shipmentId
     }
   }
 `;

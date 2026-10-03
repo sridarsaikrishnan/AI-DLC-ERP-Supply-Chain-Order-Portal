@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 
-from src.modules.ordering.application.order_service import OrderLineInput as OrderLineCommand
-from src.modules.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
-from src.modules.webhooks_outbound.application.service import WebhookEndpointService
+from src.modules.integration.webhooks_outbound.application.service import WebhookEndpointService
+from src.modules.sales.ordering.application.order_service import OrderLineInput as OrderLineCommand
+from src.modules.sales.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
 from src.shared.types import OrderId, TenantId, WebhookEndpointId
 
 from .types import (
@@ -34,9 +34,12 @@ from .types import (
 if TYPE_CHECKING:
     from strawberry.types import Info
 
-    from src.modules.ordering.projections.read_models import ResellerOrderView
-    from src.modules.quoting.domain.models import Quote
-    from src.modules.webhooks_outbound.domain.models import WebhookDelivery, WebhookEndpoint
+    from src.modules.integration.webhooks_outbound.domain.models import (
+        WebhookDelivery,
+        WebhookEndpoint,
+    )
+    from src.modules.sales.ordering.projections.read_models import ResellerOrderView
+    from src.modules.sales.quoting.domain.models import Quote
     from src.shared.money import Money
 
     from ..context import GraphQLContext

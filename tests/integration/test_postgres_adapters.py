@@ -16,24 +16,28 @@ import pytest
 pytest.importorskip("sqlalchemy")
 
 from sqlalchemy import text  # noqa: E402
-from src.modules.catalog.domain.models import Item  # noqa: E402
-from src.modules.catalog.infrastructure.postgres import PostgresItemRepository  # noqa: E402
-from src.modules.connections.domain.models import ErpConnection, ErpType  # noqa: E402
-from src.modules.connections.infrastructure.postgres import (  # noqa: E402
-    PostgresConnectionRepository,
-)
-from src.modules.ordering.domain.models import OrderState  # noqa: E402
-from src.modules.ordering.projections.postgres_store import (  # noqa: E402
-    PostgresOrderProjectionStore,
-)
-from src.modules.ordering.projections.read_models import OrderLineView  # noqa: E402
-from src.modules.tenancy.domain.errors import BindingConflict  # noqa: E402
-from src.modules.tenancy.domain.models import TenantConnectionBinding  # noqa: E402
-from src.modules.tenancy.infrastructure.postgres import PostgresBindingRepository  # noqa: E402
-from src.modules.webhooks_inbound.infrastructure.postgres import (  # noqa: E402
+from src.modules.integration.webhooks_inbound.infrastructure.postgres import (  # noqa: E402
     PostgresDedupStore,
     PostgresOrderLocator,
 )
+from src.modules.reference.catalog.domain.models import Item  # noqa: E402
+from src.modules.reference.catalog.infrastructure.postgres import (  # noqa: E402
+    PostgresItemRepository,
+)
+from src.modules.reference.connections.domain.models import ErpConnection, ErpType  # noqa: E402
+from src.modules.reference.connections.infrastructure.postgres import (  # noqa: E402
+    PostgresConnectionRepository,
+)
+from src.modules.reference.tenancy.domain.errors import BindingConflict  # noqa: E402
+from src.modules.reference.tenancy.domain.models import TenantConnectionBinding  # noqa: E402
+from src.modules.reference.tenancy.infrastructure.postgres import (  # noqa: E402
+    PostgresBindingRepository,
+)
+from src.modules.sales.ordering.domain.models import OrderState  # noqa: E402
+from src.modules.sales.ordering.projections.postgres_store import (  # noqa: E402
+    PostgresOrderProjectionStore,
+)
+from src.modules.sales.ordering.projections.read_models import OrderLineView  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 from src.shared.types import BindingId, ConnectionId, ItemId, OrderId, TenantId  # noqa: E402
 

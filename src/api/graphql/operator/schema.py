@@ -14,22 +14,21 @@ from typing import TYPE_CHECKING
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 
-from src.modules.catalog.application.service import CatalogService
-from src.modules.catalog.domain.models import Item, ItemKind
-from src.modules.connections.application.service import ConnectionService
-from src.modules.connections.domain.models import ErpConnection, ErpType
-from src.modules.quoting.domain.models import EndCustomer, OperatingCompany, Quote, QuoteLine
-from src.modules.tenancy.application.service import BindingService
+from src.modules.reference.catalog.application.service import CatalogService
+from src.modules.reference.catalog.domain.models import Item, ItemKind
+from src.modules.reference.connections.application.service import ConnectionService
+from src.modules.reference.connections.domain.models import ErpConnection, ErpType
+from src.modules.reference.tenancy.application.service import BindingService
+from src.modules.sales.quoting.domain.models import EndCustomer, OperatingCompany, Quote, QuoteLine
 from src.shared.money import Money, TaxRate
 from src.shared.types import BindingId, ConnectionId, TenantId
 
 from .types import (
     BindingType,
     ConnectionType,
-    FulfillmentLineInput,
-    FulfillmentType,
     InvoiceType,
     ItemType,
+    LineQuantityInput,
     MoneyType,
     OperatingCompanyType,
     OperatorOrder,
@@ -42,13 +41,14 @@ from .types import (
     QuoteLineType,
     QuoteType,
     ReturnType,
+    ShipmentType,
 )
 
 if TYPE_CHECKING:
     from strawberry.types import Info
 
-    from src.modules.ordering.projections.read_models import OperatorOrderView
-    from src.modules.tenancy.domain.models import TenantConnectionBinding
+    from src.modules.reference.tenancy.domain.models import TenantConnectionBinding
+    from src.modules.sales.ordering.projections.read_models import OperatorOrderView
 
     from ..context import GraphQLContext
 
@@ -389,21 +389,21 @@ class Mutation:
         return _quote_to_gql(quote)
 
     @strawberry.mutation
-    def record_fulfillment(
+    def record_shipment(
         self,
         info: Info[GraphQLContext, None],
         order_id: str,
-        lines: list[FulfillmentLineInput],
+        lines: list[LineQuantityInput],
         carrier: str | None = None,
         tracking_number: str | None = None,
         proof_of_delivery: str | None = None,
-    ) -> FulfillmentType:
+    ) -> ShipmentType:
         """Updates the order's shipped/delivered facts (FR-D2/ADR-0014) — not its `state`.
         A physical line is delivered only with a carrier or proof-of-delivery; a license is
         delivered on ship."""
         ctx = info.context
         ctx.require_role("OPERATOR")
-        fulfillment = ctx.container.fulfillment_service.record(
+        shipment = ctx.container.shipment_service.record(
             order_id=order_id,
             lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             carrier=carrier,
@@ -411,12 +411,12 @@ class Mutation:
             proof_of_delivery=proof_of_delivery,
         )
         ctx.container.drain()
-        return FulfillmentType(
-            fulfillment_id=fulfillment.id,
-            order_id=fulfillment.order_id,
-            carrier=fulfillment.carrier,
-            tracking_number=fulfillment.tracking_number,
-            proof_of_delivery=fulfillment.proof_of_delivery,
+        return ShipmentType(
+            shipment_id=shipment.id,
+            order_id=shipment.order_id,
+            carrier=shipment.carrier,
+            tracking_number=shipment.tracking_number,
+            proof_of_delivery=shipment.proof_of_delivery,
         )
 
     @strawberry.mutation
@@ -424,7 +424,7 @@ class Mutation:
         self,
         info: Info[GraphQLContext, None],
         order_id: str,
-        lines: list[FulfillmentLineInput],
+        lines: list[LineQuantityInput],
         erp_invoice_id: str | None = None,
     ) -> InvoiceType:
         ctx = info.context
@@ -484,7 +484,7 @@ class Mutation:
         self,
         info: Info[GraphQLContext, None],
         order_id: str,
-        lines: list[FulfillmentLineInput],
+        lines: list[LineQuantityInput],
         reason_code: str,
     ) -> ReturnType:
         """Standalone record (ADR-0014) — not yet wired into `fulfillment_status`."""

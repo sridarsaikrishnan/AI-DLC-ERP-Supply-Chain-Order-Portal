@@ -26,7 +26,7 @@ import json
 
 from fastapi import APIRouter, Request, Response
 
-from src.modules.webhooks_inbound.application.ingress import (
+from src.modules.integration.webhooks_inbound.application.ingress import (
     InboundWebhook,
     IngressOutcome,
     WebhookAuthMode,

@@ -13,7 +13,7 @@ import {
   OPERATOR_ORDER_QUERY,
   OPERATOR_QUOTES_QUERY,
   PAUSE_CONNECTION_MUTATION,
-  RECORD_FULFILLMENT_MUTATION,
+  RECORD_SHIPMENT_MUTATION,
   REGISTER_CONNECTION_MUTATION,
   REMOVE_BINDING_MUTATION,
   RESUME_CONNECTION_MUTATION,
@@ -253,7 +253,7 @@ export function useIssueQuote() {
   });
 }
 
-export function useRecordFulfillment(orderId: string) {
+export function useRecordShipment(orderId: string) {
   const { idToken } = useAuth();
   const queryClient = useQueryClient();
   const { notify } = useToast();
@@ -264,7 +264,7 @@ export function useRecordFulfillment(orderId: string) {
       carrier?: string | null;
       trackingNumber?: string | null;
       proofOfDelivery?: string | null;
-    }) => graphqlRequest("operator", RECORD_FULFILLMENT_MUTATION, input, idToken),
+    }) => graphqlRequest("operator", RECORD_SHIPMENT_MUTATION, input, idToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["operatorOrder", orderId] });
       notify("Shipment recorded.");

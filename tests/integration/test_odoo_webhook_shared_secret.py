@@ -64,9 +64,9 @@ def _app():
 
 def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
     from fastapi.testclient import TestClient
-    from src.modules.catalog.domain.models import Item
-    from src.modules.connections.domain.models import ErpConnection, ErpType
-    from src.modules.tenancy.domain.models import BindingStatus, TenantConnectionBinding
+    from src.modules.reference.catalog.domain.models import Item
+    from src.modules.reference.connections.domain.models import ErpConnection, ErpType
+    from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
     from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
 
     app = _app()
@@ -111,7 +111,7 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
     from datetime import date, timedelta
     from decimal import Decimal
 
-    from src.modules.quoting.domain.models import EndCustomer, QuoteLine
+    from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
     from src.shared.money import Money
 
     company = container.quote_service.create_operating_company(

@@ -21,10 +21,13 @@ pytest.importorskip("sqlalchemy")
 
 from sqlalchemy import text  # noqa: E402
 from src.composition import build_container  # noqa: E402
-from src.modules.catalog.domain.models import Item  # noqa: E402
-from src.modules.connections.domain.models import ErpConnection, ErpType  # noqa: E402
-from src.modules.ordering.domain.models import OrderLine  # noqa: E402
-from src.modules.tenancy.domain.models import BindingStatus, TenantConnectionBinding  # noqa: E402
+from src.modules.reference.catalog.domain.models import Item  # noqa: E402
+from src.modules.reference.connections.domain.models import ErpConnection, ErpType  # noqa: E402
+from src.modules.reference.tenancy.domain.models import (  # noqa: E402
+    BindingStatus,
+    TenantConnectionBinding,
+)
+from src.modules.sales.ordering.domain.models import OrderLine  # noqa: E402
 from src.shared.config import Settings  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 from src.shared.persistence.event_store import PostgresEventStore  # noqa: E402

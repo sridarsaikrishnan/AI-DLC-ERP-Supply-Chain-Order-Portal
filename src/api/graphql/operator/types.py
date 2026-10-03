@@ -58,8 +58,8 @@ class OperatorOrder:
 
 
 @strawberry.type
-class FulfillmentType:
-    fulfillment_id: str
+class ShipmentType:
+    shipment_id: str
     order_id: str
     carrier: str | None
     tracking_number: str | None
@@ -89,7 +89,10 @@ class ReturnType:
 
 
 @strawberry.input
-class FulfillmentLineInput:
+class LineQuantityInput:
+    """A line reference plus a quantity — shared by record_shipment / record_invoice /
+    record_return (each records a per-line quantity against an order)."""
+
     line_id: str
     quantity: float
 
