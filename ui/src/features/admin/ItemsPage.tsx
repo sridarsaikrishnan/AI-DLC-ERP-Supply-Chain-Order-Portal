@@ -4,20 +4,20 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { InfoTag } from "../../components/InfoTag";
 import { useConnections, useItems, useSyncItem } from "../../hooks/useAdmin";
 import type { Item } from "../../api/queries/admin";
-import { formatMoney } from "../../lib/money";
 
 export function ItemsPage() {
   const { data: items, isLoading, error } = useItems();
   const { data: connections } = useConnections();
   const syncItem = useSyncItem();
-  const [form, setForm] = useState({ sku: "", name: "", owningConnectionId: "", unitPrice: "", currency: "USD" });
+  const EMPTY_FORM = { sku: "", name: "", owningConnectionId: "", kind: "PHYSICAL" };
+  const [form, setForm] = useState(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
 
   const columns: Column<Item>[] = [
     { key: "sku", header: "SKU", render: (i) => <span className="id">{i.sku}</span> },
     { key: "name", header: "Name", render: (i) => i.name },
     { key: "owner", header: "Owning connection", render: (i) => i.owningConnectionId },
-    { key: "price", header: "Unit price", render: (i) => formatMoney(i.unitPrice) },
+    { key: "kind", header: "Kind", render: (i) => (i.kind === "LICENSE" ? "License" : "Box") },
   ];
 
   async function handleSubmit(e: FormEvent) {
@@ -26,10 +26,9 @@ export function ItemsPage() {
       sku: form.sku,
       name: form.name,
       owningConnectionId: form.owningConnectionId,
-      unitPrice: form.unitPrice === "" ? null : Number(form.unitPrice),
-      currency: form.unitPrice === "" ? null : form.currency,
+      kind: form.kind,
     });
-    setForm({ sku: "", name: "", owningConnectionId: "", unitPrice: "", currency: "USD" });
+    setForm(EMPTY_FORM);
     setShowForm(false);
   }
 
@@ -38,7 +37,9 @@ export function ItemsPage() {
       <div className="pagehead">
         <div>
           <h1>Item ownership</h1>
-          <p>Every item is owned by exactly one ERP connection. Orders for an item are routed to its owner.</p>
+          <p>
+            Every item is owned by exactly one ERP connection and says only what the product is. Price lives on the quote, not here.
+          </p>
         </div>
         <div className="actions">
           <button className="erp-btn erp-btn--primary" type="button" onClick={() => setShowForm((v) => !v)}>
@@ -77,30 +78,13 @@ export function ItemsPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="unitPrice">
-                Unit price <InfoTag text="Resolved onto every order line for this SKU at submission time — a reseller's order never carries its own price." />
+              <label htmlFor="kind">
+                Kind <InfoTag text="A box needs a carrier or proof-of-delivery before it counts as delivered; a license is delivered the moment it ships." />
               </label>
-              <input
-                className="input"
-                id="unitPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.unitPrice}
-                onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
-                placeholder="Leave blank for no price yet"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="currency">Currency</label>
-              <input
-                className="input"
-                id="currency"
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                maxLength={3}
-                disabled={form.unitPrice === ""}
-              />
+              <select className="input" id="kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} required>
+                <option value="PHYSICAL">Box (physical good)</option>
+                <option value="LICENSE">License</option>
+              </select>
             </div>
           </div>
           {syncItem.error && <div className="callout callout--danger">{(syncItem.error as Error).message}</div>}

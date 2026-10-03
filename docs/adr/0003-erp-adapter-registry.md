@@ -17,8 +17,10 @@ exactly 4 file touches, never a change to shared dispatch logic.
 
 ## The decision
 Every ERP implements `ErpAdapter` (`submit` / `fetch_status` / `cancel`) and one pure
-status-mapping function `(native_status, invoice_status) -> CanonicalStatus`. Adding an
-ERP touches exactly these 4 places, nothing else:
+status-mapping function `(fields: dict[str, str]) -> CanonicalStatus | None` — a field
+bag, not a fixed arity, so a 1-field ERP (a single combined status string) and a 3-field
+one both fit the same signature without forcing Odoo's particular 2-field shape onto
+anyone else. Adding an ERP touches exactly these 4 places, nothing else:
 
 | # | Touch point | File |
 |---|---|---|

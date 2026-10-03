@@ -93,8 +93,7 @@ def _make_connection() -> ErpConnection:
         erp_type=ErpType.ODOO,
         instance_label="Test Odoo",
         base_url="http://odoo:8069",
-        database="odoo",
-        username="admin",
+        credentials={"database": "odoo", "username": "admin"},
         secret_ref="arn:secret:test",
     )
     PostgresConnectionRepository(_factory).add(conn)

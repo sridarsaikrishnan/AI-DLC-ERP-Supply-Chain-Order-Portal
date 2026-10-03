@@ -1,6 +1,11 @@
 """Postgres-backed order projection store (read side) — mirrors `OrderProjectionStore`
 (the in-memory version) query-for-query, backed by `orders` + `order_status_history`
-(migrations 0001 + 0002).
+(migrations 0001 + 0002 + 0008).
+
+Increment 5: `orders` gained party columns; the per-line fulfillment facts
+(shipped/delivered/invoiced quantities + the vendor "scheduled" date) live inside the
+`lines` JSONB, so recording a fulfillment/invoice/vendor-date is a read-modify-write of
+that column.
 """
 
 from __future__ import annotations
@@ -10,11 +15,26 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.shared.money import money_from_payload, money_to_payload
+from src.shared.money import (
+    money_from_payload,
+    money_to_payload,
+    tax_rate_from_payload,
+    tax_rate_to_payload,
+)
 
 from ..domain.calculations import sum_money
-from ..domain.models import OrderState
-from .read_models import OperatorOrderView, OrderLineView, ResellerOrderView, TimelineEntry, status_label
+from ..domain.models import OrderState, line_is_delivered
+from .read_models import (
+    OperatorOrderView,
+    OrderLineView,
+    Parties,
+    ResellerOrderView,
+    TimelineEntry,
+    delivery_status,
+    fulfillment_status,
+    invoice_status,
+    status_label,
+)
 
 _metadata = MetaData()
 
@@ -28,6 +48,11 @@ orders_table = Table(
     Column("owning_connection_id", String),
     Column("erp_order_id", String),
     Column("lines", JSONB, nullable=False),
+    # Increment 5 party columns (reseller-safe — no ERP identity):
+    Column("quote_id", String, nullable=False, server_default=""),
+    Column("operating_company_id", String, nullable=False, server_default=""),
+    Column("end_customer_name", String, nullable=False, server_default=""),
+    Column("ship_to", String, nullable=False, server_default=""),
 )
 
 order_status_history_table = Table(
@@ -41,17 +66,56 @@ order_status_history_table = Table(
 )
 
 
+def _line_to_json(line: OrderLineView) -> dict:
+    return {
+        "product_key": line.product_key,
+        "quantity": line.quantity,
+        "unit_of_measure": line.unit_of_measure,
+        "line_id": line.line_id,
+        "kind": line.kind,
+        "unit_price": money_to_payload(line.unit_price),
+        "line_total": money_to_payload(line.line_total),
+        "tax_rates": [tax_rate_to_payload(t) for t in line.tax_rates],
+        "line_discount": money_to_payload(line.line_discount),
+        "shipped_quantity": line.shipped_quantity,
+        "delivered_quantity": line.delivered_quantity,
+        "invoiced_quantity": line.invoiced_quantity,
+        "scheduled_date": line.scheduled_date,
+    }
+
+
+def _line_from_json(line: dict) -> OrderLineView:
+    return OrderLineView(
+        product_key=str(line["product_key"]),
+        quantity=float(line["quantity"]),
+        unit_of_measure=str(line["unit_of_measure"]),
+        line_id=str(line.get("line_id") or line["product_key"]),
+        kind=str(line.get("kind") or "PHYSICAL"),
+        unit_price=money_from_payload(line.get("unit_price")),
+        line_total=money_from_payload(line.get("line_total")),
+        tax_rates=[tax_rate_from_payload(t) for t in (line.get("tax_rates") or [])],
+        line_discount=money_from_payload(line.get("line_discount")),
+        shipped_quantity=float(line.get("shipped_quantity") or 0.0),
+        delivered_quantity=float(line.get("delivered_quantity") or 0.0),
+        invoiced_quantity=float(line.get("invoiced_quantity") or 0.0),
+        scheduled_date=line.get("scheduled_date"),
+    )
+
+
 class PostgresOrderProjectionStore:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
-    # --- mutations (used by the projector; the consumer is at-least-once so these must
-    # tolerate redelivery of the same event — item C is responsible for deduping on
-    # event_id via `processed_events` before calling the projector at all, but `create`
-    # also no-ops on a duplicate order_id as a second line of defense) ---
+    # --- mutations (used by the projector; redelivery-tolerant) ---
     def create(
-        self, order_id: str, tenant_id: str, client_reference: str, lines: list[OrderLineView]
+        self,
+        order_id: str,
+        tenant_id: str,
+        client_reference: str,
+        lines: list[OrderLineView],
+        parties: Parties | None = None,
     ) -> None:
+        parties = parties or Parties()
         session = self._session_factory()
         try:
             stmt = pg_insert(orders_table).values(
@@ -59,16 +123,11 @@ class PostgresOrderProjectionStore:
                 tenant_id=tenant_id,
                 client_reference=client_reference,
                 state=OrderState.SUBMITTED.value,
-                lines=[
-                    {
-                        "product_key": line.product_key,
-                        "quantity": line.quantity,
-                        "unit_of_measure": line.unit_of_measure,
-                        "unit_price": money_to_payload(line.unit_price),
-                        "line_total": money_to_payload(line.line_total),
-                    }
-                    for line in lines
-                ],
+                lines=[_line_to_json(line) for line in lines],
+                quote_id=parties.quote_id,
+                operating_company_id=parties.operating_company_id,
+                end_customer_name=parties.end_customer_name,
+                ship_to=parties.ship_to,
             ).on_conflict_do_nothing(index_elements=["order_id"])
             session.execute(stmt)
             session.commit()
@@ -91,9 +150,6 @@ class PostgresOrderProjectionStore:
                 orders_table.update().where(orders_table.c.order_id == order_id).values(state=state.value)
             )
             label = status_label(state)
-            # Several internal states share a reseller-facing label (e.g. VALIDATED and
-            # READY_FOR_DELIVERY both read "Validated") — collapse consecutive duplicates
-            # so the timeline doesn't show the same status twice in a row.
             last_label = session.execute(
                 select(order_status_history_table.c.state)
                 .where(order_status_history_table.c.order_id == order_id)
@@ -103,10 +159,7 @@ class PostgresOrderProjectionStore:
             if last_label != label:
                 session.execute(
                     order_status_history_table.insert().values(
-                        order_id=order_id,
-                        tenant_id=tenant_id,
-                        state=label,
-                        occurred_at=occurred_at,
+                        order_id=order_id, tenant_id=tenant_id, state=label, occurred_at=occurred_at
                     )
                 )
             session.commit()
@@ -117,13 +170,15 @@ class PostgresOrderProjectionStore:
             session.close()
 
     def set_owning_connection(self, order_id: str, connection_id: str) -> None:
+        self._set(order_id, owning_connection_id=connection_id)
+
+    def set_erp_order_id(self, order_id: str, erp_order_id: str) -> None:
+        self._set(order_id, erp_order_id=erp_order_id)
+
+    def _set(self, order_id: str, **values: object) -> None:
         session = self._session_factory()
         try:
-            session.execute(
-                orders_table.update()
-                .where(orders_table.c.order_id == order_id)
-                .values(owning_connection_id=connection_id)
-            )
+            session.execute(orders_table.update().where(orders_table.c.order_id == order_id).values(**values))
             session.commit()
         except Exception:
             session.rollback()
@@ -131,34 +186,57 @@ class PostgresOrderProjectionStore:
         finally:
             session.close()
 
-    def set_erp_order_id(self, order_id: str, erp_order_id: str) -> None:
+    def _mutate_line(self, order_id: str, line_id: str, mutate) -> None:
         session = self._session_factory()
         try:
-            session.execute(
-                orders_table.update()
-                .where(orders_table.c.order_id == order_id)
-                .values(erp_order_id=erp_order_id)
-            )
+            raw = session.execute(
+                select(orders_table.c.lines).where(orders_table.c.order_id == order_id)
+            ).scalar_one_or_none()
+            if raw is None:
+                session.commit()
+                return
+            lines = list(raw)
+            for i, line in enumerate(lines):
+                if str(line.get("line_id") or line.get("product_key")) == line_id:
+                    lines[i] = mutate(dict(line))
+                    break
+            session.execute(orders_table.update().where(orders_table.c.order_id == order_id).values(lines=lines))
             session.commit()
         except Exception:
             session.rollback()
             raise
         finally:
             session.close()
+
+    def record_fulfillment(
+        self, order_id: str, line_id: str, quantity: float, carrier: str | None, proof_of_delivery: str | None
+    ) -> None:
+        def mutate(line: dict) -> dict:
+            line["shipped_quantity"] = float(line.get("shipped_quantity") or 0.0) + quantity
+            if line_is_delivered(str(line.get("kind") or "PHYSICAL"), carrier, proof_of_delivery):
+                line["delivered_quantity"] = float(line.get("delivered_quantity") or 0.0) + quantity
+            return line
+
+        self._mutate_line(order_id, line_id, mutate)
+
+    def record_invoice(self, order_id: str, line_id: str, quantity: float) -> None:
+        def mutate(line: dict) -> dict:
+            line["invoiced_quantity"] = float(line.get("invoiced_quantity") or 0.0) + quantity
+            return line
+
+        self._mutate_line(order_id, line_id, mutate)
+
+    def set_scheduled_date(self, order_id: str, line_id: str, scheduled_date: str) -> None:
+        def mutate(line: dict) -> dict:
+            line["scheduled_date"] = scheduled_date
+            return line
+
+        self._mutate_line(order_id, line_id, mutate)
 
     # --- queries ---
     @staticmethod
-    def _lines(raw_lines: list[dict[str, object]]) -> list[OrderLineView]:
-        return [
-            OrderLineView(
-                product_key=str(line["product_key"]),
-                quantity=float(line["quantity"]),  # type: ignore[arg-type]
-                unit_of_measure=str(line["unit_of_measure"]),
-                unit_price=money_from_payload(line.get("unit_price")),  # type: ignore[arg-type]
-                line_total=money_from_payload(line.get("line_total")),  # type: ignore[arg-type]
-            )
-            for line in raw_lines
-        ]
+    def _lines(raw_lines: list[dict]) -> list[OrderLineView]:
+        return [_line_from_json(line) for line in raw_lines]
 
     @staticmethod
     def _subtotal(lines: list[OrderLineView]):
@@ -171,6 +249,15 @@ class PostgresOrderProjectionStore:
             .order_by(order_status_history_table.c.id)
         ).all()
         return [TimelineEntry(status=row.state, occurred_at=row.occurred_at.isoformat()) for row in rows]
+
+    @staticmethod
+    def _parties(row) -> Parties:
+        return Parties(
+            end_customer_name=row.end_customer_name or "",
+            ship_to=row.ship_to or "",
+            operating_company_id=row.operating_company_id or "",
+            quote_id=row.quote_id or "",
+        )
 
     def get_reseller_view(self, tenant_id: str, order_id: str) -> ResellerOrderView | None:
         session = self._session_factory()
@@ -190,6 +277,10 @@ class PostgresOrderProjectionStore:
                 lines=lines,
                 timeline=self._timeline(session, order_id),
                 subtotal=self._subtotal(lines),
+                fulfillment_status=fulfillment_status(lines),
+                delivery_status=delivery_status(lines),
+                invoice_status=invoice_status(lines),
+                parties=self._parties(row),
             )
         finally:
             session.close()
@@ -209,6 +300,10 @@ class PostgresOrderProjectionStore:
                         lines=lines,
                         timeline=self._timeline(session, row.order_id),
                         subtotal=self._subtotal(lines),
+                        fulfillment_status=fulfillment_status(lines),
+                        delivery_status=delivery_status(lines),
+                        invoice_status=invoice_status(lines),
+                        parties=self._parties(row),
                     )
                 )
             return views
@@ -222,17 +317,7 @@ class PostgresOrderProjectionStore:
             if row is None:
                 return None
             lines = self._lines(row.lines)
-            return OperatorOrderView(
-                order_id=row.order_id,
-                tenant_id=row.tenant_id,
-                client_reference=row.client_reference,
-                status=status_label(OrderState(row.state)),
-                owning_connection_id=row.owning_connection_id,
-                erp_order_id=row.erp_order_id,
-                lines=lines,
-                timeline=self._timeline(session, order_id),
-                subtotal=self._subtotal(lines),
-            )
+            return self._operator_view(session, row, lines)
         finally:
             session.close()
 
@@ -241,22 +326,23 @@ class PostgresOrderProjectionStore:
         session = self._session_factory()
         try:
             rows = session.execute(select(orders_table)).all()
-            views = []
-            for row in rows:
-                lines = self._lines(row.lines)
-                views.append(
-                    OperatorOrderView(
-                        order_id=row.order_id,
-                        tenant_id=row.tenant_id,
-                        client_reference=row.client_reference,
-                        status=status_label(OrderState(row.state)),
-                        owning_connection_id=row.owning_connection_id,
-                        erp_order_id=row.erp_order_id,
-                        lines=lines,
-                        timeline=self._timeline(session, row.order_id),
-                        subtotal=self._subtotal(lines),
-                    )
-                )
-            return views
+            return [self._operator_view(session, row, self._lines(row.lines)) for row in rows]
         finally:
             session.close()
+
+    def _operator_view(self, session: Session, row, lines: list[OrderLineView]) -> OperatorOrderView:
+        return OperatorOrderView(
+            order_id=row.order_id,
+            tenant_id=row.tenant_id,
+            client_reference=row.client_reference,
+            status=status_label(OrderState(row.state)),
+            owning_connection_id=row.owning_connection_id,
+            erp_order_id=row.erp_order_id,
+            lines=lines,
+            timeline=self._timeline(session, row.order_id),
+            subtotal=self._subtotal(lines),
+            fulfillment_status=fulfillment_status(lines),
+            delivery_status=delivery_status(lines),
+            invoice_status=invoice_status(lines),
+            parties=self._parties(row),
+        )

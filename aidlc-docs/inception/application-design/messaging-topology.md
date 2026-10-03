@@ -54,6 +54,13 @@ flowchart LR
 
 **Not queues:** inbound ERP webhook = HTTP ingress → outbox → topic (no ingress queue in the base; add one only if inbound volume needs buffering). Reconciliation = EventBridge Scheduler (cron). Outbox relay = the publisher.
 
+**Plain-CRUD domain facts** (`ItemSynced`, `ConnectionRegistered`/`Paused`/`Resumed`,
+`BindingCreated`/`Verified`/`Removed` — see `src/shared/messaging/facts.py`): publish onto
+this *same* topic via the *same* outbox, from `catalog`/`connections`/`tenancy` — zero new
+infrastructure. No queue currently filters on them (none of the rows above list these
+`eventType`s), so they're durably recorded but have no consumer yet. Adding one later is
+a filter-policy change on a new/existing queue, not a producer change.
+
 ## 4. Message settings (locked)
 - `MessageGroupId = aggregateId` (order id) — per-order FIFO ordering.
 - `MessageDeduplicationId = eventId` — content-based dedup **off**; producer sets it explicitly.

@@ -35,11 +35,11 @@ class RoutingDecision:
     message: str | None = None
 
     @staticmethod
-    def to(connection_id: ConnectionId) -> "RoutingDecision":
+    def to(connection_id: ConnectionId) -> RoutingDecision:
         return RoutingDecision(routed=True, connection_id=connection_id)
 
     @staticmethod
-    def reject(reason: RejectionReason, message: str) -> "RoutingDecision":
+    def reject(reason: RejectionReason, message: str) -> RoutingDecision:
         return RoutingDecision(routed=False, reason=reason, message=message)
 
 

@@ -8,6 +8,12 @@ import { formatMoney } from "../../lib/money";
 
 const CANCELLABLE = new Set(["Submitted", "Validated"]);
 
+function scoreLabel(value: string): string {
+  // UPPER_SNAKE enum value -> human words, e.g. PARTIALLY_FULFILLED -> "Partially fulfilled"
+  const s = value.replace(/_/g, " ").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export function OrderDetailPage() {
   const { orderId = "" } = useParams();
   const navigate = useNavigate();
@@ -51,28 +57,37 @@ export function OrderDetailPage() {
                 <thead>
                   <tr>
                     <th>Item</th>
+                    <th>Kind</th>
                     <th className="num">Qty</th>
                     <th>Unit</th>
                     <th className="num">Unit price</th>
                     <th className="num">Line total</th>
+                    <th className="num">Shipped</th>
+                    <th className="num">Delivered</th>
+                    <th>Scheduled</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.lines.map((line) => (
-                    <tr key={line.productKey}>
+                    <tr key={line.lineId}>
                       <td className="id">{line.productKey}</td>
+                      <td>{line.kind === "LICENSE" ? "License" : "Box"}</td>
                       <td className="num">{line.quantity}</td>
                       <td>{line.unitOfMeasure}</td>
                       <td className="num">{formatMoney(line.unitPrice)}</td>
                       <td className="num">{formatMoney(line.lineTotal)}</td>
+                      <td className="num">{line.shippedQuantity}</td>
+                      <td className="num">{line.deliveredQuantity}</td>
+                      <td className="mono">{line.scheduledDate ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
                 {order.subtotal && (
                   <tfoot>
                     <tr>
-                      <td colSpan={4}>Subtotal</td>
+                      <td colSpan={5}>Subtotal</td>
                       <td className="num">{formatMoney(order.subtotal)}</td>
+                      <td colSpan={3}></td>
                     </tr>
                   </tfoot>
                 )}
@@ -81,6 +96,28 @@ export function OrderDetailPage() {
           </section>
         </div>
         <div className="stack">
+          <section className="panel">
+            <h2>Status</h2>
+            <dl className="kv">
+              <dt>Fulfillment</dt>
+              <dd><StatusBadge status={scoreLabel(order.fulfillmentStatus)} /></dd>
+              <dt>Delivery</dt>
+              <dd><StatusBadge status={scoreLabel(order.deliveryStatus)} /></dd>
+              <dt>Invoice</dt>
+              <dd><StatusBadge status={scoreLabel(order.invoiceStatus)} /></dd>
+            </dl>
+          </section>
+          <section className="panel">
+            <h2>Parties</h2>
+            <dl className="kv">
+              <dt>End customer</dt>
+              <dd>{order.parties.endCustomerName || "—"}</dd>
+              <dt>Ship to</dt>
+              <dd>{order.parties.shipTo || "—"}</dd>
+              <dt>Quote</dt>
+              <dd className="id">{order.parties.quoteId || "—"}</dd>
+            </dl>
+          </section>
           <section className="panel">
             <h2>Timeline</h2>
             <OrderTimeline timeline={order.timeline} currentStatus={order.status} />

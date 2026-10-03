@@ -4,12 +4,14 @@ import pytest
 
 from src.modules.catalog.application.service import CatalogService
 from src.modules.catalog.domain.errors import ItemOwnershipConflict
+from src.modules.catalog.domain.events import ITEM_SYNCED
 from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
+from src.shared.messaging.facts import CollectingFactPublisher
 from src.shared.types import ConnectionId
 
 
 def _service() -> CatalogService:
-    return CatalogService(InMemoryItemRepository())
+    return CatalogService(InMemoryItemRepository(), CollectingFactPublisher())
 
 
 def test_sync_new_item_assigns_owning_connection() -> None:
@@ -33,3 +35,14 @@ def test_same_sku_from_different_connection_is_a_conflict() -> None:
         svc.sync_item(sku="ANVIL", name="Anvil", owning_connection_id=ConnectionId("conn_2"))
     assert exc.value.existing_owner == ConnectionId("conn_1")
     assert exc.value.incoming_owner == ConnectionId("conn_2")
+
+
+def test_sync_publishes_a_fact_each_time_including_on_resync() -> None:
+    svc = _service()
+    facts: CollectingFactPublisher = svc._facts  # type: ignore[attr-defined]
+    svc.sync_item(sku="ANVIL", name="Anvil", owning_connection_id=ConnectionId("conn_1"))
+    svc.sync_item(sku="ANVIL", name="Anvil XL", owning_connection_id=ConnectionId("conn_1"))
+
+    assert [f.event_type for f in facts.published] == [ITEM_SYNCED, ITEM_SYNCED]
+    assert facts.published[-1].payload["name"] == "Anvil XL"
+    assert facts.published[-1].payload["sku"] == "ANVIL"

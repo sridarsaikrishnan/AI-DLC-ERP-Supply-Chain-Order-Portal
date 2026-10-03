@@ -26,7 +26,7 @@ def _ready_event(order_id: str = "ord_1", connection_id: str = "conn_1") -> Stor
 
 class FakeConnections:
     def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
-        return ErpTarget(erp_type="ODOO", base_url="http://odoo", database="odoo", username="admin", secret="x")
+        return ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
 
 
 class FakeOrders:
@@ -68,7 +68,7 @@ def test_terminal_failure_rejects() -> None:
         def submit(self, target: ErpTarget, payload: dict[str, Any]) -> SubmissionResult:
             return SubmissionResult(success=False, error="bad product", terminal=True)
 
-        def fetch_status(self, target: ErpTarget, erp_order_id: str) -> str | None:
+        def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None:
             return None
 
         def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult:
@@ -84,7 +84,7 @@ def test_transient_failure_marks_retrying_and_raises() -> None:
         def submit(self, target: ErpTarget, payload: dict[str, Any]) -> SubmissionResult:
             return SubmissionResult(success=False, error="timeout", terminal=False)
 
-        def fetch_status(self, target: ErpTarget, erp_order_id: str) -> str | None:
+        def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None:
             return None
 
         def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult:

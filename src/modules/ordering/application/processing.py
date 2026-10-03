@@ -41,7 +41,7 @@ class OrderProcessor:
         if decision.routed:
             assert decision.connection_id is not None
             order.validate(ConnectionId(decision.connection_id))
-            order.mark_ready_for_delivery()
+            order.accept()
         else:
             assert decision.reason is not None
             order.reject(decision.reason.value, decision.message or "order rejected")

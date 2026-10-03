@@ -42,6 +42,7 @@ from src.shared.persistence.engine import get_session_factory
 from src.shared.persistence.relay import OutboxRelay
 from src.shared.types import ConnectionId
 
+from .connection_lock import PostgresConnectionLock
 from .relay_runner import RelayRunner
 from .scheduler import ReconcileScheduler
 
@@ -132,49 +133,53 @@ def main() -> None:  # pragma: no cover - process entrypoint
     if settings.profile != "postgres":
         raise SystemExit(f"worker requires APP_PROFILE=postgres (got {settings.profile!r})")
 
+    roles = settings.worker_roles
+    if not roles:
+        raise SystemExit("WORKER_ROLE resolved to no roles — nothing for this process to do")
+
     container = build_container(settings)
     session_factory = get_session_factory(settings.database_url)
     assert container.reconcile_sweeper is not None  # guaranteed by the postgres profile
 
-    publisher = SnsFifoPublisher(
-        settings.domain_topic_arn, endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
-    )
-    relay = RelayRunner(OutboxRelay(session_factory, publisher))
-
     sqs = boto3.client("sqs", endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region)
-    consumers = [
-        SqsConsumerRunner(
-            _queue_url(sqs, "order-processing.fifo"),
-            _dedupe("order-processing", session_factory, container.order_processor.handle),
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-        ),
-        SqsConsumerRunner(
-            _queue_url(sqs, "order-delivery.fifo"),
-            _dedupe("order-delivery", session_factory, container.delivery_handler.handle),
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-        ),
-        SqsConsumerRunner(
-            _queue_url(sqs, "projections.fifo"),
-            _dedupe("projections", session_factory, container.order_projector.handle),
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-        ),
-        SqsConsumerRunner(
-            _queue_url(sqs, "webhook-dispatch.fifo"),
-            _dedupe("webhook-dispatch", session_factory, container.webhook_dispatcher.handle),
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-        ),
-    ]
 
-    scheduler = ReconcileScheduler(
-        container.reconcile_sweeper,
-        connections_provider=lambda: [c.connection_id for c in container.connections.list_active()],
-        open_orders_provider=_open_orders_provider(session_factory),
-        interval_seconds=settings.reconcile_interval_seconds,
-    )
+    threads: list[threading.Thread] = []
+
+    if "relay" in roles:
+        publisher = SnsFifoPublisher(
+            settings.domain_topic_arn, endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
+        )
+        relay = RelayRunner(OutboxRelay(session_factory, publisher))
+        threads.append(threading.Thread(target=relay.run_forever, name="outbox-relay", daemon=True))
+
+    # (queue name, consumer name, handler) — only the ones this process's roles include
+    # are built at all: no SQS lookup, no thread, for a role this process doesn't run.
+    consumer_specs = [
+        ("order-processing", "order-processing.fifo", container.order_processor.handle),
+        ("order-delivery", "order-delivery.fifo", container.delivery_handler.handle),
+        ("projections", "projections.fifo", container.order_projector.handle),
+        ("webhook-dispatch", "webhook-dispatch.fifo", container.webhook_dispatcher.handle),
+    ]
+    for role, queue_name, handler in consumer_specs:
+        if role not in roles:
+            continue
+        consumer = SqsConsumerRunner(
+            _queue_url(sqs, queue_name),
+            _dedupe(role, session_factory, handler),
+            endpoint_url=settings.aws_endpoint_url,
+            region_name=settings.aws_region,
+        )
+        threads.append(threading.Thread(target=consumer.run_forever, name=f"consumer-{role}", daemon=True))
+
+    if "reconcile" in roles:
+        scheduler = ReconcileScheduler(
+            container.reconcile_sweeper,
+            connections_provider=lambda: [c.connection_id for c in container.connections.list_active()],
+            open_orders_provider=_open_orders_provider(session_factory),
+            interval_seconds=settings.reconcile_interval_seconds,
+            lock=PostgresConnectionLock(session_factory),
+        )
+        threads.append(threading.Thread(target=scheduler.run_forever, name="reconcile-scheduler", daemon=True))
 
     stop = threading.Event()
 
@@ -185,14 +190,7 @@ def main() -> None:  # pragma: no cover - process entrypoint
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    threads = [threading.Thread(target=relay.run_forever, name="outbox-relay", daemon=True)]
-    threads += [
-        threading.Thread(target=consumer.run_forever, name=f"consumer-{i}", daemon=True)
-        for i, consumer in enumerate(consumers)
-    ]
-    threads.append(threading.Thread(target=scheduler.run_forever, name="reconcile-scheduler", daemon=True))
-
-    log.info("worker starting: %d consumer(s), relay, reconcile scheduler", len(consumers))
+    log.info("worker starting: roles=%s, %d thread(s)", sorted(roles), len(threads))
     for thread in threads:
         thread.start()
 

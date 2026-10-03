@@ -9,12 +9,15 @@ payload, submits via the ERP adapter, and drives the order aggregate:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from src.shared.eventsourcing import StoredEvent
 from src.shared.types import ConnectionId, OrderId
 
 from .ports import ConnectionResolver, ErpAdapter, OrderCommandPort, OrderReader
+
+log = logging.getLogger(__name__)
 
 
 class DeliveryRetry(Exception):
@@ -51,7 +54,12 @@ class DeliveryHandler:
             self._orders_cmd.reject(order_id, "order_not_found", "order payload unavailable")
             return
 
-        result = self._adapter_for(target.erp_type).submit(target, payload)
+        adapter = self._adapter_for(target.erp_type)
+        # Declared, not gated on yet (ADR-0015) — logged so a capability gap (e.g. this
+        # ERP doesn't support tax) is visible in context, rather than only inferable
+        # from reading the adapter's own source.
+        log.debug("submitting via %s, capabilities=%s", target.erp_type, sorted(getattr(adapter, "capabilities", frozenset())))
+        result = adapter.submit(target, payload)
         if result.success:
             assert result.erp_order_id is not None
             self._orders_cmd.send_to_erp(order_id, result.erp_order_id)

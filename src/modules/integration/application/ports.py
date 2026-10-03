@@ -16,12 +16,16 @@ class UnknownErpType(Exception):
 
 @dataclass(frozen=True)
 class ErpTarget:
-    """Resolved connection details handed to an adapter (secret already fetched)."""
+    """Resolved connection details handed to an adapter (secret already fetched).
+
+    `credentials` is a generic, per-adapter-interpreted bag of non-secret connection
+    parameters (Odoo: `{"database", "username"}`; a token-auth ERP might need an account
+    id, or nothing here at all). `secret` stays its own field, resolved via Secrets
+    Manager — never put in `credentials`."""
 
     erp_type: str
     base_url: str
-    database: str
-    username: str
+    credentials: dict[str, str]
     secret: str
 
 
@@ -33,9 +37,20 @@ class SubmissionResult:
     terminal: bool = False  # True = permanent failure (do not retry)
 
 
+# The vocabulary a capability can name — not enforced (no gating logic reads this yet,
+# ADR-0015), just a declared, inspectable contract instead of implicit per-adapter code.
+KNOWN_CAPABILITIES = frozenset({"tax", "uom", "idempotency", "fail_closed_product", "multi_currency", "partial_fulfillment"})
+
+
 class ErpAdapter(Protocol):
+    # Declared, not yet consumed for behavioral gating (ADR-0015) — `DeliveryHandler`
+    # logs it so a capability gap is visible, but still calls `submit` the same way for
+    # every adapter; real gating is deferred until a second adapter actually needs to
+    # differ, so the axes aren't guessed from a sample size of one.
+    capabilities: frozenset[str]
+
     def submit(self, target: ErpTarget, order_payload: dict[str, Any]) -> SubmissionResult: ...
-    def fetch_status(self, target: ErpTarget, erp_order_id: str) -> str | None: ...
+    def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None: ...
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult: ...
 
 

@@ -1,9 +1,12 @@
 """Native-ERP-status -> canonical-status mapping, as a registry (a PBT target).
 
-To add a new ERP's status mapping: write one pure function
-`(native_status: str, invoice_status: str) -> CanonicalStatus | None` (lowercased,
-stripped inputs — see `_map_odoo` for the shape) and add one line to `STATUS_MAPPERS`.
-No other file changes. `map_native_status` itself never needs to change again.
+To add a new ERP's status mapping: write one pure function `(fields: dict[str, str]) ->
+CanonicalStatus | None` that reads whatever keys that ERP's status actually arrives in.
+The signature doesn't force an arity — Odoo reads 2 keys (`state`, `invoice_status`), a
+single-status-string ERP reads 1 (`status`), a hypothetical 3-field ERP reads 3. Add one
+line to `STATUS_MAPPERS`. No other file changes. `map_native_status` itself never needs to
+change again — this replaced an earlier version that hardcoded exactly 2 positional
+string arguments, which was Odoo's shape leaking into what was meant to be ERP-neutral.
 """
 
 from __future__ import annotations
@@ -13,25 +16,29 @@ from enum import Enum
 
 
 class CanonicalStatus(str, Enum):
+    """Canonical lifecycle statuses an ERP poll/webhook can drive. Increment 5 removed
+    `FULFILLED` (FR-A6): "fully delivered" is a shipped/delivered fact tracked via
+    Fulfillment records, not a lifecycle status an ERP status string advances."""
+
     CONFIRMED = "CONFIRMED"
-    FULFILLED = "FULFILLED"
     CLOSED = "CLOSED"
     CANCELLED = "CANCELLED"
 
 
-# (native_status, invoice_status) -> canonical status, or None for "no transition".
-# Both inputs are already lowercased/stripped by `map_native_status` before the mapper sees them.
-StatusMapper = Callable[[str, str], "CanonicalStatus | None"]
+# Inputs are already lowercased/stripped by `map_native_status` before the mapper sees them.
+StatusMapper = Callable[[dict[str, str]], "CanonicalStatus | None"]
 
 
-def _map_odoo(native: str, invoice: str) -> CanonicalStatus | None:
+def _map_odoo(fields: dict[str, str]) -> CanonicalStatus | None:
+    native = fields.get("state", "")
+    invoice = fields.get("invoice_status", "")
     if native == "cancel":
         return CanonicalStatus.CANCELLED
     if invoice == "invoiced":
         return CanonicalStatus.CLOSED
-    if native == "done":
-        return CanonicalStatus.FULFILLED
-    if native == "sale":
+    # Both "sale" (confirmed) and "done" (locked/fully delivered) map to CONFIRMED now —
+    # delivery is tracked as a fact via Fulfillment records, not this status (FR-A6).
+    if native in ("sale", "done"):
         return CanonicalStatus.CONFIRMED
     return None
 
@@ -43,10 +50,9 @@ STATUS_MAPPERS: dict[str, StatusMapper] = {
 }
 
 
-def map_native_status(
-    erp_type: str, native_status: str | None, invoice_status: str | None = None
-) -> CanonicalStatus | None:
+def map_native_status(erp_type: str, fields: dict[str, str] | None) -> CanonicalStatus | None:
     mapper = STATUS_MAPPERS.get((erp_type or "").upper())
     if mapper is None:
         return None
-    return mapper((native_status or "").strip().lower(), (invoice_status or "").strip().lower())
+    clean = {k: (v or "").strip().lower() for k, v in (fields or {}).items()}
+    return mapper(clean)

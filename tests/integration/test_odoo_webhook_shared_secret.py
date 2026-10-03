@@ -88,8 +88,7 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             erp_type=ErpType.ODOO,
             instance_label="Webhook Test Odoo",
             base_url="http://odoo:8069",
-            database="odoo",
-            username="admin",
+            credentials={"database": "odoo", "username": "admin"},
             secret_ref=login_secret_name,
             webhook_secret_ref=webhook_secret_name,
         )

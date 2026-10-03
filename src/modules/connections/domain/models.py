@@ -36,14 +36,19 @@ class ErpConnection:
     UI's Automation Rule config — not a secret store) also leaks ERP login access. `None`
     until a connection's webhook is onboarded (target-architecture.md 5a: until then it
     silently relies on the reconciliation sweeper).
+
+    `credentials` is a generic, adapter-interpreted bag of *non-secret* connection
+    parameters — e.g. Odoo needs `{"database": ..., "username": ...}`; a token-auth ERP
+    (NetSuite, ERPNext) might need an account id, or nothing at all here (everything in
+    `secret_ref`). This replaced fixed `database`/`username` fields, which forced Odoo's
+    login shape onto every future ERP regardless of whether it fit.
     """
 
     connection_id: ConnectionId
     erp_type: ErpType
     instance_label: str
     base_url: str
-    database: str
-    username: str
+    credentials: dict[str, str]
     secret_ref: str
     status: ConnectionStatus = ConnectionStatus.ACTIVE
     webhook_secret_ref: str | None = None

@@ -48,8 +48,12 @@ export function ConnectionsPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const { database, username, ...rest } = form;
     await registerConnection.mutateAsync({
-      ...form,
+      ...rest,
+      // Odoo-shaped fields today, packed generically — a future ERP's connection form
+      // sends whatever credentials it actually needs; the backend has no fixed shape.
+      credentials: { database, username },
       webhookSecretRef: form.webhookSecretRef || undefined,
     });
     setForm(EMPTY_FORM);

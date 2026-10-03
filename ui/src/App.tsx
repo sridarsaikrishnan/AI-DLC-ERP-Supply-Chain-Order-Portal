@@ -4,11 +4,14 @@ import { useAuth } from "./auth/AuthContext";
 
 const RESELLER_NAV = [
   { to: "/orders", label: "Orders" },
+  { to: "/quotes", label: "Quotes" },
   { to: "/delivery-log", label: "Delivery log" },
   { to: "/webhook-endpoints", label: "Webhook endpoints" },
 ];
 const OPERATOR_NAV = [
   { to: "/admin/orders", label: "Orders" },
+  { to: "/admin/quotes", label: "Quotes" },
+  { to: "/admin/operating-companies", label: "Operating companies" },
   { to: "/admin/connections", label: "ERP connections" },
   { to: "/admin/tenants", label: "Resellers" },
   { to: "/admin/items", label: "Item ownership" },
@@ -20,9 +23,12 @@ function crumbFor(pathname: string): string {
   if (/^\/orders\/[^/]+\/events$/.test(pathname)) return "Orders / Order events";
   if (/^\/orders\/[^/]+$/.test(pathname)) return "Orders / Order detail";
   if (pathname.startsWith("/orders")) return "Orders";
+  if (pathname.startsWith("/quotes")) return "Quotes";
   if (pathname.startsWith("/delivery-log")) return "Delivery log";
   if (pathname.startsWith("/webhook-endpoints")) return "Webhook endpoints";
   if (pathname.startsWith("/admin/orders")) return "Operator / Orders";
+  if (pathname.startsWith("/admin/quotes")) return "Operator / Quotes";
+  if (pathname.startsWith("/admin/operating-companies")) return "Operator / Operating companies";
   if (pathname.startsWith("/admin/connections")) return "Operator / ERP connections";
   if (pathname.startsWith("/admin/tenants")) return "Operator / Resellers";
   if (pathname.startsWith("/admin/items")) return "Operator / Item ownership";

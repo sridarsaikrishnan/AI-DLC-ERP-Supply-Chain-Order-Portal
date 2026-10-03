@@ -5,19 +5,28 @@ import {
   BINDINGS_QUERY,
   CONNECTIONS_QUERY,
   CREATE_BINDING_MUTATION,
+  CREATE_OPERATING_COMPANY_MUTATION,
+  ISSUE_QUOTE_MUTATION,
   ITEMS_QUERY,
+  OPERATING_COMPANIES_QUERY,
   OPERATOR_ORDERS_QUERY,
   OPERATOR_ORDER_QUERY,
+  OPERATOR_QUOTES_QUERY,
   PAUSE_CONNECTION_MUTATION,
+  RECORD_FULFILLMENT_MUTATION,
   REGISTER_CONNECTION_MUTATION,
   REMOVE_BINDING_MUTATION,
   RESUME_CONNECTION_MUTATION,
+  SET_VENDOR_DATE_MUTATION,
   SYNC_ITEM_MUTATION,
   VERIFY_BINDING_MUTATION,
   type Binding,
   type Connection,
+  type IssueQuoteLineInput,
   type Item,
+  type OperatingCompany,
   type OperatorOrder,
+  type OperatorQuote,
 } from "../api/queries/admin";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
@@ -86,8 +95,7 @@ export function useRegisterConnection() {
       erpType: string;
       instanceLabel: string;
       baseUrl: string;
-      database: string;
-      username: string;
+      credentials: Record<string, string>;
       secretRef: string;
       webhookSecretRef?: string;
     }) => graphqlRequest("operator", REGISTER_CONNECTION_MUTATION, input, idToken),
@@ -175,11 +183,106 @@ export function useSyncItem() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { sku: string; name: string; owningConnectionId: string; unitPrice?: number | null; currency?: string | null }) =>
+    mutationFn: (input: { sku: string; name: string; owningConnectionId: string; kind: string }) =>
       graphqlRequest("operator", SYNC_ITEM_MUTATION, input, idToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       notify("Item saved.");
+    },
+    onError: (err) => notify((err as Error).message, "danger"),
+  });
+}
+
+export function useOperatingCompanies() {
+  const { idToken, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ["operatingCompanies"],
+    queryFn: () =>
+      graphqlRequest<{ operatingCompanies: OperatingCompany[] }>("operator", OPERATING_COMPANIES_QUERY, {}, idToken).then(
+        (d) => d.operatingCompanies,
+      ),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateOperatingCompany() {
+  const { idToken } = useAuth();
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
+  return useMutation({
+    mutationFn: (input: { name: string; country: string; language: string }) =>
+      graphqlRequest("operator", CREATE_OPERATING_COMPANY_MUTATION, input, idToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operatingCompanies"] });
+      notify("Operating company created.");
+    },
+    onError: (err) => notify((err as Error).message, "danger"),
+  });
+}
+
+export function useOperatorQuotes() {
+  const { idToken, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ["operatorQuotes"],
+    queryFn: () =>
+      graphqlRequest<{ quotes: OperatorQuote[] }>("operator", OPERATOR_QUOTES_QUERY, {}, idToken).then((d) => d.quotes),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useIssueQuote() {
+  const { idToken } = useAuth();
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
+  return useMutation({
+    mutationFn: (input: {
+      tenantId: string;
+      operatingCompanyId: string;
+      endCustomerName: string;
+      shipTo: string;
+      currency: string;
+      validFrom: string;
+      validUntil: string;
+      lines: IssueQuoteLineInput[];
+    }) => graphqlRequest("operator", ISSUE_QUOTE_MUTATION, input, idToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operatorQuotes"] });
+      notify("Quote issued.");
+    },
+    onError: (err) => notify((err as Error).message, "danger"),
+  });
+}
+
+export function useRecordFulfillment(orderId: string) {
+  const { idToken } = useAuth();
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
+  return useMutation({
+    mutationFn: (input: {
+      orderId: string;
+      lines: { lineId: string; quantity: number }[];
+      carrier?: string | null;
+      trackingNumber?: string | null;
+      proofOfDelivery?: string | null;
+    }) => graphqlRequest("operator", RECORD_FULFILLMENT_MUTATION, input, idToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operatorOrder", orderId] });
+      notify("Shipment recorded.");
+    },
+    onError: (err) => notify((err as Error).message, "danger"),
+  });
+}
+
+export function useSetVendorDate(orderId: string) {
+  const { idToken } = useAuth();
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
+  return useMutation({
+    mutationFn: (input: { orderId: string; lineId: string; vendorDate: string }) =>
+      graphqlRequest("operator", SET_VENDOR_DATE_MUTATION, input, idToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operatorOrder", orderId] });
+      notify("Vendor date set (scheduled).");
     },
     onError: (err) => notify((err as Error).message, "danger"),
   });

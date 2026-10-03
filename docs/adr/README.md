@@ -16,8 +16,13 @@ under a minute.
 | [0007](0007-async-outbox-reconciliation.md) | Async delivery to ERPs via outbox + queue, with polling as the fallback safety net | Accepted |
 | [0008](0008-graphql-split-by-audience.md) | Separate GraphQL schemas for reseller vs. operator | Accepted |
 | [0009](0009-single-identity-provider.md) | One identity provider (Cognito) for both human and machine-to-machine auth | Accepted |
-| [0010](0010-worker-role-split.md) | Split `worker` into independently-scalable roles | Proposed |
-| [0011](0011-catalog-price-source.md) | Order line price is resolved from the catalog, never trusted from the client | Accepted |
+| [0010](0010-worker-role-split.md) | Split `worker` into independently-scalable roles | Accepted |
+| [0011](0011-catalog-price-source.md) | Order line price is resolved from the catalog, never trusted from the client | Superseded by 0016 |
+| [0012](0012-generic-connection-credentials.md) | ERP connection credentials are a generic bag, not fixed `database`/`username` fields | Accepted |
+| [0013](0013-flat-item-tax-and-discount.md) | Tax and discount are flat per-item catalog fields, same source as price | Superseded by 0016 |
+| [0014](0014-orthogonal-fulfillment-invoice-status.md) | Fulfillment/invoice status is derived and orthogonal to order lifecycle state | Accepted |
+| [0015](0015-erp-capabilities-declared-not-gated.md) | `ErpCapabilities` is declared now, gated later (once a 2nd adapter exists) | Accepted |
+| [0016](0016-price-from-quote-not-catalog.md) | Price lives on the quote, not the catalog; an order replies to a quote | Accepted (supersedes 0011, 0013) |
 
 ## How to read one
 

@@ -4,11 +4,20 @@ from src.modules.integration.domain.status_mapping import CanonicalStatus, map_n
 
 
 def test_odoo_status_mapping() -> None:
-    assert map_native_status("ODOO", "sale") is CanonicalStatus.CONFIRMED
-    assert map_native_status("ODOO", "done") is CanonicalStatus.FULFILLED
-    assert map_native_status("ODOO", "cancel") is CanonicalStatus.CANCELLED
-    assert map_native_status("ODOO", "sale", invoice_status="invoiced") is CanonicalStatus.CLOSED
-    assert map_native_status("ODOO", "draft") is None
+    assert map_native_status("ODOO", {"state": "sale"}) is CanonicalStatus.CONFIRMED
+    # "done" (fully delivered) now maps to CONFIRMED — delivery is a fact, not a lifecycle
+    # status (FR-A6); FULFILLED left the lifecycle entirely.
+    assert map_native_status("ODOO", {"state": "done"}) is CanonicalStatus.CONFIRMED
+    assert map_native_status("ODOO", {"state": "cancel"}) is CanonicalStatus.CANCELLED
+    assert map_native_status("ODOO", {"state": "sale", "invoice_status": "invoiced"}) is CanonicalStatus.CLOSED
+    assert map_native_status("ODOO", {"state": "draft"}) is None
+
+
+def test_mapper_signature_is_a_field_bag_not_a_fixed_arity() -> None:
+    """The generic signature must not force every ERP into Odoo's 2-field shape — a
+    1-field ERP (just `status`) and an unused extra field must both be handled fine."""
+    assert map_native_status("ODOO", {"state": "sale", "unrelated_field": "whatever"}) is CanonicalStatus.CONFIRMED
+    assert map_native_status("ODOO", {}) is None
 
 
 def test_unregistered_erp_type_is_none_never_raises() -> None:
@@ -17,7 +26,7 @@ def test_unregistered_erp_type_is_none_never_raises() -> None:
     error. Re-registering ERP_NEXT with its own mapper is the intended way to support it
     again; this test would then need ERP_NEXT's real expectations, like
     `test_odoo_status_mapping` has for Odoo."""
-    assert map_native_status("ERP_NEXT", "Completed") is None
-    assert map_native_status("SAP", "whatever") is None
+    assert map_native_status("ERP_NEXT", {"status": "Completed"}) is None
+    assert map_native_status("SAP", {"order_status": "whatever"}) is None
     assert map_native_status("ODOO", None) is None
-    assert map_native_status("", "") is None
+    assert map_native_status("", {}) is None

@@ -31,12 +31,13 @@ class InboundWebhook:
     connection_id: ConnectionId
     erp_type: str
     erp_order_id: str
-    native_status: str
+    native_fields: dict[str, str]  # whatever this ERP calls its status fields — the
+    # per-ERP status mapper (status_mapping.py) picks out the keys it needs; this
+    # transport layer doesn't need to know any ERP's specific field names.
     event_ref: str  # provider delivery id, used for dedup
     raw_body: bytes
     signature: str
     auth_mode: WebhookAuthMode = WebhookAuthMode.HMAC
-    invoice_status: str | None = None
 
 
 class InboundWebhookService:
@@ -76,7 +77,7 @@ class InboundWebhookService:
             return IngressOutcome.UNATTRIBUTABLE
 
         # 4. map + apply (only now do we mark the delivery processed)
-        status = map_native_status(webhook.erp_type, webhook.native_status, webhook.invoice_status)
+        status = map_native_status(webhook.erp_type, webhook.native_fields)
         self._dedup.mark(dedup_key)
         if status is None:
             return IngressOutcome.NO_TRANSITION

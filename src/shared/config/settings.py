@@ -9,6 +9,10 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 
+_ALL_WORKER_ROLES = frozenset(
+    {"order-processing", "order-delivery", "projections", "webhook-dispatch", "relay", "reconcile"}
+)
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -21,10 +25,23 @@ class Settings:
     erp_odoo_timeout_seconds: float  # OdooAdapter-specific; a new ERP adapter gets its own timeout setting if it needs one
     log_level: str
     reconcile_interval_seconds: int
+    worker_roles: frozenset[str]  # which of {order-processing, order-delivery, projections,
+    # webhook-dispatch, relay, reconcile} this `worker` process runs — "all" (default) runs
+    # every one, matching today's single-process behavior (ADR-0010's role split, Part 1)
     cognito_user_pool_id: str | None
     cognito_client_id: str | None
     cognito_resource_server_id: str  # OAuth scope namespace for client_credentials (M2M) tokens — {this}/tenant.<id>, {this}/role.<ROLE>
     cors_allowed_origins: list[str]  # the UI's origin(s) — e.g. an S3/CloudFront URL in prod
+
+
+def _parse_worker_roles(raw: str) -> frozenset[str]:
+    if raw.strip().lower() == "all":
+        return _ALL_WORKER_ROLES
+    roles = frozenset(r.strip() for r in raw.split(",") if r.strip())
+    unknown = roles - _ALL_WORKER_ROLES
+    if unknown:
+        raise ValueError(f"unknown WORKER_ROLE value(s): {sorted(unknown)} — valid: {sorted(_ALL_WORKER_ROLES)}")
+    return roles
 
 
 @lru_cache
@@ -43,6 +60,7 @@ def get_settings() -> Settings:
         erp_odoo_timeout_seconds=float(os.environ.get("ERP_ODOO_TIMEOUT_SECONDS", "10")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         reconcile_interval_seconds=int(os.environ.get("RECONCILE_INTERVAL_SECONDS", "900")),
+        worker_roles=_parse_worker_roles(os.environ.get("WORKER_ROLE", "all")),
         cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID"),
         cognito_client_id=os.environ.get("COGNITO_CLIENT_ID"),
         cognito_resource_server_id=os.environ.get("COGNITO_RESOURCE_SERVER_ID", "erp-portal"),

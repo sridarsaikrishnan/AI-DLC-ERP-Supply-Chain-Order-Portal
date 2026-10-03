@@ -47,6 +47,14 @@ def _parse_body(raw: bytes) -> dict:
         return {}
 
 
+def _native_fields(body: dict) -> dict[str, str]:
+    """The whole payload, passed through untouched as a generic field bag — the per-ERP
+    status mapper (status_mapping.py) picks out whatever keys it needs. This layer
+    deliberately doesn't know any ERP's specific status field names (e.g. Odoo's `state`/
+    `invoice_status`); that knowledge lives only in that ERP's own mapper function."""
+    return {k: str(v) for k, v in body.items() if v is not None}
+
+
 async def _dispatch(request: Request, webhook: InboundWebhook) -> Response:
     container = request.app.state.container
     outcome = container.ingress.handle(webhook)
@@ -64,12 +72,11 @@ async def erp_webhook_hmac(connection_id: str, request: Request) -> Response:
         connection_id=ConnectionId(connection_id),
         erp_type=str(body.get("erp_type", "")),
         erp_order_id=str(body.get("erp_order_id") or body.get("name") or ""),
-        native_status=str(body.get("state") or body.get("status") or ""),
+        native_fields=_native_fields(body),
         event_ref=request.headers.get("x-erp-delivery-id", "") or str(body.get("event_id", "")),
         raw_body=raw,
         signature=request.headers.get("x-erp-signature", ""),
         auth_mode=WebhookAuthMode.HMAC,
-        invoice_status=body.get("invoice_status"),
     )
     return await _dispatch(request, webhook)
 
@@ -83,11 +90,10 @@ async def erp_webhook_shared_secret(connection_id: str, webhook_secret: str, req
         connection_id=ConnectionId(connection_id),
         erp_type=str(body.get("erp_type", "ODOO")),
         erp_order_id=str(body.get("erp_order_id") or body.get("name") or ""),
-        native_status=str(body.get("state") or body.get("status") or ""),
+        native_fields=_native_fields(body),
         event_ref=str(body.get("event_id", "")),
         raw_body=raw,
         signature=webhook_secret,
         auth_mode=WebhookAuthMode.SHARED_SECRET,
-        invoice_status=body.get("invoice_status"),
     )
     return await _dispatch(request, webhook)

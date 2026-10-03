@@ -36,7 +36,7 @@ scheduled poll as a correctness fallback that works even if webhooks never arriv
 |---|---|
 | ✅ | A crash can never lose a committed event — the outbox write is transactional with the state change |
 | ✅ | Even an ERP with unreliable or "thin" webhooks eventually reaches correct state — just on a 15-minute cadence instead of near-real-time |
-| ⚠️ | The reconciliation scheduler has no per-connection locking today — running more than one `worker` replica double-sweeps every connection (see [ADR-0010](0010-worker-role-split.md)) |
+| ✅ | The reconciliation scheduler takes a per-connection Postgres advisory lock before sweeping (`src/worker/connection_lock.py`) — running more than one `worker` replica no longer double-sweeps a connection; a replica that doesn't win the lock just skips it that cycle (see [ADR-0010](0010-worker-role-split.md), whose blocking concern this resolves) |
 
 ## Revisit when
 The reconcile interval is too slow for a specific ERP/business need — tighten the

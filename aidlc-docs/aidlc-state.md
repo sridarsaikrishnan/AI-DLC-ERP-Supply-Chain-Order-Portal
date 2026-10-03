@@ -261,6 +261,98 @@
 - [x] Docs: **ADR-0011** (new), `docs/database-schema.md` (items columns + orders.lines JSONB shape + migration list), `docs/canonical-model-v2.md` (step 2b, marked done), `docs/data-flow-walkthrough.md` (new price-resolution step in Direction 1, `line_total`/`subtotal` on the `orders` projection, Odoo-mapping row clarified: price exists on the canonical line now, Odoo adapter still doesn't send it).
 - [x] Build and Test — `pytest src tests`: **125 unit + 2 integration passed**, 5 skipped (unchanged). UI: `npm run build` (tsc --noEmit && vite build) clean. Smoke-tested `build_container()` + both GraphQL schemas build; printed SDL to confirm the new fields' exact shape.
 
-## Increment 4 Status
+## Increment 4 Status (superseded by the continuation below — see that section's status)
 - **Lifecycle Phase**: COMPLETE (through Build and Test) for: Phase 1, Phase 2, and the catalog-price-source follow-up (wired end to end through UI).
 - Phases 3-5 of `docs/canonical-model-v2.md`'s build order (fulfilled/invoiced quantities + derived status, Fulfillment/Invoice/Payment/Return entities, `ErpCapabilities`, a second ERP) remain explicitly deferred, not silently dropped — each is its own future increment. Sending price to Odoo itself (`OdooAdapter.submit`) is also not yet built — flagged in `data-flow-walkthrough.md`, not hidden.
+
+---
+
+## Increment 4, continued — architecture honesty review, then fixes
+- **Trigger**: user asked for a full honest review of where real tradeoffs/gaps exist (not spin), surfacing: RLS inert, no idempotency on ERP submit, silent product auto-create, reconcile-sweeper locking gap, `order_grand_total` dead code, the "4 touch points" claim unproven beyond Odoo, and — the user's own sharpest catch — several supposedly-generic seams (`ErpTarget`'s fixed `database`/`username`/`secret`, the 2-string status-mapper signature, `InboundWebhook`'s named `native_status`/`invoice_status` fields) actually bake in Odoo's specific shape. Also requested: catalog/connections/tenancy should publish domain-change facts (event-driven between domains) without becoming event-sourced (ADR-0002 stays correct — these are reference/supporting domains, not core/transactional ones).
+- User explicitly deferred RLS (needs their own infra/role decision) and asked to "fix others."
+- [x] **Catalog/connections/tenancy fact publishing** — new `src/shared/messaging/facts.py` (`FactPublisher` port, `BusFactPublisher`/`OutboxFactPublisher` impls, zero new infra — same shared SNS topic/outbox Order already uses, per `messaging-topology.md`). New event-type constants per domain (`catalog/domain/events.py`, `connections/domain/events.py`, `tenancy/domain/events.py`). All 3 services (`CatalogService`, `ConnectionService`, `BindingService`) publish a fact after every write; `Container` gained a `facts` field; all 7 operator-schema call sites + 4 test call sites updated. New tests assert facts are published with correct payloads and (for connections) that secrets never leak into a fact.
+- [x] **Status-mapper/webhook genericization** (the user's sharpest catch, fixed) — `map_native_status(erp_type, native_status, invoice_status)` (2 fixed strings, Odoo's shape) → `map_native_status(erp_type, fields: dict[str, str])` (a field bag, any arity). `InboundWebhook.native_status`/`invoice_status` → `native_fields: dict[str, str]`; the HTTP layer (`api/http/webhooks.py`) now passes the whole payload through generically instead of picking Odoo-specific key names. `ErpAdapter.fetch_status` return type `str | None` → `dict[str, str] | None`, updated in `OdooAdapter`/`StubErpAdapter`/`reconcile.py`. `ErpTarget`'s `database`/`username`/`secret` fixed fields were **not** touched this pass — scoped out explicitly (would need a migration + GraphQL + UI change for `ErpConnection`); flagged as its own next step.
+- [x] **Odoo adapter hardening, bundled into the same touch** — idempotency (search `client_order_ref` before create, return the existing order on a retry instead of duplicating); fail-closed on unknown product (terminal error naming the SKU, no more silent phantom-product creation; partner auto-create left as-is, judged lower risk); `fetch_status` now reads `invoice_status` alongside `state` in the same call — incidentally closes the long-standing "`CLOSED` unreachable via polling" known gap. New `test_odoo_adapter.py` (6 tests, mocks `_authenticate`/`_execute` — no live Odoo needed to verify the adapter's own decisions, though live verification is still required before trusting this in production).
+- [x] **Reconcile-sweeper per-connection locking** (ADR-0007/0010's flagged gap) — new `src/worker/connection_lock.py` (`PostgresConnectionLock`, Postgres advisory lock, 2-key-namespaced), wired into `ReconcileScheduler` (optional `lock` param, `None` = unlocked for tests/local). `run_forever` split into `run_once` (now unit-testable) + the sleep loop. New `src/worker/tests/test_scheduler.py` (3 tests: sweeps everyone with no lock, skips a connection another replica holds, one connection's exception doesn't stop the sweep for others).
+- [x] **Dead code removed** — `order_grand_total` deleted (not wired, not wireable: `discount`/`shipping` have no source anywhere in the system). `line_total`/`order_subtotal`/`order_tax_total` kept — these operate on real data (`OrderLine.unit_price`/`tax_rates`) and are the natural building blocks for the still-deferred "send price+tax to Odoo" step.
+- [x] Docs updated to match: ADR-0003 (mapper signature), ADR-0007 + ADR-0010 (locking gap marked fixed, cross-referenced), `docs/adding-an-erp.md` (checklist's ERPNext example uses the real generic signature now, plus a note to copy the idempotency/fail-closed pattern), `docs/erps/odoo.md` + `docs/mapping/odoo.md` (known-gaps list updated: 3 items struck through as fixed, 2 — UoM, price-to-Odoo — left open, not hidden), `messaging-topology.md` (new fact event types noted on the shared topic, no consuming queue yet).
+- [x] Build and Test — `pytest src tests`: **137 passed, 5 skipped** (unchanged skip set — no live Postgres/AWS in this environment). Smoke-tested `build_container()` + both GraphQL schemas + the new `connection_lock` import after every layer of change, not just once at the end.
+
+## Increment 4 (continued) Status
+- **Lifecycle Phase**: COMPLETE (through Build and Test) for everything listed above.
+- **Explicitly still deferred, not dropped**: RLS (user's own call, pending); `ErpConnection`/`ErpTarget`'s `database`/`username`/`secret` → generic `credentials: dict[str, str]` (needs a migration + GraphQL + UI change — scoped out of this pass on purpose, flagged as the next seam to fix); partial-status state machine; event-sourced `Fulfillment`/`Invoice`/`Payment`/`Return`; `ErpCapabilities`; registering a second ERP for real; sending price+UoM to Odoo; a tax/discount data source; worker role split (ADR-0010's remaining role-flag mechanism, now unblocked from its locking prerequisite).
+
+---
+
+## Increment 4, continued — generic credentials, worker role split, then the full remaining list (tax/discount, price-to-Odoo, partial status, Fulfillment/Invoice/Payment/Return, ErpCapabilities)
+- **Trigger**: direct continuation of the prior increment's own deferred list — generic credentials + worker role split first (closing ADR-0010/0012's remaining gaps), then the user's explicit instruction to "complete this" against the remaining 5-item list, finishing with "update the final documentation with required business knowledge data request and response."
+- [x] **Generic connection credentials (ADR-0012)** — `ErpConnection.database`/`username` fixed fields → `credentials: dict[str, str]`; same genericization applied to `ErpTarget` (`database`/`username`/`secret` → `credentials: dict[str,str]` + `secret`). Migration `0006_connection_credentials.py` migrates existing `database`/`username` values into the new JSONB column (real data migration, not backfill-of-missing-data — kept distinct from the "no backfill" stance taken elsewhere on new optional fields). GraphQL `registerConnection` and the UI `ConnectionsPage` form updated to pack/unpack the bag.
+- [x] **Worker role split, completed (ADR-0010)** — `Settings.worker_roles: frozenset[str]` (env `WORKER_ROLE`, default `"all"`); `worker/main.py` now role-gates which consumer/relay/scheduler threads it constructs instead of always starting everything. Unblocked by this increment's own earlier reconcile-sweeper locking work (ADR-0010 had named that locking gap as the prerequisite).
+- [x] **Tax/discount catalog data source (ADR-0013)** — `Item` gained `tax_rate: TaxRate | None`/`line_discount: Money | None`, same operator-entered mechanism as price (not a jurisdiction/tax-engine lookup — explicitly out of scope). `CatalogService.sync_item()`, both repos, migration `0007_item_tax_discount.py`, GraphQL (`ItemType`, new `TaxRateType`, `syncItem` args), and `ItemsPage` UI all extended consistently with how price already worked.
+- [x] **Price/tax/discount/UoM actually reaching Odoo** — `OdooAdapter.build_sale_order_lines()` now parses `unit_price`/`line_discount`/`tax_rates`/`unit_of_measure` and nets price against the flat discount; `submit()` resolves `product_uom` and `tax_id` per line against Odoo's own `uom.uom`/`account.tax` records, degrading gracefully (omit, don't fail) on no match — closing the long-flagged "price/tax computed but never sent to Odoo" gap. Bundled in the same pass: idempotency (`client_order_ref` search-before-create) and fail-closed unknown-product handling, both already started in the prior increment, now covered by a full new `test_odoo_adapter.py` (10 tests, mocking `_authenticate`/`_execute`).
+- [x] **Partial-status state machine + event-sourced Fulfillment/Invoice/Payment/Return (ADR-0014)** — new module `src/modules/fulfillment/` (`Fulfillment`/`Invoice`/`Payment`/`Return`, each a minimal event-sourced aggregate reusing the existing generic `EventSourcedRepository` kernel with zero kernel changes — proving the earlier "event-sourcing generalizes" claim empirically, not just in theory). `Order` gained `fulfilled_qty_by_line`/`invoiced_qty_by_line` plus **derived** `fulfillment_status`/`invoice_status` properties, fed by new `OrderLineFulfilled`/`OrderLineInvoiced` events — `OrderState` (the linear lifecycle enum) is completely untouched, by design (ADR-0014): partial fulfillment doesn't fit a straight line, so it's a second, orthogonal axis instead of forced branching into the first. 4 new GraphQL mutations (`recordFulfillment`/`recordInvoice`/`recordPayment`/`recordReturn`) on the operator schema. `Payment`/`Return` are deliberately standalone — not yet wired into `invoice_status`/`fulfillment_status` (open business-policy questions, named in ADR-0014's own "Revisit when").
+- [x] **`ErpCapabilities` (ADR-0015)** — `ErpAdapter.capabilities: frozenset[str]` required attribute; `OdooAdapter` declares `{"tax", "uom", "idempotency", "fail_closed_product"}` matching exactly what it now does; `StubErpAdapter` declares `frozenset()`. `DeliveryHandler` logs it at submit time. Declared, not yet gated — deliberately deferred until a second real adapter exists to design real gating against (ADR-0015's own stated trigger), same reasoning ADR-0003 used to reject a declarative mapping engine from a sample size of one.
+- [x] **Final documentation — business data request/response** — `docs/business-data-requirements.md` (new): for each of the 5 items above, what business data must be supplied and by whom (operator/reseller/system), and what the system computes or returns in response, with concrete worked examples — the deliverable the user explicitly asked for to close out this round.
+- [x] Docs also updated: ADR-0012/0013/0014/0015 (new), `docs/adr/README.md` index (0010 status corrected Proposed→Accepted; 0012-0015 added).
+- [x] Build and Test — `pytest src tests`: **159 passed, 5 skipped** (unchanged skip set — no live Postgres/AWS in this environment). Smoke-tested `build_container()` + both GraphQL schemas; `npm run build` clean.
+
+## Increment 4 (continued, Phase 7) Status
+- **Lifecycle Phase**: COMPLETE (through Build and Test) for everything listed above.
+- **Explicitly still deferred, not dropped**: RLS (user's own call, still pending — not started this pass either); `ErpCapabilities` behavioral gating (named trigger: a second real adapter); `Payment`/`Return` feeding back into `invoice_status`/`fulfillment_status` (named trigger: a payment/return business policy decision); automatic fulfillment/invoice recording from Odoo's own `stock.picking`/`account.move` (today `recordFulfillment`/`recordInvoice` are operator-entered only, no adapter reads Odoo for this yet); a second real ERP; multi-jurisdiction tax / promotional discount codes (ADR-0013's named non-goals).
+
+
+---
+
+## Increment 5 — Quote-before-order, named parties, box/license fulfillment, vendor date, order-truth fixes
+- **Started**: 2026-10-03
+- **Goal**: (A) Make the order truthful to the ERP — send the binding's `erp_customer_id` as the customer, key idempotency on the platform order id, give each line its own id, write shipment+quantities atomically, show both scores on the reseller order, rename `READY_FOR_DELIVERY`, demote `FULFILLED` to a score only. (B) Put a Quote in front of the Order (reseller/items/prices/validity/ship-to); order replies to a quote; no price without a quote; catalog Item becomes product-only (reverses ADR-0011/0013). (C) Name parties: reseller, end customer (name + ship-to on quote), operating-company "office card" (country + language columns, no profile service). (D) Item kind box/license with box=carrier/POD-before-delivered, license=delivered-on-ship, shipped vs delivered as distinct facts. (E) Vendor date on the line = "scheduled"; Vendor Order document deferred.
+
+### 🔵 INCEPTION PHASE (Increment 5)
+- [x] Workspace Detection (resume; brownfield)
+- [x] Reverse Engineering (SKIPPED — design trail + direct code analysis this session: ordering aggregate/events/models, order_service, projections (read_models/store/projector), adapters, catalog models, tenancy/connections models, fulfillment service/aggregates, integration ports/delivery/odoo_adapter/status_mapping)
+- [~] Requirements Analysis — `requirements/increment5-requirements.md` + `requirements/increment5-questions.md` authored; **awaiting answers at the GATE** (Q1–Q7). No code written until the gate is passed (change reverses accepted ADRs + renames persisted lifecycle states).
+- [ ] Workflow Planning
+- [ ] Application Design (conditional — new `quoting` concept + operating-company; likely light)
+- [ ] Units Generation (likely SKIPPED — extends existing units, one new reference concept)
+
+### Extension Configuration (Increment 5) — proposed, pending Q7
+| Extension | Enabled | Decided At |
+|---|---|---|
+| Security Baseline | Yes (inherited; FR-19 for new reseller surfaces) | Requirements Analysis (pending Q7) |
+| Resiliency Baseline | Yes (inherited; atomic shipment+qty, idempotency) | Requirements Analysis (pending Q7) |
+| Property-Based Testing | Partial (inherited; + quote price/validity resolution, delivered-fact derivation) | Requirements Analysis (pending Q7) |
+
+## Increment 5 Status
+- **Lifecycle Phase**: INCEPTION — Requirements Analysis, at the review gate.
+
+
+### 🔵 INCEPTION PHASE (Increment 5) — RESOLVED
+- [x] Requirements Analysis — gate passed; user answered "Start the implementation" = all recommended (Q1–Q7 = A).
+- [x] Workflow Planning / Functional Design — `construction/increment5/functional-design.md` (no new deployable unit; extends ordering/catalog/fulfillment/integration/tenancy + new `quoting` reference concept; no Units Generation).
+
+### 🟢 CONSTRUCTION PHASE (Increment 5) — COMPLETE through Build and Test
+- [x] Code Generation — all five groups implemented. See `construction/increment5/code-summary.md`.
+  - A (order truth): line_id, erp_customer_id→ERP, order_id idempotency, atomic shipment+qty (UnitOfWork), both scores on reseller order, READY_FOR_DELIVERY→ACCEPTED, FULFILLED demoted to score only.
+  - B (quote before order): new `quoting` module; price from quote; catalog product-only (ADR-0016, supersedes 0011/0013).
+  - C (parties): end customer (name+ship-to) on quote; operating-company office card (country+language).
+  - D (box/license): ItemKind; shipped vs delivered as distinct facts (box needs carrier/POD, license delivered on ship).
+  - E (vendor date): per-line vendor/"scheduled" date; Vendor Order document deferred.
+- [x] Build and Test — `APP_PROFILE=memory pytest src tests`: **174 passed, 5 skipped** (unchanged skip set = live AWS/Postgres only). Both GraphQL schemas build (SDL verified for new fields); memory AND postgres containers build cleanly. New tests: quoting (validity/refusal), delivery PBT (box/license), updated aggregate/projection/flow/status/odoo/fulfillment suites.
+- Docs: ADR-0016 (new; 0011/0013 marked Superseded); `docs/business-data-requirements.md` + `docs/data-flow-walkthrough.md` updated; `construction/increment5/{functional-design,code-summary}.md`.
+
+### Extension Configuration (Increment 5) — CONFIRMED (Q7=A)
+| Extension | Enabled | Decided At |
+|---|---|---|
+| Security Baseline | Yes (inherited; FR-19 held for new reseller surfaces — parties reseller-safe, erp_customer_id stays operator-only) | Requirements Analysis |
+| Resiliency Baseline | Yes (inherited; atomic shipment+qty via UnitOfWork, order-id idempotency) | Requirements Analysis |
+| Property-Based Testing | Partial (inherited; new PBT on the delivered-fact rule `line_is_delivered`) | Requirements Analysis |
+
+## Increment 5 Status
+- **Lifecycle Phase**: COMPLETE (through Build and Test), **including UI** (the Q6=A deferral was lifted on user request — "make sure everything is in place").
+- **UI (now done, not deferred)**: `ui/` SPA updated to the Increment 5 GraphQL shape, built in the existing design-system style (tokens + existing components; proposed screens pending formal design review per the `design/` steering):
+  - Reseller: quote-driven **New order** (pick a quote → quantities → `placeOrder(quoteId,…)`), new **Quotes** list, order detail now shows the two scores + delivered fact + parties + per-line kind/shipped/delivered/scheduled.
+  - Operator: **Quotes** (issue) + **Operating companies** (office card) pages; **Item ownership** now edits `kind` (box/license), not price; order detail shows scores/delivery/parties and has **Record a shipment** (carrier/proof-of-delivery) + **Set vendor date** controls.
+  - `ui/src/api/queries/*`, `hooks/*`, `routes.tsx`, `App.tsx` nav all updated. `npm run build` (tsc --noEmit && vite build) clean.
+- **Tooling now runnable + green** (were "could not run" before): `ruff==0.6.9` + `import-linter==2.1` installed. Fixed `pyproject.toml` import-linter config (`include_external_packages=true` required for the external-forbidden contract — a pre-existing config gap). Split `SecretsManagerSecretStore` into `src/shared/secrets/aws.py` so the `SecretStore` port stays SDK-free → both import-linter contracts now **KEPT** (0 broken). Applied safe ruff autofixes (unused imports, import order, modern syntax, stray noqa) to Increment 5 files.
+- **Known lint debt (pre-existing, repo-wide, NOT this increment)**: ~576 ruff findings dominated by E501 (dense line style), TCH typing-import style the repo never adopted, and E402 — all established conventions from before ruff was ever installed. Left as a separate cleanup, not bundled into this increment.
+- **Explicitly deferred, not dropped**: a standalone Vendor Order document (FR-E2); automatic fulfillment/invoice capture from Odoo (operator-entered only today); RLS wiring (unchanged from prior increments).

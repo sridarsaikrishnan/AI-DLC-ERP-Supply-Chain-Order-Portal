@@ -57,6 +57,7 @@ def _postgres_settings() -> Settings:
         erp_odoo_timeout_seconds=base.erp_odoo_timeout_seconds,
         log_level=base.log_level,
         reconcile_interval_seconds=base.reconcile_interval_seconds,
+        worker_roles=base.worker_roles,
         cognito_user_pool_id=base.cognito_user_pool_id,
         cognito_client_id=base.cognito_client_id,
         cognito_resource_server_id=base.cognito_resource_server_id,
@@ -77,8 +78,7 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
             erp_type=ErpType.ODOO,
             instance_label="Test Odoo",
             base_url="http://odoo:8069",
-            database="odoo",
-            username="admin",
+            credentials={"database": "odoo", "username": "admin"},
             secret_ref="env:ODOO_SECRET_UNUSED",
         )
     )

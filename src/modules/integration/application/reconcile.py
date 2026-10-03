@@ -40,8 +40,10 @@ class ReconcileSweeper:
         adapter = self._adapter_for(target.erp_type)
         applied = 0
         for erp_order_id in erp_order_ids:
-            native = adapter.fetch_status(target, erp_order_id)
-            status = map_native_status(target.erp_type, native)
+            native_fields = adapter.fetch_status(target, erp_order_id)
+            if native_fields is None:
+                continue
+            status = map_native_status(target.erp_type, native_fields)
             if status is None:
                 continue
             order_id = self._locator.find_order(connection_id, erp_order_id)

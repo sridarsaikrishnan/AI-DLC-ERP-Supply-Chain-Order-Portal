@@ -13,10 +13,11 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.shared.eventsourcing import ConcurrencyError, Snapshot, StoredEvent
 
+from .engine import current_session
 from .tables import events_table, outbox_table, snapshots_table
 
 
@@ -25,7 +26,12 @@ class PostgresEventStore:
         self._session_factory = session_factory
 
     def append(self, stream_id: str, expected_version: int, events: list[StoredEvent]) -> None:
-        session = self._session_factory()
+        # Join an enclosing unit of work (FR-A4) if one is active — then another aggregate's
+        # append in the same `atomic()` block commits together with this one. Otherwise own
+        # the session + commit, exactly as before.
+        ambient = current_session()
+        session = ambient or self._session_factory()
+        owns = ambient is None
         try:
             current = session.execute(
                 select(func.coalesce(func.max(events_table.c.version), 0)).where(
@@ -60,15 +66,19 @@ class PostgresEventStore:
                         occurred_at=event.occurred_at,
                     )
                 )
-            session.commit()
+            if owns:
+                session.commit()
         except IntegrityError as exc:  # unique(stream_id, version) or event_id race
-            session.rollback()
+            if owns:
+                session.rollback()
             raise ConcurrencyError(stream_id, expected_version, expected_version) from exc
         except Exception:
-            session.rollback()
+            if owns:
+                session.rollback()
             raise
         finally:
-            session.close()
+            if owns:
+                session.close()
 
     def load(self, stream_id: str, after_version: int = 0) -> list[StoredEvent]:
         session = self._session_factory()

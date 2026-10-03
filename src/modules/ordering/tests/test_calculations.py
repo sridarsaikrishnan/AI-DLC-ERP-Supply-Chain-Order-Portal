@@ -10,7 +10,6 @@ from src.modules.ordering.domain.calculations import (
     line_tax_total,
     line_total,
     line_total_with_tax,
-    order_grand_total,
     order_subtotal,
     order_tax_total,
 )
@@ -82,13 +81,6 @@ def test_order_subtotal_currency_mismatch_raises() -> None:
     ]
     with pytest.raises(ValueError):
         order_subtotal(lines)
-
-
-def test_order_grand_total_with_discount_and_shipping() -> None:
-    subtotal = Money(Decimal("100.00"), "USD")
-    tax = Money(Decimal("20.00"), "USD")
-    total = order_grand_total(subtotal, tax, discount=Money(Decimal("10.00"), "USD"), shipping=Money(Decimal("5.00"), "USD"))
-    assert total == Money(Decimal("115.00"), "USD")  # 100 - 10 + 20 + 5
 
 
 def test_order_tax_total_sums_lines() -> None:

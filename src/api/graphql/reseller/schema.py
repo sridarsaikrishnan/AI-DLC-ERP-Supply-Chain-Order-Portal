@@ -6,12 +6,16 @@ Every resolver is tenant-scoped via the context.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 from strawberry.types import Info
 
-from src.modules.ordering.domain.models import OrderLine
+from src.modules.ordering.application.order_service import OrderLineInput as OrderLineCommand
 from src.modules.ordering.projections.read_models import ResellerOrderView
+from src.modules.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
+from src.modules.quoting.domain.models import Quote
 from src.modules.webhooks_outbound.application.service import WebhookEndpointService
 from src.modules.webhooks_outbound.domain.models import WebhookDelivery, WebhookEndpoint
 from src.shared.money import Money
@@ -22,6 +26,9 @@ from .types import (
     MoneyType,
     OrderLineInput,
     OrderLineType,
+    PartiesType,
+    QuoteLineType,
+    QuoteType,
     ResellerOrder,
     TimelineEntryType,
     WebhookDeliveryType,
@@ -44,13 +51,49 @@ def _to_gql(view: ResellerOrderView) -> ResellerOrder:
                 product_key=l.product_key,
                 quantity=l.quantity,
                 unit_of_measure=l.unit_of_measure,
+                line_id=l.line_id,
+                kind=l.kind,
                 unit_price=_money_to_gql(l.unit_price),
                 line_total=_money_to_gql(l.line_total),
+                shipped_quantity=l.shipped_quantity,
+                delivered_quantity=l.delivered_quantity,
+                invoiced_quantity=l.invoiced_quantity,
+                scheduled_date=l.scheduled_date,
             )
             for l in view.lines
         ],
         timeline=[TimelineEntryType(status=t.status, occurred_at=t.occurred_at) for t in view.timeline],
         subtotal=_money_to_gql(view.subtotal),
+        fulfillment_status=view.fulfillment_status,
+        delivery_status=view.delivery_status,
+        invoice_status=view.invoice_status,
+        parties=PartiesType(
+            end_customer_name=view.parties.end_customer_name,
+            ship_to=view.parties.ship_to,
+            operating_company_id=view.parties.operating_company_id,
+            quote_id=view.parties.quote_id,
+        ),
+    )
+
+
+def _quote_to_gql(quote: Quote) -> QuoteType:
+    return QuoteType(
+        quote_id=quote.quote_id,
+        operating_company_id=quote.operating_company_id,
+        end_customer_name=quote.end_customer.name,
+        ship_to=quote.end_customer.ship_to,
+        currency=quote.currency,
+        valid_from=quote.valid_from.isoformat(),
+        valid_until=quote.valid_until.isoformat(),
+        status=quote.status.value,
+        lines=[
+            QuoteLineType(
+                product_key=l.product_key,
+                unit_price=MoneyType(amount=float(l.unit_price.amount), currency=l.unit_price.currency),
+                unit_of_measure=l.unit_of_measure,
+            )
+            for l in quote.lines
+        ],
     )
 
 
@@ -92,6 +135,20 @@ class Query:
         return _to_gql(view) if view else None
 
     @strawberry.field
+    def quotes(self, info: Info[GraphQLContext, None]) -> list[QuoteType]:
+        """Quotes issued to this reseller — what you can place an order against."""
+        ctx = info.context
+        return [_quote_to_gql(q) for q in ctx.container.quote_service.list_quotes_for_tenant(TenantId(ctx.tenant_id))]
+
+    @strawberry.field
+    def quote(self, info: Info[GraphQLContext, None], quote_id: str) -> QuoteType | None:
+        ctx = info.context
+        quote = ctx.container.quote_service.get_quote(quote_id)
+        if quote is None or str(quote.tenant_id) != ctx.tenant_id:  # tenant scoping (FR-19 / fail-closed)
+            return None
+        return _quote_to_gql(quote)
+
+    @strawberry.field
     def webhook_endpoints(self, info: Info[GraphQLContext, None]) -> list[WebhookEndpointType]:
         ctx = info.context
         return [
@@ -112,14 +169,22 @@ class Query:
 class Mutation:
     @strawberry.mutation
     def place_order(
-        self, info: Info[GraphQLContext, None], client_reference: str, lines: list[OrderLineInput]
+        self, info: Info[GraphQLContext, None], quote_id: str, client_reference: str, lines: list[OrderLineInput]
     ) -> str:
+        """Place an order as a reply to a quote (FR-B2). Price comes from the quote; a line
+        with no quoted price, or a missing/expired quote, is refused (FR-B3)."""
         ctx = info.context
-        order_id = ctx.container.order_service.place_order(
-            tenant_id=TenantId(ctx.tenant_id),
-            client_reference=client_reference,
-            lines=[OrderLine(li.product_key, li.quantity, li.unit_of_measure) for li in lines],
-        )
+        try:
+            order_id = ctx.container.order_service.place_order(
+                tenant_id=TenantId(ctx.tenant_id),
+                quote_id=quote_id,
+                client_reference=client_reference,
+                lines=[OrderLineCommand(li.product_key, Decimal(str(li.quantity))) for li in lines],
+            )
+        except (QuoteNotFound, QuoteNotValid) as exc:
+            raise ValueError(f"quote unavailable: {exc}") from exc
+        except PriceNotQuoted as exc:
+            raise ValueError(str(exc)) from exc
         # Memory profile drains inline; postgres profile no-ops here and the worker
         # drains the queues asynchronously, so this call returns before delivery.
         ctx.container.drain()

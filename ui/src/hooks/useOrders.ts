@@ -6,7 +6,9 @@ import {
   ORDERS_QUERY,
   ORDER_QUERY,
   PLACE_ORDER_MUTATION,
+  QUOTES_QUERY,
   type OrderLineInput,
+  type Quote,
   type ResellerOrder,
 } from "../api/queries/orders";
 import { useAuth } from "../auth/AuthContext";
@@ -39,12 +41,21 @@ export function useOrder(orderId: string) {
   });
 }
 
+export function useQuotes() {
+  const { idToken, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ["quotes"],
+    queryFn: () => graphqlRequest<{ quotes: Quote[] }>("reseller", QUOTES_QUERY, {}, idToken).then((d) => d.quotes),
+    enabled: isAuthenticated,
+  });
+}
+
 export function usePlaceOrder() {
   const { idToken } = useAuth();
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { ref: string; lines: OrderLineInput[] }) =>
+    mutationFn: (input: { quoteId: string; ref: string; lines: OrderLineInput[] }) =>
       graphqlRequest("reseller", PLACE_ORDER_MUTATION, input, idToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });

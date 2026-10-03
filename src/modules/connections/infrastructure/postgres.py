@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, MetaData, String, Table, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,8 +21,7 @@ erp_connections_table = Table(
     Column("erp_type", String, nullable=False),
     Column("instance_label", String, nullable=False),
     Column("base_url", String, nullable=False),
-    Column("database", String, nullable=False),
-    Column("username", String, nullable=False),
+    Column("credentials", JSONB, nullable=False, server_default="{}"),
     Column("secret_ref", String, nullable=False),
     Column("status", String, nullable=False),
     Column("webhook_secret_ref", String),
@@ -34,8 +34,7 @@ def _to_model(row: Row) -> ErpConnection:
         erp_type=ErpType(row.erp_type),
         instance_label=row.instance_label,
         base_url=row.base_url,
-        database=row.database,
-        username=row.username,
+        credentials=dict(row.credentials or {}),
         secret_ref=row.secret_ref,
         status=ConnectionStatus(row.status),
         webhook_secret_ref=row.webhook_secret_ref,
@@ -54,8 +53,7 @@ class PostgresConnectionRepository:
             "erp_type": connection.erp_type.value,
             "instance_label": connection.instance_label,
             "base_url": connection.base_url,
-            "database": connection.database,
-            "username": connection.username,
+            "credentials": dict(connection.credentials),
             "secret_ref": connection.secret_ref,
             "status": connection.status.value,
             "webhook_secret_ref": connection.webhook_secret_ref,

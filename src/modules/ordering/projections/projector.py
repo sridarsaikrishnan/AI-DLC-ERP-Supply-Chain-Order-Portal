@@ -4,6 +4,7 @@ consumer), and feeds the reverse-routing locator when an order gets its ERP id.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Protocol
 
 from src.shared.eventsourcing import StoredEvent
@@ -11,7 +12,7 @@ from src.shared.types import ConnectionId, OrderId
 
 from ..domain.calculations import line_total
 from ..domain.models import OrderLine, OrderState
-from .read_models import OrderLineView
+from .read_models import OrderLineView, Parties
 from .store import OrderProjectionStore
 
 
@@ -23,14 +24,14 @@ class LocatorSink(Protocol):
 
 _STATE_EVENTS: dict[str, OrderState] = {
     "OrderValidated": OrderState.VALIDATED,
-    "OrderReadyForDelivery": OrderState.READY_FOR_DELIVERY,
+    "OrderReadyForDelivery": OrderState.ACCEPTED,  # renamed state, same persisted event (Q2=A)
     "OrderSentToErp": OrderState.SENT_TO_ERP,
     "OrderConfirmed": OrderState.CONFIRMED,
-    "OrderFulfilled": OrderState.FULFILLED,
     "OrderClosed": OrderState.CLOSED,
     "OrderRejected": OrderState.REJECTED,
     "OrderRetrying": OrderState.RETRYING,
     "OrderCancelled": OrderState.CANCELLED,
+    # "OrderFulfilled" intentionally absent — FULFILLED left the lifecycle (FR-A6).
 }
 
 
@@ -50,6 +51,12 @@ class OrderProjector:
                 tenant_id=str(payload["tenant_id"]),
                 client_reference=str(payload["client_reference"]),
                 lines=[self._line_view(line) for line in payload.get("lines", [])],
+                parties=Parties(
+                    end_customer_name=str(payload.get("end_customer_name", "")),
+                    ship_to=str(payload.get("ship_to", "")),
+                    operating_company_id=str(payload.get("operating_company_id", "")),
+                    quote_id=str(payload.get("quote_id", "")),
+                ),
             )
             self._store.set_state(order_id, OrderState.SUBMITTED, at)
             return
@@ -66,6 +73,23 @@ class OrderProjector:
                     ConnectionId(operator.owning_connection_id), erp_order_id, OrderId(order_id)
                 )
 
+        if event.event_type == "OrderLineFulfilled":
+            key = str(payload.get("line_id") or payload.get("product_key") or "")
+            self._store.record_fulfillment(
+                order_id, key, float(Decimal(str(payload["quantity"]))),
+                payload.get("carrier"), payload.get("proof_of_delivery"),
+            )
+            return
+
+        if event.event_type == "OrderLineInvoiced":
+            key = str(payload.get("line_id") or payload.get("product_key") or "")
+            self._store.record_invoice(order_id, key, float(Decimal(str(payload["quantity"]))))
+            return
+
+        if event.event_type == "OrderLineVendorDateSet":
+            self._store.set_scheduled_date(order_id, str(payload["line_id"]), str(payload["vendor_date"]))
+            return
+
         state = _STATE_EVENTS.get(event.event_type)
         if state is not None:
             self._store.set_state(order_id, state, at)
@@ -77,6 +101,10 @@ class OrderProjector:
             product_key=order_line.product_key,
             quantity=float(order_line.quantity),
             unit_of_measure=order_line.unit_of_measure,
+            line_id=order_line.line_id,
+            kind=order_line.kind,
             unit_price=order_line.unit_price,
             line_total=line_total(order_line),
+            tax_rates=order_line.tax_rates,
+            line_discount=order_line.line_discount,
         )

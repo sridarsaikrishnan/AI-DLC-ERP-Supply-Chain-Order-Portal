@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -12,6 +13,17 @@ from sqlalchemy.orm import Session, sessionmaker
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
+
+# Ambient session for a unit of work (FR-A4). Thread-local because the worker runs each
+# message handler on its own thread, and a request/handler is single-threaded within it.
+_active = threading.local()
+
+
+def current_session() -> Session | None:
+    """The session of the enclosing `PostgresUnitOfWork.atomic()`, or None. Store adapters
+    join it (and skip their own commit) when it's set, so several appends share one
+    transaction."""
+    return getattr(_active, "session", None)
 
 
 def database_url() -> str:
@@ -50,3 +62,29 @@ def session_scope() -> Iterator[Session]:
 def bind_tenant(session: Session, tenant_id: str) -> None:
     """Set the RLS tenant for the current transaction (SECURITY-08 defense in depth)."""
     session.execute(text("SET LOCAL app.tenant_id = :tenant"), {"tenant": tenant_id})
+
+
+class PostgresUnitOfWork:
+    """Runs the body of `atomic()` against one shared session, committed once at the end
+    (FR-A4). Store adapters that call `current_session()` join it. Reentrant: a nested
+    `atomic()` joins the outer transaction rather than starting a second one."""
+
+    def __init__(self, session_factory: sessionmaker[Session] | None = None) -> None:
+        self._session_factory = session_factory or get_session_factory()
+
+    @contextmanager
+    def atomic(self) -> Iterator[None]:
+        if current_session() is not None:
+            yield  # already inside a unit of work — join it, don't nest a transaction
+            return
+        session = self._session_factory()
+        _active.session = session
+        try:
+            yield
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            _active.session = None
+            session.close()

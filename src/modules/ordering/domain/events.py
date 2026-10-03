@@ -1,6 +1,8 @@
 """Order domain events (event-sourced facts). Payloads are primitive/serializable.
 
-Registered with the kernel so `StoredEvent` payloads rehydrate on replay.
+Registered with the kernel so `StoredEvent` payloads rehydrate on replay. New fields added
+in Increment 5 carry defaults so events stored before the increment still deserialize
+(`event_from_stored` does `cls(**payload)` — a pre-increment payload simply omits them).
 """
 
 from __future__ import annotations
@@ -19,6 +21,12 @@ class OrderSubmitted(DomainEvent):
     client_reference: str
     lines: list[dict[str, Any]]
     product_keys: list[str]
+    # Increment 5 (FR-B2/FR-C): the order is a reply to a quote and names its parties.
+    # Reseller-safe — no ERP identity here (FR-19).
+    quote_id: str = ""
+    operating_company_id: str = ""
+    end_customer_name: str = ""
+    ship_to: str = ""
 
 
 @register_event
@@ -31,6 +39,10 @@ class OrderValidated(DomainEvent):
 @register_event
 @dataclass(frozen=True, kw_only=True)
 class OrderReadyForDelivery(DomainEvent):
+    """Historical event type name kept unchanged (Q2=A) even though the state it drives
+    was renamed `READY_FOR_DELIVERY` -> `ACCEPTED` — renaming a persisted event type would
+    mean rewriting stored history. It means "routed, ready to send to the ERP"."""
+
     order_id: str
     owning_connection_id: str
 
@@ -67,6 +79,10 @@ class OrderConfirmed(DomainEvent):
 @register_event
 @dataclass(frozen=True, kw_only=True)
 class OrderFulfilled(DomainEvent):
+    """Retained for replay of pre-Increment-5 history ONLY — nothing emits it anymore
+    (FULFILLED left the lifecycle, FR-A6). Its apply is a no-op; fulfillment is tracked by
+    `OrderLineFulfilled` quantities now."""
+
     order_id: str
 
 
@@ -81,3 +97,42 @@ class OrderClosed(DomainEvent):
 class OrderCancelled(DomainEvent):
     order_id: str
     reason: str
+
+
+@register_event
+@dataclass(frozen=True, kw_only=True)
+class OrderLineFulfilled(DomainEvent):
+    """A `Fulfillment` record reported shipping `quantity` of a line. Additive. Increment
+    5: keyed on `line_id` (FR-A3) and carries the delivery evidence (`carrier`/
+    `proof_of_delivery`) so the order can derive the delivered fact (FR-D2). `product_key`
+    is retained (default "") so pre-increment events — which had only `product_key` — still
+    deserialize; `line_id` falls back to it on replay."""
+
+    order_id: str
+    quantity: str  # str(Decimal) — JSON-safe
+    line_id: str = ""
+    product_key: str = ""
+    carrier: str | None = None
+    proof_of_delivery: str | None = None
+
+
+@register_event
+@dataclass(frozen=True, kw_only=True)
+class OrderLineInvoiced(DomainEvent):
+    """Same shape/reasoning as `OrderLineFulfilled`, for invoicing."""
+
+    order_id: str
+    quantity: str
+    line_id: str = ""
+    product_key: str = ""
+
+
+@register_event
+@dataclass(frozen=True, kw_only=True)
+class OrderLineVendorDateSet(DomainEvent):
+    """Purchasing bought the line from the maker and recorded the vendor date — that date
+    is what "scheduled" means (Increment 5, FR-E1). No Vendor Order document yet (FR-E2)."""
+
+    order_id: str
+    line_id: str
+    vendor_date: str  # ISO date

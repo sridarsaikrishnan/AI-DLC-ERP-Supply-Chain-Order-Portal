@@ -6,16 +6,19 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
 ## The four touch points
 
 1. **Status mapping** — `src/modules/integration/domain/status_mapping.py`. Write one
-   pure function `(native_status: str, invoice_status: str) -> CanonicalStatus | None`
-   (inputs already lowercased/stripped) and add one line to `STATUS_MAPPERS`:
+   pure function `(fields: dict[str, str]) -> CanonicalStatus | None` reading whatever
+   keys *this* ERP's status actually arrives in (inputs already lowercased/stripped) and
+   add one line to `STATUS_MAPPERS`. The signature is a field bag, not a fixed arity —
+   ERPNext reports status as a single combined string, so its mapper reads one key, where
+   Odoo's reads two (`state` + `invoice_status`):
    ```python
-   def _map_erpnext(native: str, invoice: str) -> CanonicalStatus | None:
+   def _map_erpnext(fields: dict[str, str]) -> CanonicalStatus | None:
        return {
            "to deliver and bill": CanonicalStatus.CONFIRMED,
            "completed": CanonicalStatus.FULFILLED,
            "closed": CanonicalStatus.CLOSED,
            "cancelled": CanonicalStatus.CANCELLED,
-       }.get(native)
+       }.get(fields.get("status", ""))
 
    STATUS_MAPPERS: dict[str, StatusMapper] = {
        "ODOO": _map_odoo,
@@ -25,12 +28,19 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
 
 2. **Adapter** — new `src/modules/integration/infrastructure/<erp>_adapter.py`
    implementing the `ErpAdapter` protocol (`submit` / `fetch_status` / `cancel`) from
-   `integration/application/ports.py`. Follow `odoo_adapter.py`'s shape: stdlib-only HTTP
-   (no new dependency for a simple REST/RPC client), explicit timeouts, and classify
-   every failure as `terminal=True` (don't retry — e.g. validation errors, 4xx) or
-   `terminal=False` (do retry — timeouts, 5xx, connection errors). Keep any pure
-   payload-building logic (like `build_sale_order_lines`) as a free function so it's
-   unit-testable without a live server.
+   `integration/application/ports.py`. `fetch_status` returns `dict[str, str] | None` —
+   the same field bag the status mapper reads, so return whatever fields your status
+   mapper needs (Odoo's returns `{"state": ..., "invoice_status": ...}`). Follow
+   `odoo_adapter.py`'s shape: stdlib-only HTTP (no new dependency for a simple REST/RPC
+   client), explicit timeouts, and classify every failure as `terminal=True` (don't retry
+   — e.g. validation errors, 4xx) or `terminal=False` (do retry — timeouts, 5xx,
+   connection errors). Keep any pure payload-building logic (like
+   `build_sale_order_lines`) as a free function so it's unit-testable without a live
+   server — see `test_odoo_adapter.py` for the pattern (mock `_authenticate`/`_execute`,
+   not a live Odoo). Two things worth copying from Odoo's adapter, not reinventing per
+   ERP: an idempotency check before creating anything (search for an existing record by
+   your own reference first), and failing closed on an unresolvable reference (don't
+   silently auto-create a phantom record in the ERP for a typo'd SKU/ID).
 
 3. **Registration** — one line in `src/modules/integration/infrastructure/registry.py`'s
    `build_adapter_registry`:

@@ -11,16 +11,16 @@ from src.shared.types import ConnectionId, OrderId, TenantId
 def _sent_order(repo: EventSourcedRepository[Order]) -> OrderId:
     order = Order.submit(
         order_id=OrderId("ord_1"), tenant_id=TenantId("t"), client_reference="r",
-        lines=[OrderLine("ANVIL", 1, "EA")],
+        lines=[OrderLine(product_key="ANVIL", quantity=1, unit_of_measure="EA", line_id="l_a")],
     )
     order.validate(ConnectionId("conn_1"))
-    order.mark_ready_for_delivery()
+    order.accept()
     order.send_to_erp("S1")
     repo.save(order)
     return OrderId("ord_1")
 
 
-def test_confirmed_then_fulfilled() -> None:
+def test_confirmed_then_closed() -> None:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(InMemoryEventStore(), Order)
     order_id = _sent_order(repo)
     applier = StatusApplier(repo)
@@ -28,25 +28,25 @@ def test_confirmed_then_fulfilled() -> None:
     applier.apply_status(order_id, CanonicalStatus.CONFIRMED)
     assert repo.get(order_id).state is OrderState.CONFIRMED
 
-    applier.apply_status(order_id, CanonicalStatus.FULFILLED)
-    assert repo.get(order_id).state is OrderState.FULFILLED
+    applier.apply_status(order_id, CanonicalStatus.CLOSED)
+    assert repo.get(order_id).state is OrderState.CLOSED
 
 
-def test_fulfilled_from_sent_advances_through_confirmed() -> None:
+def test_closed_from_sent_advances_through_confirmed() -> None:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(InMemoryEventStore(), Order)
     order_id = _sent_order(repo)
-    StatusApplier(repo).apply_status(order_id, CanonicalStatus.FULFILLED)
-    assert repo.get(order_id).state is OrderState.FULFILLED
+    StatusApplier(repo).apply_status(order_id, CanonicalStatus.CLOSED)
+    assert repo.get(order_id).state is OrderState.CLOSED
 
 
 def test_stale_update_is_ignored() -> None:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(InMemoryEventStore(), Order)
     order_id = _sent_order(repo)
     applier = StatusApplier(repo)
-    applier.apply_status(order_id, CanonicalStatus.FULFILLED)
-    # a late "confirmed" webhook must not move the order backwards
+    applier.apply_status(order_id, CanonicalStatus.CLOSED)
+    # a late "confirmed" webhook must not move the order backwards (CLOSED is terminal)
     applier.apply_status(order_id, CanonicalStatus.CONFIRMED)
-    assert repo.get(order_id).state is OrderState.FULFILLED
+    assert repo.get(order_id).state is OrderState.CLOSED
 
 
 def test_cancel_from_erp() -> None:

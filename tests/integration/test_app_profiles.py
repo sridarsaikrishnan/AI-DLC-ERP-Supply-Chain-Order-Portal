@@ -54,8 +54,7 @@ def _seed(container, tenant: str, connection: str, sku: str) -> None:
             erp_type=ErpType.ODOO,
             instance_label="Smoke Odoo",
             base_url="http://odoo:8069",
-            database="odoo",
-            username="admin",
+            credentials={"database": "odoo", "username": "admin"},
             secret_ref="env:SMOKE_ODOO_SECRET",
         )
     )

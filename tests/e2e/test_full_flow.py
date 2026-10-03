@@ -13,6 +13,9 @@ handler, status applier and webhook ingress are the real implementations.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+from decimal import Decimal
+
 from src.modules.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.integration.application.delivery import DeliveryHandler
 from src.modules.integration.application.ports import ErpTarget
@@ -22,12 +25,17 @@ from src.modules.ordering.application.adapters import (
     OrderReaderAdapter,
     StatusApplier,
 )
-from src.modules.ordering.application.order_service import OrderService
+from src.modules.ordering.application.order_service import OrderLineInput, OrderService
 from src.modules.ordering.application.processing import OrderProcessor
 from src.modules.ordering.domain.aggregate import Order
-from src.modules.ordering.domain.models import OrderLine
 from src.modules.ordering.projections.projector import OrderProjector
 from src.modules.ordering.projections.store import OrderProjectionStore
+from src.modules.quoting.application.service import QuoteService
+from src.modules.quoting.domain.models import EndCustomer, QuoteLine
+from src.modules.quoting.infrastructure.memory import (
+    InMemoryOperatingCompanyRepository,
+    InMemoryQuoteRepository,
+)
 from src.modules.webhooks_inbound.application.ingress import (
     InboundWebhook,
     InboundWebhookService,
@@ -40,6 +48,7 @@ from src.modules.webhooks_inbound.infrastructure.memory import (
 )
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.messaging import InMemoryMessageBus
+from src.shared.money import Money
 from src.shared.types import ConnectionId, TenantId
 
 _TENANT = TenantId("tnt_demo")
@@ -61,7 +70,7 @@ class FakeConnections:
     def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
         if str(connection_id) != _CONN:
             return None
-        return ErpTarget(erp_type="ODOO", base_url="http://odoo", database="odoo", username="admin", secret="x")
+        return ErpTarget(erp_type="ODOO", base_url="http://odoo", credentials={"database": "odoo", "username": "admin"}, secret="x")
 
 
 class FakeSecrets:
@@ -90,11 +99,26 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
     bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
     bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
 
-    # --- place an order and drain the pipeline ---
-    order_id = OrderService(repo, InMemoryItemRepository()).place_order(
+    # --- a quote the reseller replies to ---
+    quotes = InMemoryQuoteRepository()
+    quote_service = QuoteService(quotes, InMemoryOperatingCompanyRepository())
+    company = quote_service.create_operating_company(name="Dist", country="US", language="en")
+    quote = quote_service.issue_quote(
         tenant_id=_TENANT,
+        operating_company_id=company.operating_company_id,
+        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
+        currency="USD",
+        valid_from=date.today() - timedelta(days=1),
+        valid_until=date.today() + timedelta(days=30),
+        lines=[QuoteLine(product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA")],
+    )
+
+    # --- place an order and drain the pipeline ---
+    order_id = OrderService(repo, quotes, InMemoryItemRepository(), quote_service).place_order(
+        tenant_id=_TENANT,
+        quote_id=quote.quote_id,
         client_reference="PO-1001",
-        lines=[OrderLine(product_key="ANVIL", quantity=3, unit_of_measure="EA")],
+        lines=[OrderLineInput("ANVIL", Decimal(3))],
     )
     bus.run_until_empty()
 
@@ -119,7 +143,7 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
             connection_id=ConnectionId(_CONN),
             erp_type="ODOO",
             erp_order_id=erp_order_id,
-            native_status="sale",
+            native_fields={"state": "sale"},
             event_ref="evt-1",
             raw_body=body,
             signature=compute_signature(_SECRET, body),

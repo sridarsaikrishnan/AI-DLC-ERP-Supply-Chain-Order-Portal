@@ -71,6 +71,8 @@ branch = true
 # --- architecture boundaries (enforced): domain never imports infra/hosts ---
 [tool.importlinter]
 root_package = "src"
+# Required because the "framework-free" contract forbids external packages (boto3/fastapi/strawberry).
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Layered architecture (shared <- modules <- api/worker)"

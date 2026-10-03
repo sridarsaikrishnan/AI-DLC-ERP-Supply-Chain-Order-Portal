@@ -46,10 +46,30 @@ labeled accordingly:
 | `item_id` | Unique ID | System | `item_anvil` |
 | `sku` / `product_key` | Product code | System (operator, from catalog) | `ANVIL-100` |
 | `owning_connection_id` | Which ERP instance owns this SKU | System (operator decision) | `conn_odoo_eu` |
-| `unit_price` | What this SKU costs | System (operator enters) | `19.99` |
-| `currency` | Paired with `unit_price` | System (operator enters) | `USD` |
+| `kind` | `PHYSICAL` (a box) or `LICENSE` — drives the delivered fact (FR-D2) | System (operator enters) | `PHYSICAL` |
 
-One SKU → one connection, enforced in code. This is where "which ERP" for a product gets decided — ahead of time, not from the order. It's also the price source (ADR-0011) — nullable, since not every item has a price set yet.
+One SKU → one connection, enforced in code. This is where "which ERP" for a product gets decided — ahead of time, not from the order. **Price is no longer here (Increment 5, ADR-0016):** the catalog says only *what the product is*; price lives on the quote (below).
+
+### DB table: `operating_companies` — the "office card" (Increment 5, FR-C3)
+
+| Field | Meaning | Provided by | Example |
+|---|---|---|---|
+| `operating_company_id` | Unique ID | System | `oc_eu` |
+| `name` | The company you are | System (operator enters) | `Acme Distribution EU` |
+| `country` | So document numbers have a home | System (operator enters) | `DE` |
+| `language` | So emails have a locale | System (operator enters) | `de` |
+
+### DB table: `quotes` — the price list a reseller orders against (Increment 5, FR-B)
+
+| Field | Meaning | Provided by | Example |
+|---|---|---|---|
+| `quote_id` | Unique ID | System | `qot_55` |
+| `tenant_id` | Which reseller the quote is for | System (operator enters) | `tnt_acme` |
+| `operating_company_id` | Which office issued it | System | `oc_eu` |
+| `end_customer_name` / `ship_to` | Who the goods are for, and where | System (operator enters) | `Downstream GmbH` / `Berlin` |
+| `valid_from` / `valid_until` | How long the prices hold | System (operator enters) | `2026-01-01` … `2026-12-31` |
+| `status` | `DRAFT` / `ISSUED` / `EXPIRED` / `ACCEPTED` | System | `ISSUED` |
+| `lines[]` | Priced lines: `product_key`, `unit_price`, UoM, tax, discount | System (operator enters) | `[{ANVIL-100, 19.99 USD, EA}]` |
 
 ---
 
@@ -59,20 +79,25 @@ One SKU → one connection, enforced in code. This is where "which ERP" for a pr
 
 | Field | Meaning | Provided by | Example |
 |---|---|---|---|
+| `quote_id` | The quote this order replies to (Increment 5, FR-B2) | Reseller (picks a quote) | `qot_55` |
 | `client_reference` | Reseller's own order number | Reseller | `PO-2024-1182` |
 | `lines[].product_key` | SKU ordered | Reseller | `ANVIL-100` |
 | `lines[].quantity` | Qty ordered | Reseller | `2` |
-| `lines[].unit_of_measure` | Unit | Reseller | `EA` |
 
-### Code mapping: price resolution (`OrderService._priced` — no table, just a catalog lookup, see ADR-0011)
+No price and no unit of measure in the reseller's input — both come from the quote.
 
-Runs *before* the event below is even created. For each line, looks up `product_key`
-against the `items` table from Setup; if that item has a price, stamps it onto the line.
-The reseller's input above never carries a price — this is the only place one gets added.
+### Code mapping: price resolution from the quote (`OrderService._line_from_quote` — no table, see ADR-0016)
+
+Runs *before* the event below is created. For each line it finds the matching priced line
+on `quote_id`; the price, UoM, tax and discount are copied from the quote, and the line's
+`kind` is copied from the `items` catalog. A line with no matching quote line, or a quote
+that is missing / not ISSUED / out of its validity window, is **refused** (FR-B3).
 
 | Field | Meaning | Provided by | Example |
 |---|---|---|---|
-| `lines[].unit_price` | Resolved from `items.unit_price` | System (catalog lookup) | `{"amount": "19.99", "currency": "USD"}` |
+| `lines[].unit_price` | From the quote line | System (quote lookup) | `{"amount": "19.99", "currency": "USD"}` |
+| `lines[].line_id` | Each line's own id (FR-A3) | System (generated) | `ol_3f2a` |
+| `lines[].kind` | From `items.kind` | System (catalog lookup) | `PHYSICAL` |
 
 ### DB table: `events` — the fact gets recorded (append-only)
 
@@ -86,7 +111,7 @@ The reseller's input above never carries a price — this is the only place one 
 
 | Field | Meaning | Provided by | Example |
 |---|---|---|---|
-| `state` | Lifecycle stage | System | `SUBMITTED` → `VALIDATED` → `READY_FOR_DELIVERY` |
+| `state` | Lifecycle stage | System | `SUBMITTED` → `VALIDATED` → `ACCEPTED` (was `READY_FOR_DELIVERY`, FR-A6) |
 | `owning_connection_id` | Routing result | System (looked up, see below) | `conn_odoo_eu` |
 | `erp_order_id` | ERP's own order number | ERP (filled in once sent) | *(null until Step 5)* |
 | `lines[].line_total` | `quantity * unit_price`, computed at projection time | System (`calculations.line_total`) | `39.98` |
@@ -101,11 +126,13 @@ against the `items` table above; all lines must agree on `owning_connection_id`
 
 | Canonical field | Provided by | Odoo field | Example |
 |---|---|---|---|
-| `client_reference` | Reseller | `sale.order.client_order_ref` | `PO-2024-1182` |
-| `client_reference` | Reseller | `res.partner.name` | `PO-2024-1182` |
+| `order_id` (platform id, the idempotency key — FR-A2) | System | `sale.order.client_order_ref` | `ord_8f3c1a90` |
+| `erp_customer_id` from the binding (FR-A1) | ERP (their customer record) | `sale.order.partner_id` | `CUST-9` (used directly; no name-based auto-create) |
 | `lines[].product_key` | Reseller (value) + System (lookup) | `product.product.default_code` | `ANVIL-100` |
 | `lines[].quantity` | Reseller | `sale.order.line.product_uom_qty` | `2` |
-| *(price, currency, UoM)* | — | *(not mapped — known gap)* | `unit_price` now exists on the canonical line (ADR-0011) but `OdooAdapter.submit` still doesn't send it — that's the next adapter-side step, not yet built |
+| `lines[].unit_price` net of `line_discount` | System (catalog, ADR-0011/0013) | `sale.order.line.price_unit` | `17.99` (19.99 − 2.00) |
+| `lines[].unit_of_measure` | Reseller | `sale.order.line.product_uom` | looked up by name in Odoo's `uom.uom`; omitted (Odoo default used) if no match |
+| `lines[].tax_rates[].code` | System (catalog, ADR-0013) | `sale.order.line.tax_id` | looked up by name in Odoo's `account.tax`; omitted (no tax applied) if no match |
 
 ### DB table: `orders` — updated after Odoo accepts the order
 
@@ -140,9 +167,17 @@ This `(owning_connection_id, erp_order_id)` pair is the key Direction 2 uses to 
 | ERP `state` | ERP `invoice_status` | Canonical status | Provided by |
 |---|---|---|---|
 | `sale` | not `invoiced` | `CONFIRMED` | ERP gives inputs; System maps |
-| `done` | not `invoiced` | `FULFILLED` | ERP gives inputs; System maps |
+| `done` | not `invoiced` | `CONFIRMED` | ERP gives inputs; System maps (Increment 5: `done` no longer means `FULFILLED` — delivery is a fact, not a lifecycle status, FR-A6) |
 | any | `invoiced` | `CLOSED` | ERP gives inputs; System maps |
 | `cancel` | any | `CANCELLED` | ERP gives inputs; System maps |
+
+**Shipped and delivered are separate facts (Increment 5, FR-D).** They are not driven by
+the ERP status poll above; an operator records a shipment (`recordFulfillment` with an
+optional carrier / proof-of-delivery), and the order derives, per line: shipped (the
+fulfillment "score"), delivered (a box needs a carrier or POD; a license is delivered on
+ship), and invoiced. The reseller order shows `fulfillmentStatus`, `deliveryStatus` and
+`invoiceStatus` alongside the lifecycle status. A per-line vendor date set by purchasing
+is what "scheduled" means (FR-E1); a standalone Vendor Order document is deferred (FR-E2).
 
 ### Wire payload: outbound webhook POST body — sent to reseller (not a table — the raw HTTP body we send; `WebhookDispatchService._build_body`)
 

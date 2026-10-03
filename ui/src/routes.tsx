@@ -6,9 +6,12 @@ import { LoginPage } from "./features/auth/LoginPage";
 import { OrdersListPage } from "./features/orders/OrdersListPage";
 import { OrderDetailPage } from "./features/orders/OrderDetailPage";
 import { NewOrderPage } from "./features/orders/NewOrderPage";
+import { QuotesPage } from "./features/quotes/QuotesPage";
 import { ConnectionsPage } from "./features/admin/ConnectionsPage";
 import { TenantsPage } from "./features/admin/TenantsPage";
 import { ItemsPage } from "./features/admin/ItemsPage";
+import { OperatingCompaniesPage } from "./features/admin/OperatingCompaniesPage";
+import { QuotesPage as OperatorQuotesPage } from "./features/admin/QuotesPage";
 import { OrdersPage as OperatorOrdersPage } from "./features/admin/OrdersPage";
 import { OrderDetailPage as OperatorOrderDetailPage } from "./features/admin/OrderDetailPage";
 import { FailedMessagesPage } from "./features/admin/FailedMessagesPage";
@@ -42,10 +45,13 @@ export const router = createBrowserRouter([
       { path: "orders/new", element: <NewOrderPage /> },
       { path: "orders/:orderId", element: <OrderDetailPage /> },
       { path: "orders/:orderId/events", element: <OrderEventsPage /> },
+      { path: "quotes", element: <QuotesPage /> },
       { path: "delivery-log", element: <DeliveryLogPage /> },
       { path: "webhook-endpoints", element: <WebhookEndpointsPage /> },
       { path: "admin/orders", element: <OperatorOrdersPage /> },
       { path: "admin/orders/:orderId", element: <OperatorOrderDetailPage /> },
+      { path: "admin/quotes", element: <OperatorQuotesPage /> },
+      { path: "admin/operating-companies", element: <OperatingCompaniesPage /> },
       { path: "admin/connections", element: <ConnectionsPage /> },
       { path: "admin/tenants", element: <TenantsPage /> },
       { path: "admin/items", element: <ItemsPage /> },

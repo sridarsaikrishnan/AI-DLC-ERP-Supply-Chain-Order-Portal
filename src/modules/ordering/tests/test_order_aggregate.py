@@ -6,14 +6,26 @@ import pytest
 
 from src.modules.ordering.domain.aggregate import Order
 from src.modules.ordering.domain.errors import OrderInvalidTransition
-from src.modules.ordering.domain.models import OrderLine, OrderState
+from src.modules.ordering.domain.models import (
+    KIND_LICENSE,
+    KIND_PHYSICAL,
+    DeliveryStatus,
+    FulfillmentStatus,
+    InvoiceStatus,
+    OrderLine,
+    OrderState,
+)
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.money import Money, TaxRate
 from src.shared.types import ConnectionId, OrderId, TenantId
 
 
+def _line(product_key: str, qty, line_id: str, kind: str = KIND_PHYSICAL) -> OrderLine:
+    return OrderLine(product_key=product_key, quantity=qty, unit_of_measure="EA", line_id=line_id, kind=kind)
+
+
 def _lines() -> list[OrderLine]:
-    return [OrderLine(product_key="ANVIL", quantity=2, unit_of_measure="EA")]
+    return [_line("ANVIL", 2, "l_anvil")]
 
 
 def _order() -> Order:
@@ -22,6 +34,10 @@ def _order() -> Order:
         tenant_id=TenantId("tnt_a"),
         client_reference="PO-1",
         lines=_lines(),
+        quote_id="qot_1",
+        operating_company_id="oc_1",
+        end_customer_name="Acme Downstream",
+        ship_to="1 Main St",
     )
 
 
@@ -29,29 +45,33 @@ def test_submit_sets_state_and_derives_product_keys() -> None:
     order = _order()
     assert order.state is OrderState.SUBMITTED
     assert order.product_keys == ["ANVIL"]
+    assert order.quote_id == "qot_1"
+    assert order.end_customer_name == "Acme Downstream"
     assert order.has_pending
 
 
-def test_submit_rejects_empty_or_nonpositive_lines() -> None:
+def test_submit_rejects_empty_or_nonpositive_or_idless_lines() -> None:
     with pytest.raises(ValueError):
         Order.submit(order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r", lines=[])
     with pytest.raises(ValueError):
         Order.submit(
-            order_id=OrderId("o"),
-            tenant_id=TenantId("t"),
-            client_reference="r",
-            lines=[OrderLine(product_key="X", quantity=0, unit_of_measure="EA")],
+            order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r",
+            lines=[_line("X", 0, "l_x")],
+        )
+    with pytest.raises(ValueError):
+        Order.submit(
+            order_id=OrderId("o"), tenant_id=TenantId("t"), client_reference="r",
+            lines=[OrderLine(product_key="X", quantity=1, unit_of_measure="EA", line_id="")],
         )
 
 
 def test_happy_path_lifecycle() -> None:
     order = _order()
     order.validate(ConnectionId("conn_1"))
-    order.mark_ready_for_delivery()
+    order.accept()
     order.send_to_erp("S00001")
     order.confirm()
-    order.fulfill()
-    order.close()
+    order.close()  # CONFIRMED -> CLOSED directly; no FULFILLED lifecycle step anymore
     assert order.state is OrderState.CLOSED
     assert order.owning_connection_id == ConnectionId("conn_1")
     assert order.erp_order_id == "S00001"
@@ -66,7 +86,7 @@ def test_invalid_transition_raises() -> None:
 def test_confirm_is_idempotent() -> None:
     order = _order()
     order.validate(ConnectionId("conn_1"))
-    order.mark_ready_for_delivery()
+    order.accept()
     order.send_to_erp("S1")
     order.confirm()
     order.collect_events()
@@ -74,13 +94,13 @@ def test_confirm_is_idempotent() -> None:
     assert order.collect_events() == []
 
 
-def test_cannot_cancel_fulfilled_order() -> None:
+def test_cannot_cancel_closed_order() -> None:
     order = _order()
     order.validate(ConnectionId("conn_1"))
-    order.mark_ready_for_delivery()
+    order.accept()
     order.send_to_erp("S1")
     order.confirm()
-    order.fulfill()
+    order.close()
     with pytest.raises(OrderInvalidTransition):
         order.cancel("changed mind")
 
@@ -90,27 +110,36 @@ def test_event_sourced_round_trip_via_repository() -> None:
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = _order()
     order.validate(ConnectionId("conn_1"))
-    order.mark_ready_for_delivery()
+    order.accept()
     repo.save(order)
 
     reloaded = repo.get("ord_1")
-    assert reloaded.state is OrderState.READY_FOR_DELIVERY
+    assert reloaded.state is OrderState.ACCEPTED  # formerly READY_FOR_DELIVERY
     assert reloaded.owning_connection_id == ConnectionId("conn_1")
     assert reloaded.client_reference == "PO-1"
     assert reloaded.version == order.version
 
 
+def test_legacy_ready_for_delivery_snapshot_restores_as_accepted() -> None:
+    # A pre-Increment-5 snapshot carried the state value "READY_FOR_DELIVERY" — it must
+    # restore as the renamed ACCEPTED, not blow up (Q2=A backward-compat).
+    order = Order("ord_legacy")
+    order.restore(
+        {
+            "tenant_id": "tnt_a", "client_reference": "PO", "lines": [], "product_keys": [],
+            "state": "READY_FOR_DELIVERY", "owning_connection_id": "conn_1", "erp_order_id": None,
+            "retry_attempt": 0,
+        }
+    )
+    assert order.state is OrderState.ACCEPTED
+
+
 def test_quantity_is_decimal_and_survives_event_replay_exactly() -> None:
-    # The bug this guards against: a float round-trip through JSON can perturb a value
-    # like 2.1 (binary float can't represent it exactly). Decimal, serialized as str in
-    # the event payload (aggregate.py), must come back bit-for-bit identical.
     store = InMemoryEventStore()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = Order.submit(
-        order_id=OrderId("ord_2"),
-        tenant_id=TenantId("tnt_a"),
-        client_reference="PO-2",
-        lines=[OrderLine(product_key="ANVIL", quantity=Decimal("2.1"), unit_of_measure="EA")],
+        order_id=OrderId("ord_2"), tenant_id=TenantId("tnt_a"), client_reference="PO-2",
+        lines=[_line("ANVIL", Decimal("2.1"), "l_a")],
     )
     assert isinstance(order.lines[0].quantity, Decimal)
     repo.save(order)
@@ -121,20 +150,13 @@ def test_quantity_is_decimal_and_survives_event_replay_exactly() -> None:
 
 
 def test_priced_line_survives_event_replay_exactly() -> None:
-    # Phase 2: unit_price/line_discount/tax_rates must round-trip through the JSONB-safe
-    # payload (money_to_payload/from_payload, tax_rate_to_payload/from_payload) exactly
-    # as Decimal, same guard as Phase 1's quantity test but for the new nested fields.
     store = InMemoryEventStore()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = Order.submit(
-        order_id=OrderId("ord_3"),
-        tenant_id=TenantId("tnt_a"),
-        client_reference="PO-3",
+        order_id=OrderId("ord_3"), tenant_id=TenantId("tnt_a"), client_reference="PO-3",
         lines=[
             OrderLine(
-                product_key="ANVIL",
-                quantity=Decimal("2.5"),
-                unit_of_measure="EA",
+                product_key="ANVIL", quantity=Decimal("2.5"), unit_of_measure="EA", line_id="l_a",
                 unit_price=Money(Decimal("19.99"), "USD"),
                 line_discount=Money(Decimal("1.50"), "USD"),
                 tax_rates=[TaxRate("VAT", Decimal("0.20"), inclusive=False)],
@@ -143,8 +165,7 @@ def test_priced_line_survives_event_replay_exactly() -> None:
     )
     repo.save(order)
 
-    reloaded = repo.get("ord_3")
-    line = reloaded.lines[0]
+    line = repo.get("ord_3").lines[0]
     assert line.unit_price == Money(Decimal("19.99"), "USD")
     assert line.line_discount == Money(Decimal("1.50"), "USD")
     assert line.tax_rates == [TaxRate("VAT", Decimal("0.20"), inclusive=False)]
@@ -157,3 +178,94 @@ def test_snapshot_round_trip() -> None:
     repo.save(order)
     assert store.load_snapshot("ord_1") is not None
     assert repo.get("ord_1").state is OrderState.SUBMITTED
+
+
+def _confirmed_order_with_two_lines(anvil_kind: str = KIND_PHYSICAL) -> Order:
+    order = Order.submit(
+        order_id=OrderId("ord_pf"), tenant_id=TenantId("tnt_a"), client_reference="PO-PF",
+        lines=[_line("ANVIL", Decimal(10), "l_anvil", anvil_kind), _line("SPRING", Decimal(5), "l_spring")],
+    )
+    order.validate(ConnectionId("conn_1"))
+    order.accept()
+    order.send_to_erp("S001")
+    order.confirm()
+    return order
+
+
+def test_fulfillment_status_is_orthogonal_to_order_state() -> None:
+    order = _confirmed_order_with_two_lines()
+    assert order.fulfillment_status is FulfillmentStatus.UNFULFILLED
+    assert order.state is OrderState.CONFIRMED
+
+    order.record_fulfillment("l_anvil", Decimal(10))
+    assert order.fulfillment_status is FulfillmentStatus.PARTIALLY_FULFILLED  # SPRING not yet shipped
+    assert order.state is OrderState.CONFIRMED  # lifecycle untouched
+
+    order.record_fulfillment("l_spring", Decimal(5))
+    assert order.fulfillment_status is FulfillmentStatus.FULFILLED
+
+
+def test_fulfillment_is_additive_across_multiple_shipments() -> None:
+    order = _confirmed_order_with_two_lines()
+    order.record_fulfillment("l_anvil", Decimal(4))
+    order.record_fulfillment("l_anvil", Decimal(6))  # a second, partial shipment
+    assert order.shipped_qty_by_line["l_anvil"] == Decimal(10)
+    assert order.fulfillment_status is FulfillmentStatus.PARTIALLY_FULFILLED  # SPRING still open
+
+
+def test_shipped_and_delivered_are_different_facts_for_a_box() -> None:
+    # A physical line (box) ships but is NOT delivered until a carrier/POD is recorded (FR-D2/D3).
+    order = _confirmed_order_with_two_lines(anvil_kind=KIND_PHYSICAL)
+    order.record_fulfillment("l_anvil", Decimal(10))  # shipped, no carrier/POD
+    order.record_fulfillment("l_spring", Decimal(5))
+    assert order.fulfillment_status is FulfillmentStatus.FULFILLED  # shipped in full
+    assert order.delivery_status is DeliveryStatus.NOT_DELIVERED  # but not delivered
+
+    order.record_fulfillment("l_anvil", Decimal(0) + Decimal(10), carrier="DHL")  # now with a carrier
+    # SPRING (physical) still has no carrier -> partially delivered overall
+    assert order.delivery_status is DeliveryStatus.PARTIALLY_DELIVERED
+
+
+def test_a_license_is_delivered_on_ship() -> None:
+    order = _confirmed_order_with_two_lines(anvil_kind=KIND_LICENSE)
+    order.record_fulfillment("l_anvil", Decimal(10))  # license: delivered on ship, no carrier needed
+    assert order.delivered_qty_by_line["l_anvil"] == Decimal(10)
+
+
+def test_invoice_status_tracks_independently_of_fulfillment_status() -> None:
+    order = _confirmed_order_with_two_lines()
+    order.record_fulfillment("l_anvil", Decimal(10))
+    order.record_fulfillment("l_spring", Decimal(5))
+    assert order.fulfillment_status is FulfillmentStatus.FULFILLED
+    assert order.invoice_status is InvoiceStatus.NOT_INVOICED
+
+    order.record_invoice("l_anvil", Decimal(10))
+    assert order.invoice_status is InvoiceStatus.PARTIALLY_INVOICED
+    order.record_invoice("l_spring", Decimal(5))
+    assert order.invoice_status is InvoiceStatus.INVOICED
+
+
+def test_cannot_record_fulfillment_before_confirmed() -> None:
+    order = _order()  # fresh, still SUBMITTED
+    with pytest.raises(OrderInvalidTransition):
+        order.record_fulfillment("l_anvil", Decimal(1))
+
+
+def test_vendor_date_is_scheduled() -> None:
+    order = _confirmed_order_with_two_lines()
+    order.set_vendor_date("l_anvil", "2026-10-15")
+    assert order.vendor_date_by_line["l_anvil"] == "2026-10-15"
+    with pytest.raises(ValueError):
+        order.set_vendor_date("l_missing", "2026-10-15")
+
+
+def test_fulfillment_status_survives_event_replay() -> None:
+    store = InMemoryEventStore()
+    repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
+    order = _confirmed_order_with_two_lines()
+    order.record_fulfillment("l_anvil", Decimal(10))
+    repo.save(order)
+
+    reloaded = repo.get("ord_pf")
+    assert reloaded.fulfillment_status is FulfillmentStatus.PARTIALLY_FULFILLED
+    assert reloaded.shipped_qty_by_line["l_anvil"] == Decimal(10)

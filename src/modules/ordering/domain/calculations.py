@@ -85,19 +85,6 @@ def order_tax_total(lines: list[OrderLine]) -> Money | None:
     return sum_money(totals)
 
 
-def order_grand_total(
-    subtotal: Money, tax_total: Money, *, discount: Money | None = None, shipping: Money | None = None
-) -> Money:
-    """subtotal - discount + tax_total + shipping. Callers supply discount/shipping —
-    the Order aggregate doesn't persist either yet (no event sets them)."""
-    result = subtotal + tax_total
-    if discount is not None:
-        result = result - discount
-    if shipping is not None:
-        result = result + shipping
-    return result
-
-
 def sum_money(amounts: list[Money]) -> Money | None:
     """Sum a list of `Money`, None if empty. Used by order-level calculations above and
     by the projection layer (summing already-computed `line_total`s for display)."""

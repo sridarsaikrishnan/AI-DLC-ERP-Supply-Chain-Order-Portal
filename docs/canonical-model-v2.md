@@ -232,7 +232,10 @@ crash). Odoo's adapter today would declare `{}` (no tax, no partial fulfillment 
    calculation functions in new `ordering/domain/calculations.py`: `line_total`,
    `line_tax_total` (handles both inclusive-extracted and exclusive-added tax),
    `line_total_with_tax`, `order_subtotal`/`order_tax_total` (sum priced lines, raise on
-   currency mismatch), `order_grand_total`. Tests: `ordering/tests/test_calculations.py`
+   currency mismatch). (`order_grand_total` — subtotal/tax/discount/shipping combined —
+   was removed: `discount`/`shipping` had no source anywhere in the system, nothing could
+   ever call it with real values. Re-add it once an actual source for those exists.)
+   Tests: `ordering/tests/test_calculations.py`
    (unit + Hypothesis property tests — totality, tax-rate invariant, subtotal-equals-
    sum-of-lines) and a new event-replay round-trip test in `test_order_aggregate.py`.
    `pytest src tests`: 121 unit + 2 integration passed, 5 skipped (unchanged — no live
