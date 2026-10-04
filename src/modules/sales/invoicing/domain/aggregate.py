@@ -16,6 +16,7 @@ class Invoice(Aggregate):
     def __init__(self, id: str) -> None:
         super().__init__(id)
         self.order_id: str = ""
+        self.tenant_id: str = ""
         self.lines: list[dict[str, Any]] = []
         self.erp_invoice_id: str | None = None
 
@@ -27,6 +28,7 @@ class Invoice(Aggregate):
         order_id: str,
         lines: list[dict[str, Any]],
         erp_invoice_id: str | None = None,
+        tenant_id: str = "",
     ) -> Invoice:
         if not lines:
             raise ValueError("an invoice must have at least one line")
@@ -37,23 +39,27 @@ class Invoice(Aggregate):
                 order_id=order_id,
                 lines=lines,
                 erp_invoice_id=erp_invoice_id,
+                tenant_id=tenant_id,
             )
         )
         return inv
 
     def _apply_InvoiceRecorded(self, e: InvoiceRecorded) -> None:
         self.order_id = e.order_id
+        self.tenant_id = e.tenant_id
         self.lines = list(e.lines)
         self.erp_invoice_id = e.erp_invoice_id
 
     def snapshot_state(self) -> dict[str, Any]:
         return {
             "order_id": self.order_id,
+            "tenant_id": self.tenant_id,
             "lines": self.lines,
             "erp_invoice_id": self.erp_invoice_id,
         }
 
     def restore(self, state: dict[str, Any]) -> None:
         self.order_id = state["order_id"]
+        self.tenant_id = state.get("tenant_id", "")
         self.lines = state["lines"]
         self.erp_invoice_id = state["erp_invoice_id"]

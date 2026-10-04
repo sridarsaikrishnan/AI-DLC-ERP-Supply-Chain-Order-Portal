@@ -123,7 +123,9 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
     )
 
     # --- place an order and drain the pipeline ---
-    order_id = OrderService(repo, quotes, InMemoryItemRepository(), quote_service).place_order(
+    order_id = OrderService(
+        repo, quotes, InMemoryItemRepository(), quote_service, references=projections
+    ).place_order(
         tenant_id=_TENANT,
         quote_id=quote.quote_id,
         client_reference="PO-1001",

@@ -303,7 +303,7 @@ def _build_memory_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, items, quote_service),
+        order_service=OrderService(repo, quotes, items, quote_service, references=projections),
         projections=projections,
         ingress=ingress,
         bus=bus,
@@ -449,7 +449,7 @@ def _build_postgres_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, items, quote_service),
+        order_service=OrderService(repo, quotes, items, quote_service, references=projections),
         projections=projections,
         ingress=ingress,
         bus=None,

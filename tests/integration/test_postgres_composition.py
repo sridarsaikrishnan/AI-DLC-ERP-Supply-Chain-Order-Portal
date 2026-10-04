@@ -19,6 +19,9 @@ import pytest
 
 pytest.importorskip("sqlalchemy")
 
+from datetime import date, timedelta  # noqa: E402
+from decimal import Decimal  # noqa: E402
+
 from sqlalchemy import text  # noqa: E402
 from src.composition import build_container  # noqa: E402
 from src.modules.reference.catalog.domain.models import Item  # noqa: E402
@@ -27,8 +30,10 @@ from src.modules.reference.tenancy.domain.models import (  # noqa: E402
     BindingStatus,
     TenantConnectionBinding,
 )
-from src.modules.sales.ordering.domain.models import OrderLine  # noqa: E402
+from src.modules.sales.ordering.application.order_service import OrderLineInput  # noqa: E402
+from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine  # noqa: E402
 from src.shared.config import Settings  # noqa: E402
+from src.shared.money import Money  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 from src.shared.persistence.event_store import PostgresEventStore  # noqa: E402
 from src.shared.types import BindingId, ConnectionId, ItemId, TenantId  # noqa: E402
@@ -98,10 +103,30 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         )
     )
 
+    # Increment 5: an order replies to a quote — price/UoM come from it, never the
+    # reseller's own input (ADR-0011/ADR-0016). Issue one priced line for `sku`.
+    company = container.quote_service.create_operating_company(
+        name="Test Distributor", country="US", language="en"
+    )
+    quote = container.quote_service.issue_quote(
+        tenant_id=tenant,
+        operating_company_id=company.operating_company_id,
+        end_customer=EndCustomer(name="Downstream Co", ship_to="1 Main St"),
+        currency="USD",
+        valid_from=date.today() - timedelta(days=1),
+        valid_until=date.today() + timedelta(days=30),
+        lines=[
+            QuoteLine(
+                product_key=sku, unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA"
+            )
+        ],
+    )
+
     order_id = container.order_service.place_order(
         tenant_id=tenant,
+        quote_id=quote.quote_id,
         client_reference="PO-1",
-        lines=[OrderLine(product_key=sku, quantity=2, unit_of_measure="EA")],
+        lines=[OrderLineInput(sku, Decimal(2))],
     )
     try:
         # Nothing auto-delivers in the postgres profile (no bus) — item C's worker would
@@ -139,6 +164,13 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
             )
             session.execute(text("DELETE FROM orders WHERE order_id = :oid"), {"oid": order_id})
             session.execute(
+                text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote.quote_id}
+            )
+            session.execute(
+                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
+                {"ocid": company.operating_company_id},
+            )
+            session.execute(
                 text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"),
                 {"cid": str(connection)},
             )
@@ -149,4 +181,77 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
             session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = :cid"),
                 {"cid": str(connection)},
+            )
+
+
+def test_postgres_profile_rejects_a_reused_order_number() -> None:
+    """Gap #3 (architect review, 2026-10-04): a reseller's own order number had no
+    uniqueness check. OrderService.place_order now refuses a repeat before anything is
+    written — proved here against the real projection store, not just in-memory."""
+    from src.modules.sales.ordering.domain.errors import DuplicateOrderReference
+
+    container = build_container(_postgres_settings())
+    tenant = TenantId(_id("tnt"))
+    company = container.quote_service.create_operating_company(
+        name="Test Distributor", country="US", language="en"
+    )
+
+    def _issue_quote():
+        return container.quote_service.issue_quote(
+            tenant_id=tenant,
+            operating_company_id=company.operating_company_id,
+            end_customer=EndCustomer(name="Downstream Co", ship_to="1 Main St"),
+            currency="USD",
+            valid_from=date.today() - timedelta(days=1),
+            valid_until=date.today() + timedelta(days=30),
+            lines=[
+                QuoteLine(
+                    product_key="ANVIL",
+                    unit_price=Money(Decimal("19.99"), "USD"),
+                    unit_of_measure="EA",
+                )
+            ],
+        )
+
+    # Two separate quotes: a quote is single-use (mark_accepted after its first order),
+    # so re-using one isn't the scenario here — the repeated PO number is.
+    quote = _issue_quote()
+    quote2 = _issue_quote()
+    order_id = container.order_service.place_order(
+        tenant_id=tenant,
+        quote_id=quote.quote_id,
+        client_reference="PO-DUP",
+        lines=[OrderLineInput("ANVIL", Decimal(1))],
+    )
+    try:
+        # Postgres profile has no synchronous bus (container.bus is None) — nothing
+        # projects the order unless driven manually, same as the test above. exists()
+        # reads the projection, so it must be created before the duplicate check means
+        # anything here.
+        event_store = PostgresEventStore(_factory)
+        for event in event_store.load(order_id):
+            container.order_projector.handle(event)
+
+        with pytest.raises(DuplicateOrderReference):
+            container.order_service.place_order(
+                tenant_id=tenant,
+                quote_id=quote2.quote_id,
+                client_reference="PO-DUP",
+                lines=[OrderLineInput("ANVIL", Decimal(1))],
+            )
+    finally:
+        with _factory() as session, session.begin():
+            session.execute(text("DELETE FROM outbox WHERE stream_id = :oid"), {"oid": order_id})
+            session.execute(text("DELETE FROM events WHERE stream_id = :oid"), {"oid": order_id})
+            session.execute(
+                text("DELETE FROM order_status_history WHERE order_id = :oid"), {"oid": order_id}
+            )
+            session.execute(text("DELETE FROM orders WHERE order_id = :oid"), {"oid": order_id})
+            session.execute(
+                text("DELETE FROM quotes WHERE quote_id IN (:q1, :q2)"),
+                {"q1": quote.quote_id, "q2": quote2.quote_id},
+            )
+            session.execute(
+                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
+                {"ocid": company.operating_company_id},
             )

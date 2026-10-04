@@ -13,7 +13,7 @@ the reseller never sends one, and the server never trusts one even if it did.
 
 | Problem | Detail |
 |---|---|
-| The canonical model has a price field; nothing filled it | `OrderLine.unit_price` existed (`docs/canonical-model-v2.md`) but every line arrived unpriced — the reseller's `OrderLineInput` only ever carries `product_key`/`quantity`/`unit_of_measure` |
+| The canonical model has a price field; nothing filled it | `OrderLine.unit_price` existed (from the Increment-4 canonical-model work) but every line arrived unpriced — the reseller's `OrderLineInput` only ever carries `product_key`/`quantity`/`unit_of_measure` |
 | Calculations had nothing to compute from | `line_total`/`subtotal` (`ordering/domain/calculations.py`) return `None` without a price — a real source was needed before they could do anything |
 
 ## The decision, step by step

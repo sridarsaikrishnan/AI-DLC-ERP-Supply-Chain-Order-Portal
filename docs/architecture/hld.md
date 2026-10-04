@@ -1,8 +1,10 @@
 # High-Level Design — ERP & Supply Chain Order Portal
 
 C4 **container-level** view. Diagram source: [`hld.drawio`](hld.drawio) (open in
-diagrams.net or the VS Code Draw.io extension). It has **two pages**: *(1) Container view*
-and *(2) Modules → tables (data ownership)*.
+diagrams.net or the VS Code Draw.io extension). It has **three pages**: *(1) Container
+view*, *(2) Modules → tables (data ownership)*, and *(3) Known gaps* — a direct,
+code-verified list of real architectural gaps, not aspirational TBDs. Read page 3 before
+treating anything on pages 1–2 as fully closed.
 
 Scope: major components, their responsibilities, external dependencies, data stores,
 communication paths, and the significant flows and boundaries. It deliberately omits
@@ -76,8 +78,10 @@ Interacting parties and systems:
 - **The domain (via API + Worker) owns PostgreSQL** — the single store holding the Order
   event stream + outbox + snapshots, the order read models (projections), and reference
   data (catalog items, ERP connections, reseller bindings, quotes, operating companies,
-  webhook endpoints/deliveries). The `ordering` aggregate is the only event-sourced one;
-  everything else is CRUD/reference data.
+  webhook endpoints/deliveries). The **transactional** aggregates are event-sourced —
+  `Order` plus the fulfillment family (`Shipment`/`Invoice`/`Payment`/`Return`), all on the
+  one shared `events`/`outbox`/`snapshots` store, keyed by `aggregate_type` + `stream_id`
+  (ADR-0014); reference/config data is plain CRUD.
 - **API** publishes order events (writes events + outbox); **Worker** consumes events and
   owns projection writes. **ERP (Odoo)** owns the authoritative order record on its side;
   the portal mirrors status back via projections. Secrets are owned by **Secrets
@@ -126,6 +130,19 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
   dispatch / relay / reconcile).
 - **Local/dev** runs the same code with an in-memory bus and (optionally) floci standing
   in for AWS; **prod** uses the AWS services above.
+
+## Known gaps (honest review, 2026-10-04)
+
+Verified directly against the current code, not carried forward from an earlier pass.
+Full detail (file/line, failure scenario, fix trigger) is on diagram **page 3**.
+
+| # | Gap | Status |
+|---|---|---|
+| 1 | Reconciliation polls `sale.order.state`/`invoice_status` only — never `stock.picking` or `account.move`. A shipment made directly in Odoo is invisible to the portal until an operator manually records it. | Open |
+| 2 | `ShipmentRecorded`/`InvoiceRecorded` were excluded from the reseller webhook's dispatchable set, and `OrderFulfilled` (dead since Increment 5) was still on it. | **Fixed** — both added (with `tenant_id` now stamped on `Shipment`/`Invoice`), dead entry removed. |
+| 3 | `orders.client_reference` (the reseller's own PO number) had no `UNIQUE` constraint, per-tenant or otherwise. | **Fixed** — app-level check in `OrderService.place_order` (`DuplicateOrderReference`) plus a DB-level `UNIQUE(tenant_id, client_reference)` backstop (migration 0009) for the race window; verified against live Postgres. |
+| 4 | `MoneyType.amount` is `float` on both GraphQL schemas, even though the internal `Money`/`TaxRate` value objects are Decimal-exact. | **Fixed** — `amount` is now `String!` on both schemas (verified via printed SDL); UI `Money` type + `formatMoney` updated to parse it for display only, never arithmetic. |
+| 5 | The ordering party is still named `tenant`/`TenantId` throughout — there's no multi-tenant SaaS concept here, a "tenant" is a reseller. Misleading to a reader cold on the history, not a functional bug. | Open |
 
 ## Non-functional considerations (architecturally significant)
 

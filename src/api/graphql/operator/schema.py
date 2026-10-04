@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 
 
 def _money_to_gql(money: Money | None) -> MoneyType | None:
-    return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
+    return None if money is None else MoneyType(amount=str(money.amount), currency=money.currency)
 
 
 def _order_to_gql(view: OperatorOrderView) -> OperatorOrder:
@@ -155,7 +155,7 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
             QuoteLineType(
                 product_key=line.product_key,
                 unit_price=MoneyType(
-                    amount=float(line.unit_price.amount), currency=line.unit_price.currency
+                    amount=str(line.unit_price.amount), currency=line.unit_price.currency
                 ),
                 unit_of_measure=line.unit_of_measure,
                 tax_code=line.tax_rate.code if line.tax_rate else None,
@@ -403,12 +403,14 @@ class Mutation:
         delivered on ship."""
         ctx = info.context
         ctx.require_role("OPERATOR")
+        tenant_id = str(ctx.container.orders.get(order_id).tenant_id)
         shipment = ctx.container.shipment_service.record(
             order_id=order_id,
             lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             carrier=carrier,
             tracking_number=tracking_number,
             proof_of_delivery=proof_of_delivery,
+            tenant_id=tenant_id,
         )
         ctx.container.drain()
         return ShipmentType(
@@ -429,10 +431,12 @@ class Mutation:
     ) -> InvoiceType:
         ctx = info.context
         ctx.require_role("OPERATOR")
+        tenant_id = str(ctx.container.orders.get(order_id).tenant_id)
         invoice = ctx.container.invoice_service.record(
             order_id=order_id,
             lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
             erp_invoice_id=erp_invoice_id,
+            tenant_id=tenant_id,
         )
         ctx.container.drain()
         return InvoiceType(
@@ -475,7 +479,7 @@ class Mutation:
         return PaymentType(
             payment_id=payment.id,
             order_id=payment.order_id,
-            amount=MoneyType(amount=amount, currency=currency),
+            amount=MoneyType(amount=payment.amount["amount"], currency=payment.amount["currency"]),
             method=method,
         )
 

@@ -27,10 +27,11 @@ QUEUES: dict[str, list[str] | None] = {
     "webhook-dispatch.fifo": [
         "OrderSentToErp",
         "OrderConfirmed",
-        "OrderFulfilled",
         "OrderClosed",
         "OrderRejected",
         "OrderRetrying",
+        "ShipmentRecorded",
+        "InvoiceRecorded",
     ],
 }
 MAX_RECEIVE = 5

@@ -11,8 +11,9 @@ of repeating it:
 - **`docs/adding-an-erp.md`** — the 4-step checklist for registering any new ERP type.
 - **`docs/erp-integration-patterns.md`** — webhook shapes (rich vs. thin) and how
   multiple instances/tenants get routed, as concepts that apply to every ERP.
-- **`docs/mapping/<erp>.md`** — the canonical-field ↔ ERP-field table for that ERP.
-  Field mapping lives there, not duplicated here.
+
+The canonical-field ↔ ERP-field mapping tables live **in each ERP's own page here** (e.g.
+`odoo.md`'s outbound/inbound tables), not in a separate `mapping/` folder.
 
 ## Files
 
@@ -30,7 +31,8 @@ Copy `odoo.md`'s section headings. At minimum, cover:
 2. How authentication works against its API.
 3. What our adapter actually does for `submit` / `fetch_status` / `cancel` — in plain
    English, not just "see the code".
-4. Every quirk, gap, or surprising behavior discovered while building or running it
+4. The outbound/inbound field-mapping tables (canonical ↔ this ERP's fields).
+5. Every quirk, gap, or surprising behavior discovered while building or running it
    against a real instance — this is the part that has no other home. If you find out
    something the hard way, it belongs here so the next person doesn't re-discover it.
-5. Links out: the mapping doc, the webhook setup doc (if any), local dev setup.
+6. Links out: the webhook setup doc (if any), local dev setup.

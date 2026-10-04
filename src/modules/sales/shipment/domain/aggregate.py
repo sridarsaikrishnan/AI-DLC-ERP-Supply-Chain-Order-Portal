@@ -20,6 +20,7 @@ class Shipment(Aggregate):
     def __init__(self, id: str) -> None:
         super().__init__(id)
         self.order_id: str = ""
+        self.tenant_id: str = ""
         self.lines: list[dict[str, Any]] = []
         self.carrier: str | None = None
         self.tracking_number: str | None = None
@@ -35,6 +36,7 @@ class Shipment(Aggregate):
         carrier: str | None = None,
         tracking_number: str | None = None,
         proof_of_delivery: str | None = None,
+        tenant_id: str = "",
     ) -> Shipment:
         if not lines:
             raise ValueError("a shipment must have at least one line")
@@ -47,12 +49,14 @@ class Shipment(Aggregate):
                 carrier=carrier,
                 tracking_number=tracking_number,
                 proof_of_delivery=proof_of_delivery,
+                tenant_id=tenant_id,
             )
         )
         return s
 
     def _apply_ShipmentRecorded(self, e: ShipmentRecorded) -> None:
         self.order_id = e.order_id
+        self.tenant_id = e.tenant_id
         self.lines = list(e.lines)
         self.carrier = e.carrier
         self.tracking_number = e.tracking_number
@@ -61,6 +65,7 @@ class Shipment(Aggregate):
     def snapshot_state(self) -> dict[str, Any]:
         return {
             "order_id": self.order_id,
+            "tenant_id": self.tenant_id,
             "lines": self.lines,
             "carrier": self.carrier,
             "tracking_number": self.tracking_number,
@@ -69,6 +74,7 @@ class Shipment(Aggregate):
 
     def restore(self, state: dict[str, Any]) -> None:
         self.order_id = state["order_id"]
+        self.tenant_id = state.get("tenant_id", "")
         self.lines = state["lines"]
         self.carrier = state["carrier"]
         self.tracking_number = state["tracking_number"]

@@ -14,6 +14,7 @@ from strawberry.extensions import QueryDepthLimiter
 
 from src.modules.integration.webhooks_outbound.application.service import WebhookEndpointService
 from src.modules.sales.ordering.application.order_service import OrderLineInput as OrderLineCommand
+from src.modules.sales.ordering.domain.errors import DuplicateOrderReference
 from src.modules.sales.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
 from src.shared.types import OrderId, TenantId, WebhookEndpointId
 
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
 
 
 def _money_to_gql(money: Money | None) -> MoneyType | None:
-    return None if money is None else MoneyType(amount=float(money.amount), currency=money.currency)
+    return None if money is None else MoneyType(amount=str(money.amount), currency=money.currency)
 
 
 def _to_gql(view: ResellerOrderView) -> ResellerOrder:
@@ -100,7 +101,7 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
             QuoteLineType(
                 product_key=line.product_key,
                 unit_price=MoneyType(
-                    amount=float(line.unit_price.amount), currency=line.unit_price.currency
+                    amount=str(line.unit_price.amount), currency=line.unit_price.currency
                 ),
                 unit_of_measure=line.unit_of_measure,
             )
@@ -207,6 +208,8 @@ class Mutation:
         except (QuoteNotFound, QuoteNotValid) as exc:
             raise ValueError(f"quote unavailable: {exc}") from exc
         except PriceNotQuoted as exc:
+            raise ValueError(str(exc)) from exc
+        except DuplicateOrderReference as exc:
             raise ValueError(str(exc)) from exc
         # Memory profile drains inline; postgres profile no-ops here and the worker
         # drains the queues asynchronously, so this call returns before delivery.

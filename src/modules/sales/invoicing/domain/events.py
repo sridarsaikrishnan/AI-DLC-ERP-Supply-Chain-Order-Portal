@@ -17,3 +17,7 @@ class InvoiceRecorded(DomainEvent):
     order_id: str
     lines: list[dict[str, Any]]  # [{"line_id": str, "product_key": str, "quantity": str(Decimal)}]
     erp_invoice_id: str | None = None
+    # Added so the repository can stamp StoredEvent.tenant_id (the webhook-dispatch
+    # consumer drops any event with no tenant_id). Defaulted so pre-existing stored
+    # events still deserialize.
+    tenant_id: str = ""

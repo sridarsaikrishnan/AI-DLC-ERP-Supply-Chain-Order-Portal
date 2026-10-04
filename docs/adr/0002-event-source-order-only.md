@@ -2,11 +2,20 @@
 
 | | |
 |---|---|
-| Status | Accepted |
+| Status | Accepted — **amended by [ADR-0014](0014-orthogonal-fulfillment-invoice-status.md)** |
 | Affects | `ordering` module, `src/shared/eventsourcing` |
 
+> **Amendment (ADR-0014):** this ADR's own "revisit when" condition later fired. The
+> transactional fulfillment-family aggregates — `Shipment`, `Invoice`, `Payment`, `Return`
+> — are now event-sourced too (they reuse the same kernel). The distinction this ADR drew
+> still holds in spirit: **transactional** aggregates with a history worth replaying are
+> event-sourced; **reference/config** data (`connections`, `items`, `tenant_connection_bindings`,
+> `quotes`, `operating_companies`, webhook endpoints) stays plain CRUD. Read "only `Order`"
+> below as "only transactional aggregates, which at the time was just `Order`".
+
 ## In one sentence
-Only `Order` replays its state from an immutable event stream — every other module is
+Transactional aggregates (`Order`, and later the fulfillment family — see the amendment
+above) replay their state from an immutable event stream; reference/config modules are
 plain CRUD rows in the same Postgres.
 
 ## Why this needed a decision

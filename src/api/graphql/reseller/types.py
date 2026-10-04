@@ -7,7 +7,11 @@ import strawberry
 
 @strawberry.type
 class MoneyType:
-    amount: float
+    # str, not float (known gap, architect review 2026-10-04): internal Money/TaxRate
+    # are Decimal-exact; float can't represent 19.99 exactly, and a client doing its own
+    # arithmetic on this field would inherit that error even though every computation
+    # inside the platform stays exact end to end.
+    amount: str
     currency: str
 
 

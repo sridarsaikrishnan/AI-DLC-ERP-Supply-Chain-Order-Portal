@@ -22,3 +22,7 @@ class ShipmentRecorded(DomainEvent):
     carrier: str | None = None
     tracking_number: str | None = None
     proof_of_delivery: str | None = None  # (FR-D2) — a POD reference/signature
+    # Added so the repository can stamp StoredEvent.tenant_id (the webhook-dispatch
+    # consumer drops any event with no tenant_id). Defaulted so pre-existing stored
+    # events still deserialize.
+    tenant_id: str = ""

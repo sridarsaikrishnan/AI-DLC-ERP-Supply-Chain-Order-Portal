@@ -15,6 +15,7 @@ from src.modules.sales.quoting.domain.errors import PriceNotQuoted, QuoteNotFoun
 from src.shared.types import OrderId, TenantId, generate_id
 
 from ..domain.aggregate import Order
+from ..domain.errors import DuplicateOrderReference
 from ..domain.models import KIND_PHYSICAL, OrderLine
 
 if TYPE_CHECKING:
@@ -48,6 +49,14 @@ class QuoteAcceptor(Protocol):
     def mark_accepted(self, quote_id: str) -> None: ...
 
 
+class OrderReferenceLookup(Protocol):
+    """Narrow lookup so `place_order` can refuse a reseller re-using their own PO
+    number (`client_reference`) — reads the order projection store, so there's a known
+    race window documented on `DuplicateOrderReference` itself."""
+
+    def exists(self, tenant_id: str, client_reference: str) -> bool: ...
+
+
 class OrderService:
     def __init__(
         self,
@@ -55,11 +64,14 @@ class OrderService:
         quotes: QuoteDirectory,
         items: ItemKindLookup,
         quote_acceptor: QuoteAcceptor | None = None,
+        *,
+        references: OrderReferenceLookup,
     ) -> None:
         self._repository = repository
         self._quotes = quotes
         self._items = items
         self._quote_acceptor = quote_acceptor
+        self._references = references
 
     def place_order(
         self,
@@ -77,6 +89,8 @@ class OrderService:
             raise QuoteNotValid(quote_id)
         if not lines:
             raise ValueError("order must have at least one line")
+        if self._references.exists(str(tenant_id), client_reference):
+            raise DuplicateOrderReference(client_reference)
 
         order_lines = [self._line_from_quote(quote, inp) for inp in lines]
         order_id = OrderId(generate_id("ord"))

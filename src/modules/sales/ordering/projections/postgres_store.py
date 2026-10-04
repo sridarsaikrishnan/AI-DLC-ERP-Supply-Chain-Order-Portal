@@ -10,11 +10,13 @@ that column.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Column, DateTime, MetaData, String, Table, select
+from sqlalchemy import BigInteger, Column, DateTime, MetaData, String, Table, exists, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from src.shared.money import (
     money_from_payload,
@@ -39,6 +41,8 @@ from .read_models import (
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
+
+log = logging.getLogger(__name__)
 
 _metadata = MetaData()
 
@@ -139,6 +143,22 @@ class PostgresOrderProjectionStore:
             )
             session.execute(stmt)
             session.commit()
+        except IntegrityError:
+            # OrderService.place_order already calls exists() (below, in the queries
+            # section) before submitting — this only fires on the narrow race the
+            # docstring on DuplicateOrderReference names: two submissions with the same
+            # (tenant_id, client_reference) both passed that check before either one's
+            # projection existed yet. Don't retry — retrying hits the same constraint
+            # forever. The order's events are safely in the event store either way;
+            # only this one's projection row is skipped.
+            session.rollback()
+            log.warning(
+                "order %s projection skipped: tenant %s already has an order with "
+                "client_reference %r",
+                order_id,
+                tenant_id,
+                client_reference,
+            )
         except Exception:
             session.rollback()
             raise
@@ -253,6 +273,22 @@ class PostgresOrderProjectionStore:
         self._mutate_line(order_id, line_id, mutate)
 
     # --- queries ---
+    def exists(self, tenant_id: str, client_reference: str) -> bool:
+        session = self._session_factory()
+        try:
+            return bool(
+                session.execute(
+                    select(
+                        exists().where(
+                            orders_table.c.tenant_id == tenant_id,
+                            orders_table.c.client_reference == client_reference,
+                        )
+                    )
+                ).scalar()
+            )
+        finally:
+            session.close()
+
     @staticmethod
     def _lines(raw_lines: list[dict]) -> list[OrderLineView]:
         return [_line_from_json(line) for line in raw_lines]

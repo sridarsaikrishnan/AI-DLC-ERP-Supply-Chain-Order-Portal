@@ -55,7 +55,7 @@ def _wire(items: InMemoryItemRepository | None = None, prices: dict[str, str] | 
             for s, p in prices.items()
         ],
     )
-    svc = OrderService(repo, quotes, items, quote_service)
+    svc = OrderService(repo, quotes, items, quote_service, references=projections)
     return svc, repo, bus, projections, quote.quote_id
 
 

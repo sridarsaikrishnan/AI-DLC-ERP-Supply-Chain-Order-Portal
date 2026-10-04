@@ -132,6 +132,12 @@ class OrderProjectionStore:
         self._update_line(order_id, line_id, scheduled_date=scheduled_date)
 
     # --- queries ---
+    def exists(self, tenant_id: str, client_reference: str) -> bool:
+        return any(
+            r.tenant_id == tenant_id and r.client_reference == client_reference
+            for r in self._records.values()
+        )
+
     def get_reseller_view(self, tenant_id: str, order_id: str) -> ResellerOrderView | None:
         record = self._records.get(order_id)
         if record is None or record.tenant_id != tenant_id:  # tenant scoping (fail-closed)

@@ -8,7 +8,7 @@ under a minute.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-modular-monolith.md) | Modular monolith (`api` + `worker`), not microservices | Accepted |
-| [0002](0002-event-source-order-only.md) | Event-source the `Order` aggregate only; everything else is CRUD | Accepted |
+| [0002](0002-event-source-order-only.md) | Event-source transactional aggregates (`Order`; later the fulfillment family via 0014); reference/config stays CRUD | Accepted (amended by 0014) |
 | [0003](0003-erp-adapter-registry.md) | ERPs plug in via an adapter + registry pattern, not per-ERP conditionals | Accepted |
 | [0004](0004-single-shared-postgres.md) | One shared Postgres for event store + outbox + projections + CRUD | Accepted |
 | [0005](0005-tenant-erp-identity-binding.md) | Tenant↔ERP identity resolved by a binding table, not an identity-resolution service | Accepted |

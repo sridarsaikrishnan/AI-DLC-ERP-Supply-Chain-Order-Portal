@@ -172,7 +172,10 @@ def test_order_projection_store_reseller_view_excludes_erp_identity() -> None:
     reseller = store.get_reseller_view(tenant, order_id)
     assert reseller is not None
     assert reseller.status == "Confirmed"
-    assert reseller.lines == [OrderLineView("sku-1", 2.0, "EA")]
+    # _line_from_json falls back line_id to product_key when the stored value is empty
+    # (store.create was called with no explicit line_id above) — this is the documented
+    # read-side fallback, not a round-trip bug.
+    assert reseller.lines == [OrderLineView("sku-1", 2.0, "EA", line_id="sku-1")]
     assert not hasattr(reseller, "erp_order_id")  # FR-19: reseller view never carries ERP identity
 
     operator = store.get_operator_view(order_id)

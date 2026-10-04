@@ -22,13 +22,19 @@ class InvoiceService:
         self._invoices = invoices
 
     def record(
-        self, *, order_id: str, lines: list[dict[str, Any]], erp_invoice_id: str | None = None
+        self,
+        *,
+        order_id: str,
+        lines: list[dict[str, Any]],
+        erp_invoice_id: str | None = None,
+        tenant_id: str = "",
     ) -> Invoice:
         invoice = Invoice.record(
             invoice_id=generate_id("inv"),
             order_id=order_id,
             lines=lines,
             erp_invoice_id=erp_invoice_id,
+            tenant_id=tenant_id,
         )
         self._invoices.save(invoice)
         return invoice

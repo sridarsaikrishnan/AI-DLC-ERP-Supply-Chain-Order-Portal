@@ -1,10 +1,10 @@
-"""Pure money/tax calculations over `OrderLine` (canonical-model-v2.md §3/§5).
+"""Pure money/tax calculations over `OrderLine`.
 
 Every function here is pure — same inputs, same output, no I/O — and deliberately
 decoupled from the `Order` aggregate. Wiring these into persisted order-level fields
 (shipping, order-level discount) is future-phase work, once a command/event exists to
-set them; today there's no price source wired in (no catalog price lookup), so a line
-with `unit_price is None` contributes nothing and callers get `None` back rather than a
+set them. Line prices are resolved from the quote at placement (ADR-0016); a line with
+`unit_price is None` contributes nothing and callers get `None` back rather than a
 silently-wrong zero.
 """
 

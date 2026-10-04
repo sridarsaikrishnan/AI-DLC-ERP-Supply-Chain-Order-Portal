@@ -49,9 +49,12 @@ flowchart LR
 
 ## Only where it earns its keep
 
-**Only the `Order` aggregate is event-sourced.** Connections, items, and tenant bindings
-are plain rows, updated in place, like a normal app — they don't have an interesting
-lifecycle worth replaying. This is a deliberate choice
+**Only the *transactional* aggregates are event-sourced** — `Order`, and the
+fulfillment family it spun off (`Shipment`, `Invoice`, `Payment`, `Return`), which reuse
+the exact same kernel (ADR-0014). Reference/config data — connections, items, tenant
+bindings, quotes, operating companies — are plain rows, updated in place, like a normal
+app, because they don't have an interesting lifecycle worth replaying. This is a deliberate
+choice
 (`src/shared/eventsourcing/README.md` calls it out explicitly): event sourcing is a tool
 for aggregates with real state machines and a history worth keeping, not a house style to
 apply everywhere. Using it for `erp_connections` would just be ceremony for no benefit.

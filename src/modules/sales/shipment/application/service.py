@@ -30,6 +30,7 @@ class ShipmentService:
         carrier: str | None = None,
         tracking_number: str | None = None,
         proof_of_delivery: str | None = None,
+        tenant_id: str = "",
     ) -> Shipment:
         shipment = Shipment.record(
             shipment_id=generate_id("shp"),
@@ -38,6 +39,7 @@ class ShipmentService:
             carrier=carrier,
             tracking_number=tracking_number,
             proof_of_delivery=proof_of_delivery,
+            tenant_id=tenant_id,
         )
         self._shipments.save(shipment)
         return shipment

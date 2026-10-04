@@ -1,8 +1,8 @@
 """Money as a value object — never a float.
 
 Binary float can't represent `0.1` exactly; errors compound once tax/discount math is
-layered on top (canonical-model-v2.md §1). `round_money` is the one place rounding
-happens — every ERP adapter and calculation uses this, not its own rounding.
+layered on top. `round_money` is the one place rounding happens — every ERP adapter and
+calculation uses this, not its own rounding.
 """
 
 from __future__ import annotations

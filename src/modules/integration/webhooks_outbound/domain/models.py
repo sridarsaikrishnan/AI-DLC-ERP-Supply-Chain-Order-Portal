@@ -18,10 +18,17 @@ DISPATCHABLE_EVENT_TYPES = frozenset(
     {
         "OrderSentToErp",
         "OrderConfirmed",
-        "OrderFulfilled",
         "OrderClosed",
         "OrderRejected",
         "OrderRetrying",
+        # ShipmentRecorded/InvoiceRecorded (not Order-prefixed, but still include
+        # order_id in their own payload — see WebhookDispatchService._build_body) carry
+        # the shipment/invoice facts resellers previously had no way to be notified of.
+        # `OrderFulfilled` was removed: nothing emits it since Increment 5 dropped
+        # FULFILLED from the order lifecycle (see its docstring in
+        # sales/ordering/domain/events.py) — it was a dead subscription.
+        "ShipmentRecorded",
+        "InvoiceRecorded",
     }
 )
 

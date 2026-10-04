@@ -5,7 +5,7 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
 
 ## The four touch points
 
-1. **Status mapping** — `src/modules/integration/domain/status_mapping.py`. Write one
+1. **Status mapping** — `src/modules/integration/erp/domain/status_mapping.py`. Write one
    pure function `(fields: dict[str, str]) -> CanonicalStatus | None` reading whatever
    keys *this* ERP's status actually arrives in (inputs already lowercased/stripped) and
    add one line to `STATUS_MAPPERS`. The signature is a field bag, not a fixed arity —
