@@ -4,11 +4,11 @@ Decisions resolved: Q1–Q7 = A (see `inception/requirements/increment5-question
 
 ## New domain concept: `quoting` (CRUD, operator-authored — ADR-0002 keeps event-sourcing to Order)
 
-### OperatingCompany ("office card", FR-C3)
-`operating_company_id, name, country, language`. A plain row; one seeded by default (Q5=A). Referenced by quotes and copied onto orders so document numbers and email locale have a home. No "profile service".
+### Subsidiary ("subsidiary record", FR-C3)
+`subsidiary_id, name, country, language`. A plain row; one seeded by default (Q5=A). Referenced by quotes and copied onto orders so document numbers and email locale have a home. No "profile service".
 
 ### Quote (FR-B1/B2/B3)
-`quote_id, tenant_id (reseller), operating_company_id, end_customer{name, ship_to}, currency, valid_from, valid_until, status(DRAFT|ISSUED|EXPIRED|ACCEPTED), lines[]`.
+`quote_id, tenant_id (reseller), subsidiary_id, end_customer{name, ship_to}, currency, valid_from, valid_until, status(DRAFT|ISSUED|EXPIRED|ACCEPTED), lines[]`.
 - `QuoteLine`: `product_key, unit_price: Money, tax_rate: TaxRate|None, line_discount: Money|None, unit_of_measure`.
 - Validity window = "how long the prices hold". `is_valid_at(now)` = `ISSUED` and `valid_from <= now <= valid_until`.
 - A quote is reseller-safe: it carries no ERP identity. `erp_customer_id` stays on the binding (operator-only).
@@ -18,7 +18,7 @@ Decisions resolved: Q1–Q7 = A (see `inception/requirements/increment5-question
 1. Load quote; refuse if missing, wrong tenant, or not valid now (`QuoteNotValid`).
 2. For each ordered line, find the quote line by `product_key`; refuse the whole order if any line has no quoted price (`PriceNotQuoted`).
 3. Build `OrderLine`s with price/tax/discount **copied from the quote**, `kind` copied from the catalog item, and a freshly generated `line_id`.
-4. Copy `end_customer`, `ship_to`, `operating_company_id`, `quote_id` onto the order (via `OrderSubmitted`).
+4. Copy `end_customer`, `ship_to`, `subsidiary_id`, `quote_id` onto the order (via `OrderSubmitted`).
 
 Catalog `Item` drops `unit_price/tax_rate/line_discount`; keeps `item_id, sku, name, owning_connection_id, kind`. `OrderService` no longer depends on `PriceCatalog`; it depends on a `QuoteDirectory` (read quote) + the item repo (read `kind`).
 
@@ -55,7 +55,7 @@ Order tracks three per-line maps keyed by `line_id`: `shipped_qty_by_line`, `del
 
 ## GraphQL
 - Reseller `ResellerOrder`: add `fulfillmentStatus`, `invoiceStatus`, `deliveryStatus`; per line `shipped`/`delivered`/`scheduledDate`. `placeOrder` takes `quoteId` + line inputs (no price). New `quotes`/`quote` queries (reseller-safe). Still no ERP identity (FR-19).
-- Operator: `recordFulfillment(orderId, lineId, quantity, carrier, proofOfDelivery)`, `setVendorDate(orderId, lineId, date)`; quote/operating-company admin mutations (`createOperatingCompany`, `issueQuote`); item `kind` on `syncItem`/`ItemType` (no price args anymore).
+- Operator: `recordFulfillment(orderId, lineId, quantity, carrier, proofOfDelivery)`, `setVendorDate(orderId, lineId, date)`; quote/subsidiary admin mutations (`createSubsidiary`, `issueQuote`); item `kind` on `syncItem`/`ItemType` (no price args anymore).
 
 ## Migrations (next: 0008)
-`0008_increment5`: `operating_companies`, `quotes`, `quote_lines`; `items` drop price/tax/discount + add `kind`; `orders.lines` JSONB gains `line_id`/`kind`; order projection columns for scores/delivery/parties/quote_ref/vendor dates. Dev/PoC data stance: no backfill of dropped price columns (consistent with prior increments).
+`0008_increment5`: `subsidiaries`, `quotes`, `quote_lines`; `items` drop price/tax/discount + add `kind`; `orders.lines` JSONB gains `line_id`/`kind`; order projection columns for scores/delivery/parties/quote_ref/vendor dates. Dev/PoC data stance: no backfill of dropped price columns (consistent with prior increments).

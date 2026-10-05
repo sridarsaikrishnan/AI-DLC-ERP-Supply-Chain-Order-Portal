@@ -1,9 +1,11 @@
 type Role = "neutral" | "progress" | "success" | "warning" | "danger";
 
 // design/README.md "Status badge roles" — the exact, closed vocabulary this app uses.
-// Order statuses come from the backend Title Case (read_models.STATUS_LABELS);
-// connection/binding statuses come through as raw enum values (ConnectionStatus,
-// BindingStatus) — both forms are mapped here.
+// Order/fulfillment/delivery/invoice statuses come from the backend as raw
+// SCREAMING_SNAKE_CASE; callers pass them through lib/statusLabel.ts first, so this table
+// is keyed on the resulting Title Case text. Connection/binding statuses (ConnectionStatus,
+// BindingStatus) come through as raw enum values with no translation — both forms are
+// mapped here.
 const ROLE_BY_STATUS: Record<string, Role> = {
   Draft: "neutral",
   Closed: "neutral",

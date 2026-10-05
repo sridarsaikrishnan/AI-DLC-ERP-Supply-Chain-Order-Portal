@@ -9,8 +9,7 @@ import { NewOrderPage } from "./features/orders/NewOrderPage";
 import { QuotesPage } from "./features/quotes/QuotesPage";
 import { ConnectionsPage } from "./features/admin/ConnectionsPage";
 import { TenantsPage } from "./features/admin/TenantsPage";
-import { ItemsPage } from "./features/admin/ItemsPage";
-import { OperatingCompaniesPage } from "./features/admin/OperatingCompaniesPage";
+import { SubsidiariesPage } from "./features/admin/SubsidiariesPage";
 import { QuotesPage as OperatorQuotesPage } from "./features/admin/QuotesPage";
 import { OrdersPage as OperatorOrdersPage } from "./features/admin/OrdersPage";
 import { OrderDetailPage as OperatorOrderDetailPage } from "./features/admin/OrderDetailPage";
@@ -51,10 +50,9 @@ export const router = createBrowserRouter([
       { path: "admin/orders", element: <OperatorOrdersPage /> },
       { path: "admin/orders/:orderId", element: <OperatorOrderDetailPage /> },
       { path: "admin/quotes", element: <OperatorQuotesPage /> },
-      { path: "admin/operating-companies", element: <OperatingCompaniesPage /> },
+      { path: "admin/subsidiaries", element: <SubsidiariesPage /> },
       { path: "admin/connections", element: <ConnectionsPage /> },
       { path: "admin/tenants", element: <TenantsPage /> },
-      { path: "admin/items", element: <ItemsPage /> },
       { path: "admin/failed-messages", element: <FailedMessagesPage /> },
     ],
   },

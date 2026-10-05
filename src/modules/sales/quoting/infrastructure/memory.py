@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.shared.types import TenantId
 
-    from ..domain.models import OperatingCompany, Quote
+    from ..domain.models import Quote, Subsidiary
 
 
 class InMemoryQuoteRepository:
@@ -30,15 +30,26 @@ class InMemoryQuoteRepository:
         return list(self._by_id.values())
 
 
-class InMemoryOperatingCompanyRepository:
+class InMemorySubsidiaryRepository:
     def __init__(self) -> None:
-        self._by_id: dict[str, OperatingCompany] = {}
+        self._by_id: dict[str, Subsidiary] = {}
 
-    def add(self, company: OperatingCompany) -> None:
-        self._by_id[company.operating_company_id] = company
+    def add(self, company: Subsidiary) -> None:
+        self._by_id[company.subsidiary_id] = company
 
-    def get(self, operating_company_id: str) -> OperatingCompany | None:
-        return self._by_id.get(operating_company_id)
+    def get(self, subsidiary_id: str) -> Subsidiary | None:
+        return self._by_id.get(subsidiary_id)
 
-    def list_all(self) -> list[OperatingCompany]:
+    def list_all(self) -> list[Subsidiary]:
         return list(self._by_id.values())
+
+
+class InMemorySubsidiaryRouteRepository:
+    def __init__(self) -> None:
+        self._route_by_company: dict[str, str] = {}
+
+    def set_route(self, subsidiary_id: str, connection_id: str) -> None:
+        self._route_by_company[subsidiary_id] = connection_id
+
+    def get_route(self, subsidiary_id: str) -> str | None:
+        return self._route_by_company.get(subsidiary_id)

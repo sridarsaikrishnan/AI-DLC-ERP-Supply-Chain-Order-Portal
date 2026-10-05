@@ -25,16 +25,8 @@ export interface Money {
   currency: string;
 }
 
-export interface Item {
-  itemId: string;
-  sku: string;
-  name: string;
-  owningConnectionId: string;
-  kind: string; // PHYSICAL (box) | LICENSE
-}
-
-export interface OperatingCompany {
-  operatingCompanyId: string;
+export interface Subsidiary {
+  subsidiaryId: string;
   name: string;
   country: string;
   language: string;
@@ -42,6 +34,8 @@ export interface OperatingCompany {
 
 export interface OperatorQuoteLine {
   productKey: string;
+  name: string;
+  kind: string; // PHYSICAL (box) | LICENSE
   unitPrice: Money;
   unitOfMeasure: string;
   taxCode: string | null;
@@ -52,12 +46,13 @@ export interface OperatorQuoteLine {
 export interface OperatorQuote {
   quoteId: string;
   tenantId: string;
-  operatingCompanyId: string;
+  subsidiaryId: string;
   endCustomerName: string;
   shipTo: string;
   currency: string;
   validFrom: string;
   validUntil: string;
+  routedToConnectionId: string;
   status: string;
   lines: OperatorQuoteLine[];
 }
@@ -89,7 +84,7 @@ export interface OperatorOrder {
   fulfillmentStatus: string;
   deliveryStatus: string;
   invoiceStatus: string;
-  parties: { endCustomerName: string; shipTo: string; operatingCompanyId: string; quoteId: string };
+  parties: { endCustomerName: string; shipTo: string; subsidiaryId: string; quoteId: string };
 }
 
 export const CONNECTIONS_QUERY = /* GraphQL */ `
@@ -104,23 +99,23 @@ export const BINDINGS_QUERY = /* GraphQL */ `
   }
 `;
 
-export const ITEMS_QUERY = /* GraphQL */ `
-  query Items {
-    items { itemId sku name owningConnectionId kind }
+export const SUBSIDIARIES_QUERY = /* GraphQL */ `
+  query Subsidiaries {
+    subsidiaries { subsidiaryId name country language }
   }
 `;
 
-export const OPERATING_COMPANIES_QUERY = /* GraphQL */ `
-  query OperatingCompanies {
-    operatingCompanies { operatingCompanyId name country language }
+export const ERP_ROUTE_QUERY = /* GraphQL */ `
+  query ErpRoute($subsidiaryId: String!) {
+    erpRoute(subsidiaryId: $subsidiaryId)
   }
 `;
 
 export const OPERATOR_QUOTES_QUERY = /* GraphQL */ `
   query OperatorQuotes {
     quotes {
-      quoteId tenantId operatingCompanyId endCustomerName shipTo currency validFrom validUntil status
-      lines { productKey unitPrice { amount currency } unitOfMeasure taxCode taxRate lineDiscount { amount currency } }
+      quoteId tenantId subsidiaryId endCustomerName shipTo currency validFrom validUntil routedToConnectionId status
+      lines { productKey name kind unitPrice { amount currency } unitOfMeasure taxCode taxRate lineDiscount { amount currency } }
     }
   }
 `;
@@ -135,7 +130,7 @@ const OPERATOR_ORDER_FIELDS = /* GraphQL */ `
   fulfillmentStatus
   deliveryStatus
   invoiceStatus
-  parties { endCustomerName shipTo operatingCompanyId quoteId }
+  parties { endCustomerName shipTo subsidiaryId quoteId }
   lines {
     lineId productKey quantity unitOfMeasure kind
     unitPrice { amount currency } lineTotal { amount currency }
@@ -189,10 +184,10 @@ export const VERIFY_BINDING_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const SYNC_ITEM_MUTATION = /* GraphQL */ `
-  mutation SyncItem($sku: String!, $name: String!, $owningConnectionId: String!, $kind: String!) {
-    syncItem(sku: $sku, name: $name, owningConnectionId: $owningConnectionId, kind: $kind) {
-      itemId
+export const SET_ERP_ROUTE_MUTATION = /* GraphQL */ `
+  mutation SetErpRoute($subsidiaryId: String!, $connectionId: String!) {
+    setErpRoute(subsidiaryId: $subsidiaryId, connectionId: $connectionId) {
+      subsidiaryId
     }
   }
 `;
@@ -215,16 +210,18 @@ export const REMOVE_BINDING_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const CREATE_OPERATING_COMPANY_MUTATION = /* GraphQL */ `
-  mutation CreateOperatingCompany($name: String!, $country: String!, $language: String!) {
-    createOperatingCompany(name: $name, country: $country, language: $language) {
-      operatingCompanyId
+export const CREATE_SUBSIDIARY_MUTATION = /* GraphQL */ `
+  mutation CreateSubsidiary($name: String!, $country: String!, $language: String!) {
+    createSubsidiary(name: $name, country: $country, language: $language) {
+      subsidiaryId
     }
   }
 `;
 
 export interface IssueQuoteLineInput {
   productKey: string;
+  name: string;
+  kind: string;
   unitPrice: number;
   unitOfMeasure: string;
   taxCode?: string | null;
@@ -236,7 +233,7 @@ export interface IssueQuoteLineInput {
 export const ISSUE_QUOTE_MUTATION = /* GraphQL */ `
   mutation IssueQuote(
     $tenantId: String!
-    $operatingCompanyId: String!
+    $subsidiaryId: String!
     $endCustomerName: String!
     $shipTo: String!
     $currency: String!
@@ -246,7 +243,7 @@ export const ISSUE_QUOTE_MUTATION = /* GraphQL */ `
   ) {
     issueQuote(
       tenantId: $tenantId
-      operatingCompanyId: $operatingCompanyId
+      subsidiaryId: $subsidiaryId
       endCustomerName: $endCustomerName
       shipTo: $shipTo
       currency: $currency

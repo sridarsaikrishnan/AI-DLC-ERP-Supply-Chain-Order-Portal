@@ -10,7 +10,7 @@
 > — are now event-sourced too (they reuse the same kernel). The distinction this ADR drew
 > still holds in spirit: **transactional** aggregates with a history worth replaying are
 > event-sourced; **reference/config** data (`connections`, `items`, `tenant_connection_bindings`,
-> `quotes`, `operating_companies`, webhook endpoints) stays plain CRUD. Read "only `Order`"
+> `quotes`, `subsidiaries`, webhook endpoints) stays plain CRUD. Read "only `Order`"
 > below as "only transactional aggregates, which at the time was just `Order`".
 
 ## In one sentence

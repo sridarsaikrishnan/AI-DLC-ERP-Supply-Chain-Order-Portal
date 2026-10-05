@@ -305,14 +305,14 @@
 
 ## Increment 5 — Quote-before-order, named parties, box/license fulfillment, vendor date, order-truth fixes
 - **Started**: 2026-10-03
-- **Goal**: (A) Make the order truthful to the ERP — send the binding's `erp_customer_id` as the customer, key idempotency on the platform order id, give each line its own id, write shipment+quantities atomically, show both scores on the reseller order, rename `READY_FOR_DELIVERY`, demote `FULFILLED` to a score only. (B) Put a Quote in front of the Order (reseller/items/prices/validity/ship-to); order replies to a quote; no price without a quote; catalog Item becomes product-only (reverses ADR-0011/0013). (C) Name parties: reseller, end customer (name + ship-to on quote), operating-company "office card" (country + language columns, no profile service). (D) Item kind box/license with box=carrier/POD-before-delivered, license=delivered-on-ship, shipped vs delivered as distinct facts. (E) Vendor date on the line = "scheduled"; Vendor Order document deferred.
+- **Goal**: (A) Make the order truthful to the ERP — send the binding's `erp_customer_id` as the customer, key idempotency on the platform order id, give each line its own id, write shipment+quantities atomically, show both scores on the reseller order, rename `READY_FOR_DELIVERY`, demote `FULFILLED` to a score only. (B) Put a Quote in front of the Order (reseller/items/prices/validity/ship-to); order replies to a quote; no price without a quote; catalog Item becomes product-only (reverses ADR-0011/0013). (C) Name parties: reseller, end customer (name + ship-to on quote), subsidiary record (country + language columns, no profile service). (D) Item kind box/license with box=carrier/POD-before-delivered, license=delivered-on-ship, shipped vs delivered as distinct facts. (E) Vendor date on the line = "scheduled"; Vendor Order document deferred.
 
 ### 🔵 INCEPTION PHASE (Increment 5)
 - [x] Workspace Detection (resume; brownfield)
 - [x] Reverse Engineering (SKIPPED — design trail + direct code analysis this session: ordering aggregate/events/models, order_service, projections (read_models/store/projector), adapters, catalog models, tenancy/connections models, fulfillment service/aggregates, integration ports/delivery/odoo_adapter/status_mapping)
 - [~] Requirements Analysis — `requirements/increment5-requirements.md` + `requirements/increment5-questions.md` authored; **awaiting answers at the GATE** (Q1–Q7). No code written until the gate is passed (change reverses accepted ADRs + renames persisted lifecycle states).
 - [ ] Workflow Planning
-- [ ] Application Design (conditional — new `quoting` concept + operating-company; likely light)
+- [ ] Application Design (conditional — new `quoting` concept + subsidiary; likely light)
 - [ ] Units Generation (likely SKIPPED — extends existing units, one new reference concept)
 
 ### Extension Configuration (Increment 5) — proposed, pending Q7
@@ -334,7 +334,7 @@
 - [x] Code Generation — all five groups implemented. See `construction/increment5/code-summary.md`.
   - A (order truth): line_id, erp_customer_id→ERP, order_id idempotency, atomic shipment+qty (UnitOfWork), both scores on reseller order, READY_FOR_DELIVERY→ACCEPTED, FULFILLED demoted to score only.
   - B (quote before order): new `quoting` module; price from quote; catalog product-only (ADR-0016, supersedes 0011/0013).
-  - C (parties): end customer (name+ship-to) on quote; operating-company office card (country+language).
+  - C (parties): end customer (name+ship-to) on quote; subsidiary record (country+language).
   - D (box/license): ItemKind; shipped vs delivered as distinct facts (box needs carrier/POD, license delivered on ship).
   - E (vendor date): per-line vendor/"scheduled" date; Vendor Order document deferred.
 - [x] Build and Test — `APP_PROFILE=memory pytest src tests`: **174 passed, 5 skipped** (unchanged skip set = live AWS/Postgres only). Both GraphQL schemas build (SDL verified for new fields); memory AND postgres containers build cleanly. New tests: quoting (validity/refusal), delivery PBT (box/license), updated aggregate/projection/flow/status/odoo/fulfillment suites.
@@ -351,7 +351,7 @@
 - **Lifecycle Phase**: COMPLETE (through Build and Test), **including UI** (the Q6=A deferral was lifted on user request — "make sure everything is in place").
 - **UI (now done, not deferred)**: `ui/` SPA updated to the Increment 5 GraphQL shape, built in the existing design-system style (tokens + existing components; proposed screens pending formal design review per the `design/` steering):
   - Reseller: quote-driven **New order** (pick a quote → quantities → `placeOrder(quoteId,…)`), new **Quotes** list, order detail now shows the two scores + delivered fact + parties + per-line kind/shipped/delivered/scheduled.
-  - Operator: **Quotes** (issue) + **Operating companies** (office card) pages; **Item ownership** now edits `kind` (box/license), not price; order detail shows scores/delivery/parties and has **Record a shipment** (carrier/proof-of-delivery) + **Set vendor date** controls.
+  - Operator: **Quotes** (issue) + **Subsidiaries** page; **Item ownership** now edits `kind` (box/license), not price; order detail shows scores/delivery/parties and has **Record a shipment** (carrier/proof-of-delivery) + **Set vendor date** controls.
   - `ui/src/api/queries/*`, `hooks/*`, `routes.tsx`, `App.tsx` nav all updated. `npm run build` (tsc --noEmit && vite build) clean.
 - **Tooling now runnable + green** (were "could not run" before): `ruff==0.6.9` + `import-linter==2.1` installed. Fixed `pyproject.toml` import-linter config (`include_external_packages=true` required for the external-forbidden contract — a pre-existing config gap). Split `SecretsManagerSecretStore` into `src/shared/secrets/aws.py` so the `SecretStore` port stays SDK-free → both import-linter contracts now **KEPT** (0 broken). Applied safe ruff autofixes (unused imports, import order, modern syntax, stray noqa) to Increment 5 files.
 - **Known lint debt (pre-existing, repo-wide, NOT this increment)**: ~576 ruff findings dominated by E501 (dense line style), TCH typing-import style the repo never adopted, and E402 — all established conventions from before ruff was ever installed. Left as a separate cleanup, not bundled into this increment.
@@ -402,3 +402,88 @@ Both commits landed. The four split modules (`shipment`/`invoicing`/`payments`/`
 
 ### Known environment constraint
 - Terminal intermittently hangs/times out on piped or large-output bash commands and `git commit` heredocs. Workaround: commit via message file (`git commit -q -F <file>` then remove it); use the `grep_search` tool instead of bash `grep`.
+
+---
+
+## Increment 7 — Multi-ERP architecture: subsidiary-to-ERP routing, no shared catalog, ERP-authored quotes
+
+- **Started**: 2026-10-04
+- **Trigger**: user flagged the current routing design (order-time, bottom-up from
+  `Item.owning_connection_id`) as fragile ahead of bringing in multiple ERPs; a comparison
+  against a sister platform's entity-resolution approach confirmed the specific failure
+  mode (a product can only ever belong to one ERP; routing is reconstructed per-order
+  instead of fixed per-deal) and that ADR-0005's own "revisit when" condition — "identity
+  needs resolving across more than two systems for the same order" — is now met.
+- **Goal (original)**: decide the target ERP once, at quote-issue time (from the issuing
+  subsidiary's routing assignment), instead of re-deriving it from order line items
+  every time.
+- **Revision 1**: the first draft also proposed letting one product be listed for sale
+  through more than one ERP (`item_erp_listings`). User asked "do we need this at all" —
+  answer: no. `OdooAdapter._resolve_product` already does a live, fail-closed lookup of
+  the product inside the specific target ERP at submission time; a second, our-side
+  cached listing table would only duplicate that check with a copy that can drift from the
+  real thing. Dropped.
+- **Revision 2 (bigger)**: user questioned the shared catalog's existence entirely —
+  pointed out that NetSuite (coming next) is used by sales reps who already work in
+  NetSuite directly and will never touch our UI. That reframes who authors a quote: for
+  Odoo today, our operator does, in our UI; for NetSuite-style channels, the ERP does, and
+  our platform only mirrors it in. User's decision (confirmed): **remove the shared `Item`
+  catalog table entirely, for every channel** — every quote line now carries its own
+  product description inline (`name`, `kind`, plus the pricing fields already on it since
+  Increment 5), matching the sister platform's approach, not just its routing idea. This
+  also surfaces new, explicitly out-of-scope-for-now work: an ERP acting as the *source* of
+  a quote (not just the destination of an order) needs a new ingestion path, deferred to
+  when NetSuite integration actually starts.
+
+### 🔵 INCEPTION PHASE (Increment 7)
+- [x] Workspace Detection (resume; brownfield)
+- [x] Reverse Engineering (SKIPPED — direct reading of `routing.py`, `processing.py`,
+  `catalog/domain/models.py`, `quoting/domain/models.py`, `order_service.py`,
+  `ordering/domain/models.py`, `odoo_adapter.py`, `composition.py`, ADR-0005/0006 this
+  session)
+- [x] Application Design — `inception/application-design/multi-erp-routing.md` (3
+  revisions, same file/thread). Written for three audiences at once
+  (architect/product owner/developer) in plain language, per explicit user request — no
+  jargon, plain field/table names.
+- [x] Requirements Analysis — `inception/requirements/multi-erp-entity-questions.md` (11
+  questions, comparing against a sister distribution platform's entity-resolution model).
+  Answered 2026-10-04, all recommended (A); 4 flagged ⚠ as business facts assumed, not
+  verified (single-tenant intent, no reseller holding structures, real scale, no
+  inter-company trade).
+- [x] **Review gate — RESOLVED 2026-10-05.** The design doc's own 4 open questions (§7)
+  reconciled against the requirements doc: 1 directly answered there (multi-ERP-per-subsidiary
+  → no), 1 made moot by the catalog-removal revision, 2 had never actually been asked (only
+  carried a "proposed default") — asked and answered directly: no backfill of existing
+  quote lines before dropping `items` (accepted data loss, pre-production, no real data to
+  protect yet); yes, a quote's ERP stamp is permanent once issued. **All four resolved —
+  Construction may begin.**
+
+## Increment 7 Status
+- **Lifecycle Phase**: INCEPTION complete, review gate passed 2026-10-05. **Ready for
+  Construction.** No code changes yet for the routing/catalog work itself. Migration (4
+  steps: quote-line fields, order-service dependency drop, catalog module removal, routing
+  fix — a 5th, ERP-authored quote ingestion, is explicitly its own future increment) and a
+  new ADR (superseding ADR-0005's item-ownership half and ADR-0011/0016's remaining
+  catalog-kind dependency) are both scoped in the doc, not yet started.
+
+### Parallel work this session (reseller notifications — not blocked on, and doesn't block, the routing/catalog work above)
+- [x] Fixed a real casing inconsistency: order `status` was backend-formatted as human
+  Title Case ("Sent to ERP") while `fulfillmentStatus`/`deliveryStatus`/`invoiceStatus`
+  were raw SCREAMING_SNAKE_CASE — the one deliberate translation layer (`STATUS_LABELS`,
+  `VALIDATED`+`ACCEPTED` → one reseller-facing word) was only ever built for one of the
+  four fields. Now all four are raw and consistent; presentation (human label, color)
+  moved fully into the UI (`ui/src/lib/statusLabel.ts`, replacing two duplicated
+  `scoreLabel` copies). Confirmed this also fixed the webhook body (`_build_body` reads
+  the same `STATUS_LABELS`-driven view) with no separate backend change needed.
+- [x] Documented the full order lifecycle (every state, its guard, exact trigger) and
+  every dispatchable webhook event (trigger + exact wire body) in
+  `docs/developer-guide.md` §4.3/§4.4/§5 — grounded directly in the aggregate/event code,
+  not described from memory.
+- [x] That documentation pass surfaced a real gap: `OrderCancelled` was never in
+  `DISPATCHABLE_EVENT_TYPES` — a cancellation (reseller-initiated or ERP-reported) never
+  reached a reseller's webhook. Fixed in the real code, the real SNS filter policy
+  (`scripts/messaging_bootstrap.py`), and `messaging-topology.md` (which also had
+  unrelated pre-existing drift — a dead `OrderFulfilled` reference, a missing
+  `order-fulfillment.fifo` row — fixed in the same pass). New regression test.
+- `pytest src tests`: 182 passed, 5 skipped. `ruff check`: clean. `npm run build` (UI):
+  clean.

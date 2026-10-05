@@ -19,3 +19,13 @@ class PriceNotQuoted(Exception):
     def __init__(self, product_key: str) -> None:
         super().__init__(f"no quoted price on file for '{product_key}'")
         self.product_key = product_key
+
+
+class NoErpRouteConfigured(Exception):
+    """The issuing subsidiary has no active ERP connection to route to — a quote
+    can't be issued until an operator sets one (Increment 7: routing is decided at
+    quote-issue time, not derived from items at order time)."""
+
+    def __init__(self, subsidiary_id: str) -> None:
+        super().__init__(f"subsidiary '{subsidiary_id}' has no active ERP route")
+        self.subsidiary_id = subsidiary_id

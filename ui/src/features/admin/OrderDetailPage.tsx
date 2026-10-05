@@ -6,11 +6,7 @@ import { OrderTimeline } from "../../components/OrderTimeline";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useOperatorOrder, useRecordShipment, useSetVendorDate } from "../../hooks/useAdmin";
 import { formatMoney } from "../../lib/money";
-
-function scoreLabel(value: string): string {
-  const s = value.replace(/_/g, " ").toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { statusLabel } from "../../lib/statusLabel";
 
 /** Operator view of one order: everything the reseller sees, plus ERP identity (owning
  * connection, ERP order id) — never shown on the reseller-facing OrderDetailPage. */
@@ -47,14 +43,14 @@ export function OrderDetailPage() {
     setVendor({ lineId: "", vendorDate: "" });
   }
 
-  const recordable = order.status === "Confirmed" || order.status === "Closed";
+  const recordable = order.status === "CONFIRMED" || order.status === "CLOSED";
 
   return (
     <>
       <div className="pagehead">
         <div>
           <h1>
-            Order {order.orderId} <StatusBadge status={order.status} />
+            Order {order.orderId} <StatusBadge status={statusLabel(order.status)} />
           </h1>
           <p>
             Tenant {order.tenantId}, reference {order.clientReference}.
@@ -195,11 +191,11 @@ export function OrderDetailPage() {
             <h2>Fulfillment</h2>
             <dl className="kv">
               <dt>Fulfillment</dt>
-              <dd><StatusBadge status={scoreLabel(order.fulfillmentStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.fulfillmentStatus)} /></dd>
               <dt>Delivery</dt>
-              <dd><StatusBadge status={scoreLabel(order.deliveryStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.deliveryStatus)} /></dd>
               <dt>Invoice</dt>
-              <dd><StatusBadge status={scoreLabel(order.invoiceStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.invoiceStatus)} /></dd>
             </dl>
           </section>
           <section className="panel">
@@ -209,8 +205,8 @@ export function OrderDetailPage() {
               <dd>{order.parties.endCustomerName || "—"}</dd>
               <dt>Ship to</dt>
               <dd>{order.parties.shipTo || "—"}</dd>
-              <dt>Operating company</dt>
-              <dd className="mono">{order.parties.operatingCompanyId || "—"}</dd>
+              <dt>Subsidiary</dt>
+              <dd className="mono">{order.parties.subsidiaryId || "—"}</dd>
             </dl>
           </section>
           <section className="panel">

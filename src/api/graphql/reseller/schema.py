@@ -81,7 +81,7 @@ def _to_gql(view: ResellerOrderView) -> ResellerOrder:
         parties=PartiesType(
             end_customer_name=view.parties.end_customer_name,
             ship_to=view.parties.ship_to,
-            operating_company_id=view.parties.operating_company_id,
+            subsidiary_id=view.parties.subsidiary_id,
             quote_id=view.parties.quote_id,
         ),
     )
@@ -90,7 +90,7 @@ def _to_gql(view: ResellerOrderView) -> ResellerOrder:
 def _quote_to_gql(quote: Quote) -> QuoteType:
     return QuoteType(
         quote_id=quote.quote_id,
-        operating_company_id=quote.operating_company_id,
+        subsidiary_id=quote.subsidiary_id,
         end_customer_name=quote.end_customer.name,
         ship_to=quote.end_customer.ship_to,
         currency=quote.currency,
@@ -100,6 +100,8 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
         lines=[
             QuoteLineType(
                 product_key=line.product_key,
+                name=line.name,
+                kind=line.kind,
                 unit_price=MoneyType(
                     amount=str(line.unit_price.amount), currency=line.unit_price.currency
                 ),

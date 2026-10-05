@@ -55,11 +55,11 @@ D) Other (please describe after [Answer]: tag below)
 [Answer]: 
 
 ## Question 5
-The operating-company "office card" (country + language, for document numbers and email locale).
+The subsidiary "subsidiary record" (country + language, for document numbers and email locale).
 
-A) **Single operating company (recommended).** One operating-company record per deployment, referenced by quotes/orders for numbering + email locale. Smallest thing that satisfies "document numbers and emails have a home."
+A) **Single subsidiary (recommended).** One subsidiary record per deployment, referenced by quotes/orders for numbering + email locale. Smallest thing that satisfies "document numbers and emails have a home."
 
-B) Multiple operating companies (multi-entity); each quote/order points to one.
+B) Multiple subsidiaries (multi-entity); each quote/order points to one.
 
 C) Other (please describe after [Answer]: tag below)
 

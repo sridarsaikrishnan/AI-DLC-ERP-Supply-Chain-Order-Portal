@@ -8,13 +8,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from src.composition import build_container
-from src.modules.reference.catalog.domain.models import Item
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType
 from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
 from src.modules.sales.ordering.application.order_service import OrderLineInput
 from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
 from src.shared.money import Money
-from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
+from src.shared.types import BindingId, ConnectionId, TenantId
 
 
 def test_container_places_routes_and_delivers() -> None:
@@ -32,9 +31,6 @@ def test_container_places_routes_and_delivers() -> None:
             secret_ref="env:ODOO_SECRET",
         )
     )
-    container.items.add(
-        Item(item_id=ItemId("item_anvil"), sku="ANVIL", name="Anvil", owning_connection_id=conn)
-    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId("bind_demo"),
@@ -45,12 +41,13 @@ def test_container_places_routes_and_delivers() -> None:
         )
     )
 
-    company = container.quote_service.create_operating_company(
+    company = container.quote_service.create_subsidiary(
         name="Distributor Co", country="US", language="en"
     )
+    container.quote_service.set_erp_route(company.subsidiary_id, str(conn))
     quote = container.quote_service.issue_quote(
         tenant_id=TenantId("tnt_demo"),
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream Inc", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
@@ -72,5 +69,5 @@ def test_container_places_routes_and_delivers() -> None:
 
     view = container.projections.get_reseller_view("tnt_demo", order_id)
     assert view is not None
-    assert view.status == "Sent to ERP"
+    assert view.status == "SENT_TO_ERP"
     assert view.parties.end_customer_name == "Downstream Inc"

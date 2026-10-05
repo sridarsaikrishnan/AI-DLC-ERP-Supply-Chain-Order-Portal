@@ -46,17 +46,26 @@ class QuoteLine:
     unit_of_measure: str = ""
     tax_rate: TaxRate | None = None
     line_discount: Money | None = None
+    # What the product is — supplied directly on the line (Increment 7), not looked up
+    # from a shared catalog. `kind` drives the delivered fact downstream on the order
+    # (box needs carrier/proof-of-delivery; license is delivered on ship).
+    name: str = ""
+    kind: str = "PHYSICAL"
 
 
 @dataclass
 class Quote:
     quote_id: str
     tenant_id: TenantId  # the reseller this quote is for (FR-B1)
-    operating_company_id: str  # which operating company issued it (FR-C3)
+    subsidiary_id: str  # which subsidiary issued it (FR-C3)
     end_customer: EndCustomer
     currency: str
     valid_from: date
     valid_until: date
+    # Which ERP connection this quote's resulting order goes to — resolved from the
+    # issuing subsidiary's current route at issue time and stamped here
+    # permanently (Increment 7). Never re-derived from line items at order time.
+    routed_to_connection_id: str = ""
     lines: list[QuoteLine] = field(default_factory=list)
     status: QuoteStatus = QuoteStatus.DRAFT
 
@@ -73,11 +82,12 @@ class Quote:
 
 
 @dataclass
-class OperatingCompany:
-    """The "office card" (FR-C3): the company you are. Country and language live here so
-    document numbers and email locale have a home. A plain record, not a profile service."""
+class Subsidiary:
+    """The subsidiary record (FR-C3): the company you are. Country and language live here
+    so document numbers and email locale have a home. A plain record, not a profile
+    service."""
 
-    operating_company_id: str
+    subsidiary_id: str
     name: str
     country: str
     language: str

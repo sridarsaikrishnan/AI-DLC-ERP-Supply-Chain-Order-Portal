@@ -5,7 +5,7 @@ from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.domain.models import OrderLine, OrderState
 from src.shared.canonical_status import CanonicalStatus
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
-from src.shared.types import ConnectionId, OrderId, TenantId
+from src.shared.types import OrderId, TenantId
 
 
 def _sent_order(repo: EventSourcedRepository[Order]) -> OrderId:
@@ -14,8 +14,9 @@ def _sent_order(repo: EventSourcedRepository[Order]) -> OrderId:
         tenant_id=TenantId("t"),
         client_reference="r",
         lines=[OrderLine(product_key="ANVIL", quantity=1, unit_of_measure="EA", line_id="l_a")],
+        routed_to_connection_id="conn_1",
     )
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S1")
     repo.save(order)

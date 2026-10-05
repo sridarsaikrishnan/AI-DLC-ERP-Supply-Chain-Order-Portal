@@ -26,9 +26,9 @@ Quote-before-order, named parties, box/license fulfillment, vendor dates, and or
 - **FR-B4 — Catalog is product-only.** The catalog `Item` answers only "what the product is" (identity/description/kind). It no longer carries `unit_price`/`tax_rate`/`line_discount`. **This reverses ADR-0011 and ADR-0013.**
 
 ### Group C — "Name the parties"
-- **FR-C1 — Three named parties.** Reseller, end customer, and the operating company ("the company you are") are named on the two papers (quote and order).
+- **FR-C1 — Three named parties.** Reseller, end customer, and the subsidiary ("the company you are") are named on the two papers (quote and order).
 - **FR-C2 — End customer.** The end customer is a **name + ship-to address** recorded on the quote (not a managed account/entity — just those fields).
-- **FR-C3 — Operating-company "office card".** A simple operating-company record carries **country** and **language** columns, so document numbers and email locale have a home. Implemented as columns / a small table — explicitly **not** a separate "Distributor profile" service.
+- **FR-C3 — Subsidiary "subsidiary record".** A simple subsidiary record carries **country** and **language** columns, so document numbers and email locale have a home. Implemented as columns / a small table — explicitly **not** a separate "subsidiary profile" service.
 
 ### Group D — "Box or a license"
 - **FR-D1 — Item kind.** Each catalog item is marked **physical ("box")** or **license**.
@@ -40,7 +40,7 @@ Quote-before-order, named parties, box/license fulfillment, vendor dates, and or
 - **FR-E2 — Vendor Order deferred.** No separate Vendor Order document is built in this increment; it waits until that purchase is its own paper with its own number.
 
 ## Non-functional requirements (inherited unless Q7 changes them)
-- **Security Baseline** (Increment 3/4: Yes). New reseller surfaces must honor **FR-19 / AC-02**: no ERP name, instance, or ERP record id (including `erp_customer_id`) ever reaches a reseller view. Quote/end-customer/operating-company data is reseller-safe; `erp_customer_id` stays operator-only, exactly like the binding today.
+- **Security Baseline** (Increment 3/4: Yes). New reseller surfaces must honor **FR-19 / AC-02**: no ERP name, instance, or ERP record id (including `erp_customer_id`) ever reaches a reseller view. Quote/end-customer/subsidiary data is reseller-safe; `erp_customer_id` stays operator-only, exactly like the binding today.
 - **Resiliency Baseline** (Yes). The new atomic shipment+quantity write (FR-A4) and the ERP idempotency change (FR-A2) are reliability requirements, not nice-to-haves.
 - **Property-Based Testing** (Partial). Extend PBT to the new pure functions: quote price/validity resolution and the box/license delivered-fact derivation.
 - **Event-sourcing versioning.** Renaming/removing `OrderState` members must not break replay of events already in the store. Persisted event *type names* (`OrderReadyForDelivery`, `OrderFulfilled`) are historical facts; the chosen approach must keep old streams replayable (see Q2/Q3 and the design stage).
@@ -48,7 +48,7 @@ Quote-before-order, named parties, box/license fulfillment, vendor dates, and or
 ## ADRs this increment changes or adds
 - **Reverses**: ADR-0011 (price from catalog), ADR-0013 (flat item tax/discount from catalog).
 - **Amends**: ADR-0005 (binding is now the ERP customer actually sent), ADR-0014 (lifecycle vs. fulfillment status — `FULFILLED` leaves the lifecycle; shipped/delivered become fulfillment-derived facts).
-- **New (to be written at design time)**: Quote-before-order & price-from-quote; operating-company office card; item kind + delivered-fact derivation; vendor/scheduled date without a Vendor Order.
+- **New (to be written at design time)**: Quote-before-order & price-from-quote; subsidiary subsidiary record; item kind + delivered-fact derivation; vendor/scheduled date without a Vendor Order.
 
 ## Open questions
 See `increment5-questions.md`. Each question carries a recommended answer; the forks are real because they reverse accepted ADRs, rename persisted lifecycle states, and (Q6) would touch undesigned UI governed by the `design/` source of truth.

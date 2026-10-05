@@ -40,7 +40,7 @@ class OperatorTimelineEntryType:
 class OperatorPartiesType:
     end_customer_name: str
     ship_to: str
-    operating_company_id: str
+    subsidiary_id: str
     quote_id: str
 
 
@@ -123,20 +123,8 @@ class BindingType:
 
 
 @strawberry.type
-class ItemType:
-    """Catalog item — identity only now (Increment 5, ADR-0016). Price/tax/discount moved
-    to the quote; `kind` says box vs. license."""
-
-    item_id: str
-    sku: str
-    name: str
-    owning_connection_id: str
-    kind: str
-
-
-@strawberry.type
-class OperatingCompanyType:
-    operating_company_id: str
+class SubsidiaryType:
+    subsidiary_id: str
     name: str
     country: str
     language: str
@@ -145,6 +133,8 @@ class OperatingCompanyType:
 @strawberry.type
 class QuoteLineType:
     product_key: str
+    name: str
+    kind: str
     unit_price: MoneyType
     unit_of_measure: str
     tax_code: str | None
@@ -156,12 +146,13 @@ class QuoteLineType:
 class QuoteType:
     quote_id: str
     tenant_id: str
-    operating_company_id: str
+    subsidiary_id: str
     end_customer_name: str
     ship_to: str
     currency: str
     valid_from: str
     valid_until: str
+    routed_to_connection_id: str
     status: str
     lines: list[QuoteLineType]
 
@@ -169,7 +160,9 @@ class QuoteType:
 @strawberry.input
 class QuoteLineInput:
     product_key: str
+    name: str
     unit_price: float
+    kind: str = "PHYSICAL"
     unit_of_measure: str = ""
     tax_code: str | None = None
     tax_rate: float | None = None

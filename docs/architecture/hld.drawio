@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" pages="3">
+<mxfile host="app.diagrams.net" pages="2">
   <diagram id="hld-containers" name="1 · Container view (C4)">
     <mxGraphModel dx="867" dy="493" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1740" pageHeight="970" background="#FFFFFF" math="0" shadow="0">
       <root>
@@ -31,7 +31,7 @@
         <mxCell id="spa_res" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Reseller portal&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#3B5A86&#39;&gt;[SPA · React]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;Browse quotes, place orders, track status, manage webhooks. No ERP identity (FR-19).&lt;/font&gt;" vertex="1">
           <mxGeometry height="70" width="200" x="190" y="250" as="geometry" />
         </mxCell>
-        <mxCell id="spa_op" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Operator admin&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#3B5A86&#39;&gt;[SPA · React]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;Manage connections, resellers, items, quotes, office cards; view all orders.&lt;/font&gt;" vertex="1">
+        <mxCell id="spa_op" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Operator admin&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#3B5A86&#39;&gt;[SPA · React]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;Manage connections, resellers, quotes, subsidiaries + their ERP routing; view all orders.&lt;/font&gt;" vertex="1">
           <mxGeometry height="70" width="200" x="190" y="340" as="geometry" />
         </mxCell>
         <mxCell id="cognito" parent="1" style="fontFamily=Helvetica;sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#FFFFFF;fillColor=#DD344C;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;spacingLeft=6;" value="&lt;b&gt;Amazon Cognito&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;identity · issues JWT&lt;/font&gt;" vertex="1">
@@ -40,7 +40,7 @@
         <mxCell id="api" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#D5E8D4;strokeColor=#82B366;" value="&lt;b&gt;API host&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#4D7A3A&#39;&gt;[Container · Python / FastAPI · HTTP]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#333333&#39;&gt;The only HTTP server: GraphQL for reseller + operator, inbound ERP webhook route, request auth.&lt;br&gt;Reseller surface hides ERP identity (FR-19).&lt;/font&gt;" vertex="1">
           <mxGeometry height="180" width="380" x="555" y="240" as="geometry" />
         </mxCell>
-        <mxCell id="domain" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFF2CC;strokeColor=#D6B656;verticalAlign=top;spacingTop=4;" value="&lt;b&gt;Domain modules&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#8A6D1F&#39;&gt;[shared library · used by API + Worker]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#8A6D1F&#39;&gt;★ event-sourced · see page 2 for module → table ownership · page 3 for known gaps&lt;/font&gt;" vertex="1">
+        <mxCell id="domain" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFF2CC;strokeColor=#D6B656;verticalAlign=top;spacingTop=4;" value="&lt;b&gt;Domain modules&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#8A6D1F&#39;&gt;[shared library · used by API + Worker]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#8A6D1F&#39;&gt;★ event-sourced · see page 2 for onboarding &amp; ERP routing&lt;/font&gt;" vertex="1">
           <mxGeometry height="170" width="380" x="555" y="460" as="geometry" />
         </mxCell>
         <mxCell id="chip0" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;fontStyle=1;" value="ordering ★" vertex="1">
@@ -61,23 +61,20 @@
         <mxCell id="chip5" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="quoting" vertex="1">
           <mxGeometry height="24" width="112" x="811" y="532" as="geometry" />
         </mxCell>
-        <mxCell id="chip6" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="catalog" vertex="1">
+        <mxCell id="chip6" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="tenancy" vertex="1">
           <mxGeometry height="24" width="112" x="567" y="562" as="geometry" />
         </mxCell>
-        <mxCell id="chip7" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="tenancy" vertex="1">
+        <mxCell id="chip7" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="connections" vertex="1">
           <mxGeometry height="24" width="112" x="689" y="562" as="geometry" />
         </mxCell>
-        <mxCell id="chip8" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="connections" vertex="1">
+        <mxCell id="chip8" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="integration (ERP)" vertex="1">
           <mxGeometry height="24" width="112" x="811" y="562" as="geometry" />
         </mxCell>
-        <mxCell id="chip9" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="integration (ERP)" vertex="1">
+        <mxCell id="chip9" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="webhooks_inbound" vertex="1">
           <mxGeometry height="24" width="112" x="567" y="592" as="geometry" />
         </mxCell>
-        <mxCell id="chip10" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="webhooks_inbound" vertex="1">
+        <mxCell id="chip10" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="webhooks_outbound" vertex="1">
           <mxGeometry height="24" width="112" x="689" y="592" as="geometry" />
-        </mxCell>
-        <mxCell id="chip11" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D6B656;fontSize=10;spacing=2;arcSize=20;" value="webhooks_outbound ⚠" vertex="1">
-          <mxGeometry height="24" width="112" x="811" y="592" as="geometry" />
         </mxCell>
         <mxCell id="worker" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#D5E8D4;strokeColor=#82B366;" value="&lt;b&gt;Worker host&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#4D7A3A&#39;&gt;[Container · Python process — not HTTP / not FastAPI]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#333333&#39;&gt;Background consumers: order routing, ERP delivery, projections, outbound webhook dispatch · outbox relay · reconciliation scheduler. Role-splittable.&lt;/font&gt;" vertex="1">
           <mxGeometry height="100" width="380" x="555" y="640" as="geometry" />
@@ -97,14 +94,11 @@
         <mxCell id="erp" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F8CECC;strokeColor=#B85450;" value="&lt;b&gt;ERP — Odoo&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#8A3B38&#39;&gt;[external]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;System of record for orders. Receives orders via JSON-RPC; pushes status via webhooks.&lt;br&gt;Other ERPs: &lt;b&gt;TBD&lt;/b&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="100" width="280" x="1420" y="240" as="geometry" />
         </mxCell>
-        <mxCell id="gap_erp" parent="1" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=#FFF4E5;fontSize=9;fontColor=#8A3B38;align=left;verticalAlign=top;rounded=1;arcSize=10;spacingLeft=6;spacingTop=3;" value="⚠ Reconciliation polls sale.order state/invoice_status only — stock.picking (shipments) and account.move (invoices) aren't read. Odoo-side shipments go unnoticed until an operator records them. See page 3." vertex="1">
+        <mxCell id="gap_erp" parent="1" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=#FFF4E5;fontSize=9;fontColor=#8A3B38;align=left;verticalAlign=top;rounded=1;arcSize=10;spacingLeft=6;spacingTop=3;" value="⚠ Reconciliation polls sale.order state/invoice_status only — stock.picking (shipments) and account.move (invoices) aren't read. Odoo-side shipments go unnoticed until an operator records them." vertex="1">
           <mxGeometry height="60" width="280" x="1420" y="345" as="geometry" />
         </mxCell>
         <mxCell id="whep" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F8CECC;strokeColor=#B85450;" value="&lt;b&gt;Reseller webhook endpoints&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#8A3B38&#39;&gt;[external]&lt;/font&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39; color=&#39;#555555&#39;&gt;Reseller-operated receivers for order-status notifications (HMAC-signed).&lt;/font&gt;" vertex="1">
-          <mxGeometry height="90" width="280" x="1420" y="800" as="geometry" />
-        </mxCell>
-        <mxCell id="gap_wh" parent="1" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=#E8F5E9;fontSize=9;fontColor=#3A6B3A;align=left;verticalAlign=top;rounded=1;arcSize=10;spacingLeft=6;spacingTop=3;" value="✓ Fixed 2026-10-04: ShipmentRecorded/InvoiceRecorded now dispatch to resellers (tenant_id stamped); dead OrderFulfilled removed. See page 3." vertex="1">
-          <mxGeometry height="60" width="280" x="1420" y="700" as="geometry" />
+          <mxGeometry height="90" width="280" x="1420" y="700" as="geometry" />
         </mxCell>
         <mxCell id="e_res" edge="1" parent="1" source="a_res" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#333333;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="spa_res" value="">
           <mxGeometry relative="1" as="geometry" />
@@ -272,264 +266,113 @@
       </root>
     </mxGraphModel>
   </diagram>
-  <diagram id="hld-data" name="2 · Modules → tables (data ownership)">
-    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1100" background="#FFFFFF" math="0" shadow="0">
+  <diagram id="hld-onboarding" name="2 · Onboarding &amp; ERP routing">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1000" background="#FFFFFF" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="t" value="Modules → PostgreSQL tables (data ownership)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;align=left;" vertex="1" parent="1">
-          <mxGeometry x="30" y="18" width="800" height="30" as="geometry" />
+        <mxCell id="t2" value="Onboarding &amp; ERP routing — reaching the right ERP instance" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="30" y="18" width="900" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="st" value="All tables live in the single Aurora PostgreSQL datastore (ADR-0004). ★ = event-sourced aggregate, persisted through the shared event-store kernel." style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=12;align=left;fontColor=#666666;" vertex="1" parent="1">
-          <mxGeometry x="30" y="48" width="1200" height="20" as="geometry" />
+        <mxCell id="st2" value="Two mappings an operator sets up, kept independent on purpose: which ERP instance a subsidiary's quotes route to, and whether a given reseller is known inside that specific ERP instance (and under what customer id)." style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=12;align=left;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="30" y="50" width="1200" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="key_t" value="Table groups:" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
-          <mxGeometry x="30" y="80" width="90" height="20" as="geometry" />
+        <mxCell id="op2" parent="1" style="fontFamily=Helvetica;sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;html=1;aspect=fixed;shape=mxgraph.aws4.user;fontSize=12;fontStyle=1;labelPosition=bottom;verticalLabelPosition=bottom;align=center;verticalAlign=top;spacingTop=6;" value="Operator /&lt;br&gt;distributor admin" vertex="1">
+          <mxGeometry x="20" y="230" width="40" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="key_es" value="Event store (shared kernel)" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="122" y="80" width="170" height="22" as="geometry" />
+        <mxCell id="res_a" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Reseller A&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#3B5A86&#39;&gt;the ordering party (TenantId)&lt;/font&gt;" vertex="1">
+          <mxGeometry x="100" y="140" width="220" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="key_ord" value="Order read models" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="302" y="80" width="170" height="22" as="geometry" />
+        <mxCell id="res_b" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Reseller B&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#3B5A86&#39;&gt;the ordering party (TenantId)&lt;/font&gt;" vertex="1">
+          <mxGeometry x="540" y="140" width="220" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="key_ref" value="Reference / CRUD data" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="482" y="80" width="170" height="22" as="geometry" />
+        <mxCell id="res_c" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;" value="&lt;b&gt;Reseller C&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#3B5A86&#39;&gt;the ordering party (TenantId)&lt;/font&gt;" vertex="1">
+          <mxGeometry x="980" y="140" width="220" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="key_wh" value="Outbound webhooks" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="662" y="80" width="170" height="22" as="geometry" />
+        <mxCell id="bindings" parent="1" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;" value="&lt;b&gt;tenant_connection_bindings&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39;&gt;reseller ↔ ERP identity: erp_customer_id + status&lt;/font&gt;" vertex="1">
+          <mxGeometry x="470" y="250" width="360" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="key_idem" value="Idempotency (dedupe)" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="842" y="80" width="170" height="22" as="geometry" />
+        <mxCell id="office_us" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFF2CC;strokeColor=#D6B656;" value="&lt;b&gt;Subsidiary — US&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#8A6D1F&#39;&gt;subsidiary_id&lt;/font&gt;" vertex="1">
+          <mxGeometry x="100" y="370" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="h0" value="&lt;b&gt;Module&lt;/b&gt;" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#EEEEEE;strokeColor=#CCCCCC;fontSize=11;arcSize=10;" vertex="1" parent="1">
-          <mxGeometry x="30" y="120" width="250" height="30" as="geometry" />
+        <mxCell id="office_de" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFF2CC;strokeColor=#D6B656;" value="&lt;b&gt;Subsidiary — Germany&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#8A6D1F&#39;&gt;subsidiary_id&lt;/font&gt;" vertex="1">
+          <mxGeometry x="540" y="370" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="h1" value="&lt;b&gt;Owns (writes)&lt;/b&gt;" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#EEEEEE;strokeColor=#CCCCCC;fontSize=11;arcSize=10;" vertex="1" parent="1">
-          <mxGeometry x="290" y="120" width="470" height="30" as="geometry" />
+        <mxCell id="office_apac" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFF2CC;strokeColor=#D6B656;" value="&lt;b&gt;Subsidiary — APAC&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#8A6D1F&#39;&gt;subsidiary_id&lt;/font&gt;" vertex="1">
+          <mxGeometry x="980" y="370" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="h2" value="&lt;b&gt;Also writes / updates&lt;/b&gt;" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#EEEEEE;strokeColor=#CCCCCC;fontSize=11;arcSize=10;" vertex="1" parent="1">
-          <mxGeometry x="770" y="120" width="245" height="30" as="geometry" />
+        <mxCell id="conn_us" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#D5E8D4;strokeColor=#82B366;" value="&lt;b&gt;Connection: Odoo — US warehouse&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#4D7A3A&#39;&gt;erp_type = ODOO&lt;/font&gt;" vertex="1">
+          <mxGeometry x="100" y="480" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="h3" value="&lt;b&gt;Reads&lt;/b&gt;" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#EEEEEE;strokeColor=#CCCCCC;fontSize=11;arcSize=10;" vertex="1" parent="1">
-          <mxGeometry x="1025" y="120" width="245" height="30" as="geometry" />
+        <mxCell id="conn_eu" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#D5E8D4;strokeColor=#82B366;" value="&lt;b&gt;Connection: Odoo — EU warehouse&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#4D7A3A&#39;&gt;erp_type = ODOO&lt;/font&gt;" vertex="1">
+          <mxGeometry x="540" y="480" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="row0" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="160" width="1240" height="52" as="geometry" />
+        <mxCell id="conn_future" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;dashed=1;fillColor=#F5F5F5;strokeColor=#AAAAAA;fontColor=#888888;" value="&lt;b&gt;Connection: next ERP type&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39;&gt;e.g. NetSuite — plugs in via the adapter registry; not yet registered&lt;/font&gt;" vertex="1">
+          <mxGeometry x="980" y="480" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="mod0" value="shared event-sourcing kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="168" width="226" height="36" as="geometry" />
+        <mxCell id="ext_box" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=2;html=1;fillColor=none;dashed=1;dashPattern=6 4;verticalAlign=top;align=left;fontStyle=1;fontSize=11;spacingLeft=10;spacingTop=4;container=0;strokeColor=#B85450;fontColor=#8A3B38;" value="EXTERNAL SYSTEMS" vertex="1">
+          <mxGeometry x="60" y="610" width="1180" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="own0_0" value="events" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="1">
-          <mxGeometry x="300" y="165" width="142" height="42" as="geometry" />
+        <mxCell id="ext_us" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F8CECC;strokeColor=#B85450;" value="&lt;b&gt;Odoo — US instance&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#8A3B38&#39;&gt;[external]&lt;/font&gt;" vertex="1">
+          <mxGeometry x="100" y="650" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="own0_1" value="outbox" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="1">
-          <mxGeometry x="452" y="165" width="142" height="42" as="geometry" />
+        <mxCell id="ext_eu" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F8CECC;strokeColor=#B85450;" value="&lt;b&gt;Odoo — EU instance&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:9px&#39; color=&#39;#8A3B38&#39;&gt;[external]&lt;/font&gt;" vertex="1">
+          <mxGeometry x="540" y="650" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="own0_2" value="snapshots" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="1">
-          <mxGeometry x="604" y="165" width="142" height="42" as="geometry" />
+        <mxCell id="ext_note" parent="1" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" value="no live adapter yet — registering a connection above doesn't light this up until the ERP's adapter is implemented (adapter registry)" vertex="1">
+          <mxGeometry x="980" y="650" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="row1" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="218" width="1240" height="52" as="geometry" />
+        <mxCell id="e_ra_bind" edge="1" parent="1" source="res_a" target="bindings" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.3;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" value="">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="mod1" value="ordering ★" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="42" y="226" width="226" height="36" as="geometry" />
+        <mxCell id="e_rb_bind" edge="1" parent="1" source="res_b" target="bindings" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.3;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="has a binding per connection">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="own1_0" value="orders" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#FFE6CC;strokeColor=#D79B00;" vertex="1" parent="1">
-          <mxGeometry x="300" y="223" width="142" height="42" as="geometry" />
+        <mxCell id="e_rc_bind" edge="1" parent="1" source="res_c" target="bindings" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.3;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" value="">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="own1_1" value="order_status_history" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#FFE6CC;strokeColor=#D79B00;" vertex="1" parent="1">
-          <mxGeometry x="452" y="223" width="142" height="42" as="geometry" />
+        <mxCell id="e_ra_office" edge="1" parent="1" source="res_a" target="office_us" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#6C8EBF;strokeWidth=1.3;dashed=1;dashPattern=4 3;endArrow=block;endFill=1;fontColor=#3B5A86;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" value="④ requests a quote">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="also1_0" value="events ★ via kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#9673A6;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="780" y="231" width="112" height="26" as="geometry" />
+        <mxCell id="e_rb_office" edge="1" parent="1" source="res_b" target="office_de" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#6C8EBF;strokeWidth=1.3;dashed=1;dashPattern=4 3;endArrow=block;endFill=1;fontColor=#3B5A86;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" value="">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="row2" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="276" width="1240" height="52" as="geometry" />
+        <mxCell id="e_rc_office" edge="1" parent="1" source="res_c" target="office_apac" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#6C8EBF;strokeWidth=1.3;dashed=1;dashPattern=4 3;endArrow=block;endFill=1;fontColor=#3B5A86;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" value="">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="mod2" value="shipment ★" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="42" y="284" width="226" height="36" as="geometry" />
+        <mxCell id="e_office_conn_us" edge="1" parent="1" source="office_us" target="conn_us" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="② current route">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="own2_none" value="— no tables of its own —" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="292" width="300" height="20" as="geometry" />
+        <mxCell id="e_office_conn_eu" edge="1" parent="1" source="office_de" target="conn_eu" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="② current route">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="also2_0" value="events ★ via kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#9673A6;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="780" y="289" width="112" height="26" as="geometry" />
+        <mxCell id="e_office_conn_apac" edge="1" parent="1" source="office_apac" target="conn_future" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="② current route">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="also2_1" value="orders · updates" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D79B00;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="898" y="289" width="112" height="26" as="geometry" />
+        <mxCell id="e_bind_conn_us" edge="1" parent="1" source="bindings" target="conn_us" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#9673A6;strokeWidth=1.3;dashed=1;dashPattern=6 4;endArrow=block;endFill=1;fontColor=#6A4B86;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" value="③ verified binding">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="gap2" value="✓ dispatched to reseller webhooks (fixed 2026-10-04, page 3)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#5A9E5A;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="1025" y="290" width="245" height="20" as="geometry" />
+        <mxCell id="e_bind_conn_eu" edge="1" parent="1" source="bindings" target="conn_eu" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#9673A6;strokeWidth=1.3;dashed=1;dashPattern=6 4;endArrow=block;endFill=1;fontColor=#6A4B86;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" value="③ verified binding">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="row3" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="334" width="1240" height="52" as="geometry" />
+        <mxCell id="e_op_conn" edge="1" parent="1" source="op2" target="conn_us" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.3;endArrow=open;fontColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="① registers connection">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="40" y="505" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="mod3" value="invoicing ★" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="42" y="342" width="226" height="36" as="geometry" />
+        <mxCell id="e_op_bind" edge="1" parent="1" source="op2" target="bindings" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#333333;strokeWidth=1.3;endArrow=open;fontColor=#333333;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" value="③ binds reseller + erp_customer_id">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="own3_none" value="— no tables of its own —" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="350" width="300" height="20" as="geometry" />
+        <mxCell id="e_conn_ext_us" edge="1" parent="1" source="conn_us" target="ext_us" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#B85450;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#8A3B38;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="adapter call">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="also3_0" value="events ★ via kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#9673A6;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="780" y="347" width="112" height="26" as="geometry" />
+        <mxCell id="e_conn_ext_eu" edge="1" parent="1" source="conn_eu" target="ext_eu" style="fontFamily=Helvetica;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;labelBackgroundColor=#FFFFFF;jumpStyle=arc;endSize=7;strokeColor=#B85450;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#8A3B38;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="adapter call">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="also3_1" value="orders · updates" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D79B00;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="898" y="347" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="gap3" value="✓ dispatched to reseller webhooks (fixed 2026-10-04, page 3)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#5A9E5A;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="1025" y="348" width="245" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="row4" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="392" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod4" value="payments ★" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="42" y="400" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own4_none" value="— no tables of its own — standalone, not wired to the order yet" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="408" width="460" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="also4_0" value="events ★ via kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#9673A6;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="780" y="405" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="row5" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="450" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod5b" value="returns ★" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="42" y="458" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own5b_none" value="— no tables of its own — standalone, not wired to the order yet" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="466" width="460" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="also5b_0" value="events ★ via kernel" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#9673A6;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="780" y="463" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="row6" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="508" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod6" value="quoting" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="516" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own6_0" value="quotes" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
-          <mxGeometry x="300" y="513" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="own6_1" value="operating_companies" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
-          <mxGeometry x="452" y="513" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="row7" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="566" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod7" value="catalog" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="574" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own7_0" value="items" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
-          <mxGeometry x="300" y="571" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="gap7" value="⚠ items.sku has no price/tax — see quoting (Increment 5, ADR-0016)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="452" y="582" width="420" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="row8" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="624" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod8" value="tenancy" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="632" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own8_0" value="tenant_connection_bindings" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="300" y="629" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="gap8" value="⚠ &quot;tenant&quot; = the ordering reseller, not a SaaS tenant (page 3)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#B85450;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="452" y="640" width="420" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="row9" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="682" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod9" value="connections" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="690" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own9_0" value="erp_connections" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
-          <mxGeometry x="300" y="687" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="row10" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="740" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod10" value="integration (ERP adapters)" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="748" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own10_none" value="— no tables of its own —" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=10;fontColor=#999999;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="756" width="300" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="read10_0" value="erp_connections" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#82B366;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="1035" y="753" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="read10_1" value="orders · payload" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D79B00;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="1153" y="753" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="gap10" value="⚠ poll reads sale.order only — not stock.picking / account.move (page 3)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#B85450;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="300" y="774" width="500" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="row11" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FFFFFF;" vertex="1" parent="1">
-          <mxGeometry x="30" y="798" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod11" value="webhooks_inbound" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="806" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own11_0" value="processed_events" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#DAE8FC;strokeColor=#6C8EBF;" vertex="1" parent="1">
-          <mxGeometry x="300" y="803" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="read11_0" value="orders · locator" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFFFFF;strokeColor=#D79B00;dashed=1;fontSize=10;spacing=2;arcSize=20;" vertex="1" parent="1">
-          <mxGeometry x="1035" y="811" width="112" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="row12" value="" style="fontFamily=Helvetica;rounded=0;html=1;strokeColor=#E6E6E6;fillColor=#FAFAFA;" vertex="1" parent="1">
-          <mxGeometry x="30" y="856" width="1240" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="mod12" value="webhooks_outbound" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="42" y="864" width="226" height="36" as="geometry" />
-        </mxCell>
-        <mxCell id="own12_0" value="webhook_endpoints" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="1">
-          <mxGeometry x="300" y="861" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="own12_1" value="webhook_deliveries" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="1">
-          <mxGeometry x="452" y="861" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="gap12" value="✓ DISPATCHABLE_EVENT_TYPES now includes ShipmentRecorded/InvoiceRecorded; dead OrderFulfilled removed (fixed 2026-10-04, page 3)" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=9;fontColor=#5A9E5A;fontStyle=2;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="620" y="870" width="640" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="audit" value="audit_log" style="fontFamily=Helvetica;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fontSize=10;fillColor=#FBEAEA;strokeColor=#B85450;dashed=1;" vertex="1" parent="1">
-          <mxGeometry x="300" y="934" width="142" height="42" as="geometry" />
-        </mxCell>
-        <mxCell id="audit_n" value="&lt;b&gt;Reserved&lt;/b&gt; — no module writes &lt;i&gt;audit_log&lt;/i&gt; yet (TBD)." style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=11;fontColor=#8A3B38;align=left;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="452" y="945" width="420" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="notes" value="&lt;b&gt;Notes&lt;/b&gt;&lt;br&gt;• &lt;i&gt;processed_events&lt;/i&gt; is also used by Worker consumers to dedupe on &lt;i&gt;event_id&lt;/i&gt;.&lt;br&gt;• Dashed chips reference a table owned by another row; their outline colour matches the owning table group.&lt;br&gt;• &lt;b&gt;orders.client_reference&lt;/b&gt; (the reseller's own PO number) is now UNIQUE per tenant (migration 0009, fixed 2026-10-04) — see page 3.&lt;br&gt;• Red ⚠ rows are real, open gaps as of 2026-10-04; green ✓ rows were gaps fixed the same day — full detail on page 3, not cosmetic notes." style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F7F9FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;fontSize=11;spacing=10;" vertex="1" parent="1">
-          <mxGeometry x="30" y="994" width="900" height="90" as="geometry" />
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
-  <diagram id="hld-gaps" name="3 · Known gaps (architect notes, 2026-10-04)">
-    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="980" background="#FFFFFF" math="0" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="gt" value="Known gaps — honest review, 2026-10-04" style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;align=left;" vertex="1" parent="1">
-          <mxGeometry x="30" y="18" width="800" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="gst" value="Each card: what happens today, why it's a real gap (not a style nit), and what would trigger fixing it. None of these are hidden from the code — they're read directly off it." style="fontFamily=Helvetica;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=12;align=left;fontColor=#666666;" vertex="1" parent="1">
-          <mxGeometry x="30" y="48" width="1200" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="card1" value="&lt;b&gt;1. Reconciliation only sees order status — not shipments or invoices in Odoo&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Today:&lt;/b&gt; the reconcile poll (&lt;i&gt;integration/erp/infrastructure/odoo_adapter.py: fetch_status&lt;/i&gt;) reads only &lt;i&gt;sale.order.state&lt;/i&gt; and &lt;i&gt;sale.order.invoice_status&lt;/i&gt;. It never reads &lt;i&gt;stock.picking&lt;/i&gt; or &lt;i&gt;account.move&lt;/i&gt;.&lt;br&gt;&lt;b&gt;Why it matters:&lt;/b&gt; a warehouse can validate a delivery directly in Odoo without the sale order's own state/invoice_status changing. The portal has no signal at all — &lt;i&gt;shippedQuantity&lt;/i&gt;/&lt;i&gt;invoiceStatus&lt;/i&gt; stay at zero until an &lt;b&gt;operator manually&lt;/b&gt; calls &lt;i&gt;recordFulfillment&lt;/i&gt;/&lt;i&gt;recordInvoice&lt;/i&gt; — today that's the &lt;b&gt;only&lt;/b&gt; way these facts enter the system.&lt;br&gt;&lt;b&gt;Fix trigger:&lt;/b&gt; an Odoo-side push (Automation Rule on &lt;i&gt;stock.picking&lt;/i&gt; validate / &lt;i&gt;account.move&lt;/i&gt; post) or a dedicated poll of those models, same pattern as the existing order-status webhook." style="fontFamily=Helvetica;rounded=1;arcSize=4;whiteSpace=wrap;html=1;fontSize=11;align=left;verticalAlign=top;spacing=10;fillColor=#FFF4E5;strokeColor=#B85450;strokeWidth=1.3;" vertex="1" parent="1">
-          <mxGeometry x="30" y="90" width="1240" height="160" as="geometry" />
-        </mxCell>
-        <mxCell id="card2" value="&lt;b&gt;2. FIXED (2026-10-04) — Shipment/invoice facts never reached the reseller webhook, and a dead event was still on the list&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Was:&lt;/b&gt; &lt;i&gt;DISPATCHABLE_EVENT_TYPES&lt;/i&gt; only had the old lifecycle events, plus a dead &lt;i&gt;OrderFulfilled&lt;/i&gt; (nothing emits it since Increment 5). &lt;i&gt;ShipmentRecorded&lt;/i&gt;/&lt;i&gt;InvoiceRecorded&lt;/i&gt; were missing — and would have been dropped anyway, since &lt;i&gt;Shipment&lt;/i&gt;/&lt;i&gt;Invoice&lt;/i&gt; never stamped a &lt;i&gt;tenant_id&lt;/i&gt;, which the dispatcher requires.&lt;br&gt;&lt;b&gt;Fix:&lt;/b&gt; &lt;i&gt;OrderFulfilled&lt;/i&gt; removed; &lt;i&gt;ShipmentRecorded&lt;/i&gt;/&lt;i&gt;InvoiceRecorded&lt;/i&gt; added to both &lt;i&gt;DISPATCHABLE_EVENT_TYPES&lt;/i&gt; and the SNS filter policy (&lt;i&gt;scripts/messaging_bootstrap.py&lt;/i&gt;). &lt;i&gt;Shipment&lt;/i&gt;/&lt;i&gt;Invoice&lt;/i&gt; now carry &lt;i&gt;tenant_id&lt;/i&gt; (threaded from the order, through the GraphQL resolver, the service, and the event itself) so the dispatcher's existing tenant_id guard actually passes." style="fontFamily=Helvetica;rounded=1;arcSize=4;whiteSpace=wrap;html=1;fontSize=11;align=left;verticalAlign=top;spacing=10;fillColor=#E8F5E9;strokeColor=#5A9E5A;strokeWidth=1.3;" vertex="1" parent="1">
-          <mxGeometry x="30" y="262" width="1240" height="150" as="geometry" />
-        </mxCell>
-        <mxCell id="card3" value="&lt;b&gt;3. FIXED (2026-10-04) — A reseller's own order number wasn't enforced unique&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Was:&lt;/b&gt; &lt;i&gt;orders.client_reference&lt;/i&gt; had no uniqueness check at all, per-tenant or otherwise.&lt;br&gt;&lt;b&gt;Fix:&lt;/b&gt; &lt;i&gt;OrderService.place_order&lt;/i&gt; now checks the projection store (&lt;i&gt;OrderReferenceLookup.exists&lt;/i&gt;) before submitting and raises &lt;i&gt;DuplicateOrderReference&lt;/i&gt; — the common case, no race. Migration 0009 adds &lt;i&gt;UNIQUE(tenant_id, client_reference)&lt;/i&gt; on the DB as the backstop for the narrow race window (two submissions beating each other to the projection); the projector catches that one IntegrityError and logs rather than retrying forever. Verified against live Postgres, not just unit tests." style="fontFamily=Helvetica;rounded=1;arcSize=4;whiteSpace=wrap;html=1;fontSize=11;align=left;verticalAlign=top;spacing=10;fillColor=#E8F5E9;strokeColor=#5A9E5A;strokeWidth=1.3;" vertex="1" parent="1">
-          <mxGeometry x="30" y="422" width="1240" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="card4" value="&lt;b&gt;4. FIXED (2026-10-04) — Money on the API was a float, not the internal Decimal&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Was:&lt;/b&gt; internally &lt;i&gt;Money&lt;/i&gt;/&lt;i&gt;TaxRate&lt;/i&gt; (&lt;i&gt;src/shared/money.py&lt;/i&gt;) are Decimal-backed and rounded exactly once (&lt;i&gt;round_money&lt;/i&gt;), but &lt;i&gt;MoneyType.amount&lt;/i&gt; in &lt;b&gt;both&lt;/b&gt; GraphQL schemas was declared &lt;i&gt;float&lt;/i&gt; — any client doing its own arithmetic on it would have inherited float rounding error.&lt;br&gt;&lt;b&gt;Fix:&lt;/b&gt; &lt;i&gt;MoneyType.amount&lt;/i&gt; is now &lt;i&gt;String!&lt;/i&gt; on both schemas (confirmed via printed SDL), matching the wire-safety pattern already used for &lt;i&gt;quantity&lt;/i&gt; and event payloads. UI's &lt;i&gt;Money&lt;/i&gt; type and &lt;i&gt;formatMoney&lt;/i&gt; updated to parse the string for display only (&lt;i&gt;Number(money.amount)&lt;/i&gt; straight into &lt;i&gt;Intl.NumberFormat&lt;/i&gt;) — the UI never did arithmetic on it, only display, so this closed the gap with zero behavior change for users." style="fontFamily=Helvetica;rounded=1;arcSize=4;whiteSpace=wrap;html=1;fontSize=11;align=left;verticalAlign=top;spacing=10;fillColor=#E8F5E9;strokeColor=#5A9E5A;strokeWidth=1.3;" vertex="1" parent="1">
-          <mxGeometry x="30" y="604" width="1240" height="140" as="geometry" />
-        </mxCell>
-        <mxCell id="card5" value="&lt;b&gt;5. The ordering party is still called &quot;tenant&quot; in the code&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Today:&lt;/b&gt; &lt;i&gt;TenantId&lt;/i&gt;, &lt;i&gt;tenant_id&lt;/i&gt; columns, and &lt;i&gt;Tenant...&lt;/i&gt;-prefixed names run through every module and the DB schema. There is no multi-tenant SaaS concept in this system — a &quot;tenant&quot; &lt;b&gt;is&lt;/b&gt; a reseller, full stop.&lt;br&gt;&lt;b&gt;Why it matters:&lt;/b&gt; not a functional bug — but an architect reading the code cold will reasonably infer a different kind of system (shared-schema SaaS multi-tenancy) than what this actually is (reseller-scoped B2B ordering). The naming actively misleads about the domain.&lt;br&gt;&lt;b&gt;Fix trigger:&lt;/b&gt; a rename pass (&lt;i&gt;ResellerId&lt;/i&gt;, &lt;i&gt;reseller_id&lt;/i&gt;, etc.) — mechanical but wide, since every module touches &lt;i&gt;tenant_id&lt;/i&gt;. Worth doing before onboarding an engineer unfamiliar with this history, cheaper the earlier it's done." style="fontFamily=Helvetica;rounded=1;arcSize=4;whiteSpace=wrap;html=1;fontSize=11;align=left;verticalAlign=top;spacing=10;fillColor=#FFF4E5;strokeColor=#B85450;strokeWidth=1.3;" vertex="1" parent="1">
-          <mxGeometry x="30" y="784" width="1240" height="150" as="geometry" />
+        <mxCell id="steps_box" parent="1" style="fontFamily=Helvetica;rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontSize=12;spacing=8;verticalAlign=middle;align=center;fillColor=#F7F9FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;fontSize=11;spacing=12;fontColor=#333333;" value="&lt;b&gt;ONBOARDING&lt;/b&gt; &lt;font style=&#39;font-size:10px&#39; color=&#39;#777777&#39;&gt;(operator, one-time setup)&lt;/font&gt;&lt;br&gt;&lt;br&gt;① Register a new ERP connection — erp_type, base_url, credentials. Once per ERP instance.&lt;br&gt;② Set the subsidiary's current route to that connection. One active route per subsidiary at a time — changeable later.&lt;br&gt;③ Bind each reseller who trades with that subsidiary to the connection, recording their erp_customer_id inside it. A reseller trading with two subsidiaries on two different ERPs needs two bindings.&lt;br&gt;&lt;br&gt;&lt;b&gt;THEN, AUTOMATICALLY AT RUNTIME&lt;/b&gt;&lt;br&gt;④ Issuing a quote for a subsidiary stamps its &lt;i&gt;current&lt;/i&gt; route onto the quote, permanently — changing the route later never moves quotes already issued.&lt;br&gt;⑤ Placing an order inherits the quote's stamp. Before accepting it, the system resolves the reseller's erp_customer_id for that exact connection and refuses the order if no verified binding exists — this lookup is the &lt;b&gt;entity resolver&lt;/b&gt;: the same reseller can be a completely different customer number in each ERP they're onboarded into." vertex="1">
+          <mxGeometry x="60" y="770" width="1180" height="200" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

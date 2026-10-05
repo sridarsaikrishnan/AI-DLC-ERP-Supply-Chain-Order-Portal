@@ -18,8 +18,8 @@ actually lives in.
 - **Reseller** — a customer of the distributor. Places orders against quotes, tracks their
   status, and (optionally) receives webhook notifications. Sees only their own data, and
   never sees any ERP identity (which ERP, which instance, the ERP's own order/customer IDs).
-- **Operator** (distributor admin) — issues quotes, manages the catalog and the operating
-  companies, links resellers to their ERP customer records, registers ERP connections, and
+- **Operator** (distributor admin) — issues quotes, manages the catalog and the
+  subsidiaries, links resellers to their ERP customer records, registers ERP connections, and
   records shipments/invoices. Sees across all resellers, including ERP identity.
 
 ## The core workflow
@@ -37,7 +37,7 @@ the end customer and where the goods go. The catalog only says *what a product i
 ## Features supported today
 
 ### Quoting (the price list a reseller orders against)
-- An operator issues a quote to a specific reseller: the operating company issuing it, the
+- An operator issues a quote to a specific reseller: the subsidiary issuing it, the
   end customer (name + ship-to), currency, a validity window (`valid_from`/`valid_until`),
   and priced lines (unit price, unit of measure, optional tax rate and per-unit discount).
 - Prices live **only** on the quote. A reseller can never set or override a price.
@@ -100,7 +100,7 @@ that line. That date is what "scheduled" means to the reseller.
 - Link a reseller to their ERP customer id (the binding), and verify it.
 - Manage the catalog: each SKU is owned by one connection and marked as a **box** or a
   **license**.
-- Create operating companies ("office cards": name, country, language).
+- Create subsidiaries (name, country, language).
 - View every reseller's orders, the full timeline, and a cross-tenant failed-messages view.
 
 ## Rules & assumptions worth knowing
@@ -163,7 +163,7 @@ surprise:
 - **Quote** — operator-issued, time-bound price list a reseller orders against.
 - **Binding** — the verified link between a reseller and their customer record in one ERP.
 - **Connection** — one configured ERP instance (one Odoo database, say).
-- **Operating company** — the distributor entity ("office card") issuing a quote: a name,
-  country and language so documents and emails have a home.
+- **Subsidiary** — the distributor's own entity issuing a quote: a name, country and
+  language so documents and emails have a home.
 - **Box vs. license** — a physical item that ships and must be delivered, vs. a digital item
   delivered the moment it ships.

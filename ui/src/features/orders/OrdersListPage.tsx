@@ -5,6 +5,7 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useOrders } from "../../hooks/useOrders";
 import type { ResellerOrder } from "../../api/queries/orders";
+import { statusLabel } from "../../lib/statusLabel";
 
 export function OrdersListPage() {
   const { data: orders, isLoading, error } = useOrders();
@@ -18,7 +19,7 @@ export function OrdersListPage() {
     { key: "orderId", header: "Order", render: (o) => <Link to={`/orders/${o.orderId}`}>{o.orderId}</Link> },
     { key: "ref", header: "Your reference", render: (o) => <span className="id">{o.clientReference}</span> },
     { key: "lines", header: "Lines", align: "right", render: (o) => o.lines.length },
-    { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+    { key: "status", header: "Status", render: (o) => <StatusBadge status={statusLabel(o.status)} /> },
   ];
 
   return (

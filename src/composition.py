@@ -1,7 +1,7 @@
 """Composition root — the one place the object graph is wired.
 
-Bridges modules to each other's ports (ownership, bindings, connection resolution) and
-selects infrastructure by `settings.profile`:
+Bridges modules to each other's ports (bindings, connection resolution) and selects
+infrastructure by `settings.profile`:
 - "memory": in-memory bus + event store, for local dev/tests (no infra),
 - "postgres": PostgresEventStore + Postgres repos/projection store + real/stub Odoo
   adapter + Secrets Manager. The repo publishes nothing itself (PostgresEventStore writes
@@ -45,8 +45,6 @@ from src.modules.integration.webhooks_outbound.infrastructure.postgres import (
     PostgresWebhookDeliveryRepository,
     PostgresWebhookEndpointRepository,
 )
-from src.modules.reference.catalog.infrastructure.memory import InMemoryItemRepository
-from src.modules.reference.catalog.infrastructure.postgres import PostgresItemRepository
 from src.modules.reference.connections.infrastructure.memory import InMemoryConnectionRepository
 from src.modules.reference.connections.infrastructure.postgres import PostgresConnectionRepository
 from src.modules.reference.tenancy.infrastructure.memory import InMemoryBindingRepository
@@ -69,12 +67,14 @@ from src.modules.sales.payments.application.service import PaymentService
 from src.modules.sales.payments.domain.aggregate import Payment
 from src.modules.sales.quoting.application.service import QuoteService
 from src.modules.sales.quoting.infrastructure.memory import (
-    InMemoryOperatingCompanyRepository,
     InMemoryQuoteRepository,
+    InMemorySubsidiaryRepository,
+    InMemorySubsidiaryRouteRepository,
 )
 from src.modules.sales.quoting.infrastructure.postgres import (
-    PostgresOperatingCompanyRepository,
     PostgresQuoteRepository,
+    PostgresSubsidiaryRepository,
+    PostgresSubsidiaryRouteRepository,
 )
 from src.modules.sales.returns.application.service import ReturnService
 from src.modules.sales.returns.domain.aggregate import Return
@@ -102,12 +102,12 @@ if TYPE_CHECKING:
         WebhookDeliveryRepository,
         WebhookEndpointRepository,
     )
-    from src.modules.reference.catalog.application.ports import ItemRepository
     from src.modules.reference.connections.application.ports import ConnectionRepository
     from src.modules.reference.tenancy.application.ports import BindingRepository
     from src.modules.sales.quoting.application.ports import (
-        OperatingCompanyRepository,
         QuoteRepository,
+        SubsidiaryRepository,
+        SubsidiaryRouteRepository,
     )
     from src.shared.types import ConnectionId, TenantId
 
@@ -116,15 +116,6 @@ log = logging.getLogger(__name__)
 
 
 # --- bridge adapters: other modules' repos -> the ports ordering/integration expect ---
-class CatalogOwnershipQuery:
-    def __init__(self, items: ItemRepository) -> None:
-        self._items = items
-
-    def owner_of(self, product_key: str) -> ConnectionId | None:
-        item = self._items.find_by_sku(product_key)
-        return item.owning_connection_id if item else None
-
-
 class TenancyBindingQuery:
     def __init__(self, bindings: BindingRepository) -> None:
         self._bindings = bindings
@@ -193,7 +184,6 @@ class Container:
     bus: InMemoryMessageBus | None  # None in the postgres profile (no synchronous bus)
     drain: Callable[[], None]  # memory: bus.run_until_empty; postgres: no-op, worker drains
     connections: ConnectionRepository
-    items: ItemRepository
     bindings: BindingRepository
     order_processor: OrderProcessor
     delivery_handler: DeliveryHandler
@@ -222,7 +212,8 @@ class Container:
     ]  # exposed so GraphQL can read fulfillment_status/invoice_status (derived, aggregate-only)
     quote_service: QuoteService
     quotes: QuoteRepository
-    operating_companies: OperatingCompanyRepository
+    subsidiaries: SubsidiaryRepository
+    subsidiary_routes: SubsidiaryRouteRepository
 
 
 def build_container(settings: Settings | None = None) -> Container:
@@ -248,11 +239,11 @@ def _build_memory_container(settings: Settings) -> Container:
     order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = InMemoryConnectionRepository()
-    items = InMemoryItemRepository()
     bindings = InMemoryBindingRepository()
     quotes = InMemoryQuoteRepository()
-    operating_companies = InMemoryOperatingCompanyRepository()
-    quote_service = QuoteService(quotes, operating_companies)
+    subsidiaries = InMemorySubsidiaryRepository()
+    subsidiary_routes = InMemorySubsidiaryRouteRepository()
+    quote_service = QuoteService(quotes, subsidiaries, subsidiary_routes)
     secrets: SecretStore = EnvSecretStore()
 
     projections = OrderProjectionStore()
@@ -263,7 +254,7 @@ def _build_memory_container(settings: Settings) -> Container:
     def adapter_for(_erp_type):
         return erp_adapter
 
-    processor = OrderProcessor(repo, CatalogOwnershipQuery(items), TenancyBindingQuery(bindings))
+    processor = OrderProcessor(repo, TenancyBindingQuery(bindings))
     delivery = DeliveryHandler(
         connections=ConnectionsResolver(connections, secrets),
         orders_read=OrderReaderAdapter(projections, TenancyCustomerDirectory(bindings)),
@@ -303,13 +294,12 @@ def _build_memory_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, items, quote_service, references=projections),
+        order_service=OrderService(repo, quotes, quote_service, references=projections),
         projections=projections,
         ingress=ingress,
         bus=bus,
         drain=bus.run_until_empty,
         connections=connections,
-        items=items,
         bindings=bindings,
         order_processor=processor,
         delivery_handler=delivery,
@@ -330,7 +320,8 @@ def _build_memory_container(settings: Settings) -> Container:
         orders=repo,
         quote_service=quote_service,
         quotes=quotes,
-        operating_companies=operating_companies,
+        subsidiaries=subsidiaries,
+        subsidiary_routes=subsidiary_routes,
     )
 
 
@@ -396,11 +387,11 @@ def _build_postgres_container(settings: Settings) -> Container:
     order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = PostgresConnectionRepository(session_factory)
-    items = PostgresItemRepository(session_factory)
     bindings = PostgresBindingRepository(session_factory)
     quotes = PostgresQuoteRepository(session_factory)
-    operating_companies = PostgresOperatingCompanyRepository(session_factory)
-    quote_service = QuoteService(quotes, operating_companies)
+    subsidiaries = PostgresSubsidiaryRepository(session_factory)
+    subsidiary_routes = PostgresSubsidiaryRouteRepository(session_factory)
+    quote_service = QuoteService(quotes, subsidiaries, subsidiary_routes)
     secrets: SecretStore = SecretsManagerSecretStore(
         endpoint_url=settings.aws_endpoint_url, region_name=settings.aws_region
     )
@@ -414,7 +405,7 @@ def _build_postgres_container(settings: Settings) -> Container:
     connections_resolver = ConnectionsResolver(connections, secrets)
     status_applier = StatusApplier(repo)
 
-    processor = OrderProcessor(repo, CatalogOwnershipQuery(items), TenancyBindingQuery(bindings))
+    processor = OrderProcessor(repo, TenancyBindingQuery(bindings))
     delivery = DeliveryHandler(
         connections=connections_resolver,
         orders_read=OrderReaderAdapter(projections, TenancyCustomerDirectory(bindings)),
@@ -449,13 +440,12 @@ def _build_postgres_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, items, quote_service, references=projections),
+        order_service=OrderService(repo, quotes, quote_service, references=projections),
         projections=projections,
         ingress=ingress,
         bus=None,
         drain=lambda: None,
         connections=connections,
-        items=items,
         bindings=bindings,
         order_processor=processor,
         delivery_handler=delivery,
@@ -476,5 +466,6 @@ def _build_postgres_container(settings: Settings) -> Container:
         orders=repo,
         quote_service=quote_service,
         quotes=quotes,
-        operating_companies=operating_companies,
+        subsidiaries=subsidiaries,
+        subsidiary_routes=subsidiary_routes,
     )

@@ -41,17 +41,16 @@ def _app(profile: str):
 
 
 def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
-    """Seed a connection + item + verified binding + an issued quote. Returns
-    (quote_id, operating_company_id) — an order replies to the quote (Increment 5)."""
+    """Seed a connection + verified binding + a subsidiary routed to it + an issued quote.
+    Returns (quote_id, subsidiary_id) — an order replies to the quote (Increment 5)."""
     from datetime import date, timedelta
     from decimal import Decimal
 
-    from src.modules.reference.catalog.domain.models import Item
     from src.modules.reference.connections.domain.models import ErpConnection, ErpType
     from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
     from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
     from src.shared.money import Money
-    from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
+    from src.shared.types import BindingId, ConnectionId, TenantId
 
     os.environ["SMOKE_ODOO_SECRET"] = "local-secret"  # resolved via EnvSecretStore (memory profile)
     container.connections.add(
@@ -64,14 +63,6 @@ def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
             secret_ref="env:SMOKE_ODOO_SECRET",
         )
     )
-    container.items.add(
-        Item(
-            item_id=ItemId(_id("item")),
-            sku=sku,
-            name="Widget",
-            owning_connection_id=ConnectionId(connection),
-        )
-    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId(_id("bind")),
@@ -81,12 +72,13 @@ def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
             status=BindingStatus.VERIFIED,
         )
     )
-    company = container.quote_service.create_operating_company(
+    company = container.quote_service.create_subsidiary(
         name="Smoke Co", country="US", language="en"
     )
+    container.quote_service.set_erp_route(company.subsidiary_id, connection)
     quote = container.quote_service.issue_quote(
         tenant_id=TenantId(tenant),
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
@@ -97,7 +89,7 @@ def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
             )
         ],
     )
-    return quote.quote_id, company.operating_company_id
+    return quote.quote_id, company.subsidiary_id
 
 
 _PLACE_ORDER = """
@@ -149,7 +141,7 @@ def test_memory_profile_places_order_and_delivers_inline() -> None:
     # time the mutation returns, routing + stub-ERP delivery have already happened.
     view = app.state.container.projections.get_reseller_view(tenant, order_id)
     assert view is not None
-    assert view.status == "Sent to ERP"
+    assert view.status == "SENT_TO_ERP"
 
     # Through the actual GraphQL query resolver this time, not just the container — this
     # is what caught `OrderLineType(pos, pos, pos)` breaking under strawberry (types need
@@ -162,7 +154,7 @@ def test_memory_profile_places_order_and_delivers_inline() -> None:
     assert resp.status_code == 200
     gql_body = resp.json()
     assert gql_body.get("errors") is None, gql_body
-    assert gql_body["data"]["order"]["status"] == "Sent to ERP"
+    assert gql_body["data"]["order"]["status"] == "SENT_TO_ERP"
     assert gql_body["data"]["order"]["lines"] == [
         {"productKey": sku, "quantity": 1.0, "unitOfMeasure": "EA"}
     ]
@@ -230,13 +222,14 @@ def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_wo
                 {"cid": connection},
             )
             session.execute(
-                text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection}
-            )
-            session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
             )
             session.execute(text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote_id})
             session.execute(
-                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
+                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
+                {"ocid": oc_id},
+            )
+            session.execute(
+                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
                 {"ocid": oc_id},
             )

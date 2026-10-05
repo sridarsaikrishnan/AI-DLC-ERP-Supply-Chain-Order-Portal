@@ -24,7 +24,6 @@ from decimal import Decimal  # noqa: E402
 
 from sqlalchemy import text  # noqa: E402
 from src.composition import build_container  # noqa: E402
-from src.modules.reference.catalog.domain.models import Item  # noqa: E402
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType  # noqa: E402
 from src.modules.reference.tenancy.domain.models import (  # noqa: E402
     BindingStatus,
@@ -36,7 +35,7 @@ from src.shared.config import Settings  # noqa: E402
 from src.shared.money import Money  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
 from src.shared.persistence.event_store import PostgresEventStore  # noqa: E402
-from src.shared.types import BindingId, ConnectionId, ItemId, TenantId  # noqa: E402
+from src.shared.types import BindingId, ConnectionId, TenantId  # noqa: E402
 
 try:
     _factory = get_session_factory()
@@ -90,9 +89,6 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         )
     )
     sku = _id("ANVIL")
-    container.items.add(
-        Item(item_id=ItemId(_id("item")), sku=sku, name="Anvil", owning_connection_id=connection)
-    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId(_id("bind")),
@@ -105,12 +101,13 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
 
     # Increment 5: an order replies to a quote — price/UoM come from it, never the
     # reseller's own input (ADR-0011/ADR-0016). Issue one priced line for `sku`.
-    company = container.quote_service.create_operating_company(
+    company = container.quote_service.create_subsidiary(
         name="Test Distributor", country="US", language="en"
     )
+    container.quote_service.set_erp_route(company.subsidiary_id, str(connection))
     quote = container.quote_service.issue_quote(
         tenant_id=tenant,
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream Co", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
@@ -148,7 +145,7 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
 
         operator = container.projections.get_operator_view(order_id)
         assert operator is not None
-        assert operator.status == "Validated"
+        assert operator.status == "VALIDATED"
         assert operator.owning_connection_id == str(connection)
     finally:
         # This order/connection has no consumer of its own; leaving rows behind would
@@ -167,15 +164,15 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
                 text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote.quote_id}
             )
             session.execute(
-                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
-                {"ocid": company.operating_company_id},
+                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
+            )
+            session.execute(
+                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
             )
             session.execute(
                 text("DELETE FROM tenant_connection_bindings WHERE connection_id = :cid"),
-                {"cid": str(connection)},
-            )
-            session.execute(
-                text("DELETE FROM items WHERE owning_connection_id = :cid"),
                 {"cid": str(connection)},
             )
             session.execute(
@@ -192,14 +189,15 @@ def test_postgres_profile_rejects_a_reused_order_number() -> None:
 
     container = build_container(_postgres_settings())
     tenant = TenantId(_id("tnt"))
-    company = container.quote_service.create_operating_company(
+    company = container.quote_service.create_subsidiary(
         name="Test Distributor", country="US", language="en"
     )
+    container.quote_service.set_erp_route(company.subsidiary_id, _id("conn"))
 
     def _issue_quote():
         return container.quote_service.issue_quote(
             tenant_id=tenant,
-            operating_company_id=company.operating_company_id,
+            subsidiary_id=company.subsidiary_id,
             end_customer=EndCustomer(name="Downstream Co", ship_to="1 Main St"),
             currency="USD",
             valid_from=date.today() - timedelta(days=1),
@@ -252,6 +250,10 @@ def test_postgres_profile_rejects_a_reused_order_number() -> None:
                 {"q1": quote.quote_id, "q2": quote2.quote_id},
             )
             session.execute(
-                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
-                {"ocid": company.operating_company_id},
+                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
+            )
+            session.execute(
+                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
             )

@@ -11,10 +11,9 @@ const RESELLER_NAV = [
 const OPERATOR_NAV = [
   { to: "/admin/orders", label: "Orders" },
   { to: "/admin/quotes", label: "Quotes" },
-  { to: "/admin/operating-companies", label: "Operating companies" },
+  { to: "/admin/subsidiaries", label: "Subsidiaries" },
   { to: "/admin/connections", label: "ERP connections" },
   { to: "/admin/tenants", label: "Resellers" },
-  { to: "/admin/items", label: "Item ownership" },
   { to: "/admin/failed-messages", label: "Failed messages" },
 ];
 
@@ -28,10 +27,9 @@ function crumbFor(pathname: string): string {
   if (pathname.startsWith("/webhook-endpoints")) return "Webhook endpoints";
   if (pathname.startsWith("/admin/orders")) return "Operator / Orders";
   if (pathname.startsWith("/admin/quotes")) return "Operator / Quotes";
-  if (pathname.startsWith("/admin/operating-companies")) return "Operator / Operating companies";
+  if (pathname.startsWith("/admin/subsidiaries")) return "Operator / Subsidiaries";
   if (pathname.startsWith("/admin/connections")) return "Operator / ERP connections";
   if (pathname.startsWith("/admin/tenants")) return "Operator / Resellers";
-  if (pathname.startsWith("/admin/items")) return "Operator / Item ownership";
   if (pathname.startsWith("/admin/failed-messages")) return "Operator / Failed messages";
   return "";
 }

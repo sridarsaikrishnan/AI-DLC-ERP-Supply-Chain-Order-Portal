@@ -16,7 +16,7 @@ from src.shared.types import OrderId, TenantId, generate_id
 
 from ..domain.aggregate import Order
 from ..domain.errors import DuplicateOrderReference
-from ..domain.models import KIND_PHYSICAL, OrderLine
+from ..domain.models import OrderLine
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -39,12 +39,6 @@ class QuoteDirectory(Protocol):
     def get(self, quote_id: str) -> Quote | None: ...
 
 
-class ItemKindLookup(Protocol):
-    """Narrow lookup for a line's kind (box/license) — not the full `ItemRepository`."""
-
-    def find_by_sku(self, sku: str) -> object | None: ...  # duck-typed: .kind
-
-
 class QuoteAcceptor(Protocol):
     def mark_accepted(self, quote_id: str) -> None: ...
 
@@ -62,14 +56,12 @@ class OrderService:
         self,
         repository: EventSourcedRepository[Order],
         quotes: QuoteDirectory,
-        items: ItemKindLookup,
         quote_acceptor: QuoteAcceptor | None = None,
         *,
         references: OrderReferenceLookup,
     ) -> None:
         self._repository = repository
         self._quotes = quotes
-        self._items = items
         self._quote_acceptor = quote_acceptor
         self._references = references
 
@@ -100,9 +92,10 @@ class OrderService:
             client_reference=client_reference,
             lines=order_lines,
             quote_id=quote.quote_id,
-            operating_company_id=quote.operating_company_id,
+            subsidiary_id=quote.subsidiary_id,
             end_customer_name=quote.end_customer.name,
             ship_to=quote.end_customer.ship_to,
+            routed_to_connection_id=quote.routed_to_connection_id,
         )
         self._repository.save(order)
         if self._quote_acceptor is not None:
@@ -113,15 +106,12 @@ class OrderService:
         quote_line = quote.find_line(inp.product_key)
         if quote_line is None:
             raise PriceNotQuoted(inp.product_key)  # FR-B3: no quoted price -> refused
-        item = self._items.find_by_sku(inp.product_key)
-        kind = getattr(item, "kind", None)
-        kind_str = kind.value if kind is not None else KIND_PHYSICAL
         return OrderLine(
             product_key=inp.product_key,
             quantity=inp.quantity,
             unit_of_measure=quote_line.unit_of_measure,
             line_id=generate_id("ol"),
-            kind=kind_str,
+            kind=quote_line.kind,
             unit_price=quote_line.unit_price,
             line_discount=quote_line.line_discount,
             tax_rates=[quote_line.tax_rate] if quote_line.tax_rate is not None else [],

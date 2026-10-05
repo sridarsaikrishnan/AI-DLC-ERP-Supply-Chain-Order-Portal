@@ -60,7 +60,7 @@ Three layers, each a deliberate choice:
    `Order` has a real state machine and a history worth replaying (its timeline *is* its
    events); the fulfillment family (`Shipment`/`Invoice`/`Payment`/`Return`) are event-sourced
    too, reusing the same kernel. Reference/config data — connections, items, bindings,
-   quotes, operating companies — are plain rows. Event sourcing is applied where it earns
+   quotes, subsidiaries — are plain rows. Event sourcing is applied where it earns
    its keep, not as a house style.
 2. **Per-aggregate transactional outbox** (ADR-0007). An aggregate's events and their outbox
    rows commit in **one** transaction — no dual-write, the stream and the outbox can't

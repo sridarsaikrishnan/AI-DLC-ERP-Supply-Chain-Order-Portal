@@ -30,6 +30,7 @@ QUEUES: dict[str, list[str] | None] = {
         "OrderClosed",
         "OrderRejected",
         "OrderRetrying",
+        "OrderCancelled",
         "ShipmentRecorded",
         "InvoiceRecorded",
     ],

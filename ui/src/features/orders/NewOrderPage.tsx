@@ -75,7 +75,8 @@ export function NewOrderPage() {
               <table className="erp-table">
                 <thead>
                   <tr>
-                    <th>Item (SKU)</th>
+                    <th>SKU</th>
+                    <th>Name</th>
                     <th>Unit</th>
                     <th className="num">Unit price</th>
                     <th className="num">Qty</th>
@@ -85,6 +86,7 @@ export function NewOrderPage() {
                   {quote.lines.map((line) => (
                     <tr key={line.productKey}>
                       <td className="id">{line.productKey}</td>
+                      <td>{line.name}</td>
                       <td>{line.unitOfMeasure}</td>
                       <td className="num">{formatMoney(line.unitPrice)}</td>
                       <td className="num">

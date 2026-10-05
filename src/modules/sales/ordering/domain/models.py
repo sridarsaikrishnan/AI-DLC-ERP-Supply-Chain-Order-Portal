@@ -16,8 +16,8 @@ from src.shared.money import (
     tax_rate_to_payload,
 )
 
-# Line kind, carried on the order line as a plain string (not the catalog's `ItemKind`
-# enum — ordering must not import catalog's domain). Copied from the catalog at placement.
+# Line kind, carried on the order line as a plain string. Copied from the quote line at
+# placement (Increment 7) — no shared catalog to look it up from.
 KIND_PHYSICAL = "PHYSICAL"
 KIND_LICENSE = "LICENSE"
 
@@ -38,7 +38,7 @@ class OrderLine:
     # across event replay, and the key fulfillment/invoice/vendor records attach to —
     # so two lines of the same SKU are tracked separately.
     line_id: str = ""
-    # "box" (PHYSICAL) or "license" (LICENSE) — copied from the catalog item at placement
+    # "box" (PHYSICAL) or "license" (LICENSE) — copied from the quote line at placement
     # (Increment 5, FR-D1). Drives the delivered fact (FR-D2).
     kind: str = KIND_PHYSICAL
     # Pricing is copied from the Quote at placement (Increment 5, FR-B3 / ADR-0016).

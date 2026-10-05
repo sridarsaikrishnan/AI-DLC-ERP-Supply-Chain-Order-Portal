@@ -36,7 +36,7 @@ class _FakeSender:
 
 class _FakeOrders:
     def get_operator_view(self, order_id: str):
-        return SimpleNamespace(client_reference="PO-88213", status="Sent to ERP")
+        return SimpleNamespace(client_reference="PO-88213", status="SENT_TO_ERP")
 
 
 def _event(event_type: str = "OrderSentToErp", tenant_id: str = "tnt_demo") -> StoredEvent:
@@ -121,12 +121,30 @@ def test_successful_delivery_signs_and_records_delivered() -> None:
     assert headers["X-Signature"].startswith("t=") and ",v1=" in headers["X-Signature"]
     parsed = json.loads(body)
     assert parsed["event"] == "OrderSentToErp"
-    assert parsed["order"] == {"id": "ord_1", "number": "PO-88213", "status": "Sent to ERP"}
+    assert parsed["order"] == {"id": "ord_1", "number": "PO-88213", "status": "SENT_TO_ERP"}
 
     recorded = deliveries.find(endpoint.endpoint_id, event.event_id)
     assert recorded is not None
     assert recorded.status is DeliveryStatus.DELIVERED
     assert recorded.attempts == 1
+
+
+def test_order_cancelled_is_dispatched() -> None:
+    """Previously a documented gap — a cancellation never reached a reseller's webhook."""
+    endpoints = InMemoryWebhookEndpointRepository()
+    secrets = EnvSecretStore()
+    _register_endpoint(endpoints, secrets)
+    sender = _FakeSender(success=True)
+    service = WebhookDispatchService(
+        endpoints=endpoints,
+        deliveries=InMemoryWebhookDeliveryRepository(),
+        secrets=secrets,
+        sender=sender,
+        orders=_FakeOrders(),
+    )
+    service.handle(_event(event_type="OrderCancelled"))
+    assert len(sender.calls) == 1
+    assert json.loads(sender.calls[0][2])["event"] == "OrderCancelled"
 
 
 def test_endpoint_not_subscribed_to_event_type_is_skipped() -> None:

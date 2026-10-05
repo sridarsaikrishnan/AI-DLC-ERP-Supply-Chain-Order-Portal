@@ -12,7 +12,7 @@ from src.modules.sales.ordering.domain.models import (
 )
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore, StoredEvent
 from src.shared.eventsourcing.events import utcnow
-from src.shared.types import ConnectionId, OrderId, TenantId
+from src.shared.types import OrderId, TenantId
 
 # The consumer reacts to event-type STRINGS + payload shape, never importing the shipment/
 # invoicing modules — so those events are constructed here as plain envelopes, exactly how
@@ -30,8 +30,9 @@ def _confirmed_order() -> tuple[EventSourcedRepository[Order], str]:
                 product_key="ANVIL", quantity=Decimal(10), unit_of_measure="EA", line_id="l_a"
             )
         ],
+        routed_to_connection_id="conn_1",
     )
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S001")
     order.confirm()

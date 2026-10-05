@@ -26,7 +26,7 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
    }
    ```
 
-2. **Adapter** — new `src/modules/integration/infrastructure/<erp>_adapter.py`
+2. **Adapter** — new `src/modules/integration/erp/infrastructure/<erp>_adapter.py`
    implementing the `ErpAdapter` protocol (`submit` / `fetch_status` / `cancel`) from
    `integration/application/ports.py`. `fetch_status` returns `dict[str, str] | None` —
    the same field bag the status mapper reads, so return whatever fields your status
@@ -42,7 +42,7 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
    your own reference first), and failing closed on an unresolvable reference (don't
    silently auto-create a phantom record in the ERP for a typo'd SKU/ID).
 
-3. **Registration** — one line in `src/modules/integration/infrastructure/registry.py`'s
+3. **Registration** — one line in `src/modules/integration/erp/infrastructure/registry.py`'s
    `build_adapter_registry`:
    ```python
    return {
@@ -54,7 +54,7 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
    needs its own timeout — don't reuse Odoo's.)
 
 4. **The type itself** — one line in `ErpType`
-   (`src/modules/connections/domain/models.py`):
+   (`src/modules/reference/connections/domain/models.py`):
    ```python
    class ErpType(str, Enum):
        ODOO = "ODOO"

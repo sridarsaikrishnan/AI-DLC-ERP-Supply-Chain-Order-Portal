@@ -37,9 +37,10 @@ def _order() -> Order:
         client_reference="PO-1",
         lines=_lines(),
         quote_id="qot_1",
-        operating_company_id="oc_1",
+        subsidiary_id="oc_1",
         end_customer_name="Acme Downstream",
         ship_to="1 Main St",
+        routed_to_connection_id="conn_1",
     )
 
 
@@ -73,7 +74,7 @@ def test_submit_rejects_empty_or_nonpositive_or_idless_lines() -> None:
 
 def test_happy_path_lifecycle() -> None:
     order = _order()
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S00001")
     order.confirm()
@@ -91,7 +92,7 @@ def test_invalid_transition_raises() -> None:
 
 def test_confirm_is_idempotent() -> None:
     order = _order()
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S1")
     order.confirm()
@@ -102,7 +103,7 @@ def test_confirm_is_idempotent() -> None:
 
 def test_cannot_cancel_closed_order() -> None:
     order = _order()
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S1")
     order.confirm()
@@ -115,7 +116,7 @@ def test_event_sourced_round_trip_via_repository() -> None:
     store = InMemoryEventStore()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order)
     order = _order()
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     repo.save(order)
 
@@ -207,8 +208,9 @@ def _confirmed_order_with_two_lines(anvil_kind: str = KIND_PHYSICAL) -> Order:
             _line("ANVIL", Decimal(10), "l_anvil", anvil_kind),
             _line("SPRING", Decimal(5), "l_spring"),
         ],
+        routed_to_connection_id="conn_1",
     )
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S001")
     order.confirm()

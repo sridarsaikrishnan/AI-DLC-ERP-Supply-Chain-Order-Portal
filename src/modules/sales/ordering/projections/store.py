@@ -71,7 +71,7 @@ class OrderProjectionStore:
         record.state = state
         label = status_label(state)
         # Several internal states share a reseller-facing label (e.g. VALIDATED and
-        # ACCEPTED both read "Validated") — collapse consecutive duplicates so the
+        # ACCEPTED both read "VALIDATED") — collapse consecutive duplicates so the
         # timeline doesn't show the same status twice in a row.
         if not record.timeline or record.timeline[-1].status != label:
             record.timeline.append(TimelineEntry(status=label, occurred_at=occurred_at))

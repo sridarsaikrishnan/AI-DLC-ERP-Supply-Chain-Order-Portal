@@ -4,10 +4,10 @@ Backend + GraphQL only (Q6=A). All 174 unit/integration tests pass (5 skipped = 
 AWS/Postgres only); both GraphQL schemas and the memory + postgres containers build.
 
 ## New module: `quoting`
-- `domain/models.py`: `Quote`, `QuoteLine`, `EndCustomer`, `OperatingCompany`, `QuoteStatus`, `is_valid_on`.
+- `domain/models.py`: `Quote`, `QuoteLine`, `EndCustomer`, `Subsidiary`, `QuoteStatus`, `is_valid_on`.
 - `domain/errors.py`: `QuoteNotFound`, `QuoteNotValid`, `PriceNotQuoted`.
-- `application/service.py`: `QuoteService` (create operating company, issue quote, mark accepted).
-- `application/ports.py` + `infrastructure/{memory,postgres}.py`: repositories (quotes JSONB lines + operating_companies).
+- `application/service.py`: `QuoteService` (create subsidiary, issue quote, mark accepted).
+- `application/ports.py` + `infrastructure/{memory,postgres}.py`: repositories (quotes JSONB lines + subsidiaries).
 - `tests/test_quoting.py`.
 
 ## `catalog` (ADR-0016 — product-only)
@@ -35,16 +35,16 @@ AWS/Postgres only); both GraphQL schemas and the memory + postgres containers bu
 
 ## GraphQL
 - Reseller: `placeOrder(quoteId, …)`, `quotes`/`quote`, order scores + `deliveryStatus` + `parties` + per-line `kind`/`scheduledDate`/shipped/delivered/invoiced.
-- Operator: `issueQuote`, `createOperatingCompany`, `operatingCompanies`, `quotes`, `setVendorDate`; `recordFulfillment` with `lineId`/`proofOfDelivery`; `syncItem` with `kind` (no price); order `deliveryStatus` + `parties`.
+- Operator: `issueQuote`, `createSubsidiary`, `subsidiaries`, `quotes`, `setVendorDate`; `recordFulfillment` with `lineId`/`proofOfDelivery`; `syncItem` with `kind` (no price); order `deliveryStatus` + `parties`.
 
 ## Migration
-- `0008_increment5`: items product-only + `kind`; order party columns; `operating_companies` + `quotes` tables.
+- `0008_increment5`: items product-only + `kind`; order party columns; `subsidiaries` + `quotes` tables.
 
 ## UI (done — Q6=A deferral lifted on request)
 `ui/` updated to the new GraphQL shape and built in the existing design system:
 - API/query/type layer (`api/queries/orders.ts`, `api/queries/admin.ts`) + hooks (`useOrders`, `useAdmin`).
 - Reseller: quote-driven `NewOrderPage`, new `features/quotes/QuotesPage`, `OrderDetailPage` scores/delivered/parties/kind/scheduled.
-- Operator: new `features/admin/QuotesPage` (issue) + `OperatingCompaniesPage`; `ItemsPage` edits `kind` (no price); `OrderDetailPage` scores/delivery/parties + record-shipment + set-vendor-date controls.
+- Operator: new `features/admin/QuotesPage` (issue) + `SubsidiariesPage`; `ItemsPage` edits `kind` (no price); `OrderDetailPage` scores/delivery/parties + record-shipment + set-vendor-date controls.
 - `routes.tsx` + `App.tsx` nav extended. `npm run build` clean.
 
 ## Tooling (now runnable + green)

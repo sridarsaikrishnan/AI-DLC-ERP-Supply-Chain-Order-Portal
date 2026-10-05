@@ -5,9 +5,6 @@ from decimal import Decimal
 
 import pytest
 
-from src.modules.reference.catalog.application.service import CatalogService
-from src.modules.reference.catalog.domain.models import ItemKind
-from src.modules.reference.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.sales.ordering.application.order_service import OrderLineInput, OrderService
 from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.domain.models import OrderLine
@@ -17,12 +14,12 @@ from src.modules.sales.quoting.application.service import QuoteService
 from src.modules.sales.quoting.domain.errors import PriceNotQuoted
 from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
 from src.modules.sales.quoting.infrastructure.memory import (
-    InMemoryOperatingCompanyRepository,
     InMemoryQuoteRepository,
+    InMemorySubsidiaryRepository,
+    InMemorySubsidiaryRouteRepository,
 )
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.messaging import InMemoryMessageBus
-from src.shared.messaging.facts import CollectingFactPublisher
 from src.shared.money import Money
 from src.shared.types import ConnectionId, OrderId, TenantId
 
@@ -31,8 +28,7 @@ def _line(product_key: str, qty, line_id: str) -> OrderLine:
     return OrderLine(product_key=product_key, quantity=qty, unit_of_measure="EA", line_id=line_id)
 
 
-def _wire(items: InMemoryItemRepository | None = None, prices: dict[str, str] | None = None):
-    items = items or InMemoryItemRepository()
+def _wire(prices: dict[str, str] | None = None, kinds: dict[str, str] | None = None):
     store = InMemoryEventStore()
     bus = InMemoryMessageBus()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order, publisher=bus)
@@ -40,22 +36,31 @@ def _wire(items: InMemoryItemRepository | None = None, prices: dict[str, str] | 
     bus.subscribe("projections", OrderProjector(projections).handle)
 
     quotes = InMemoryQuoteRepository()
-    quote_service = QuoteService(quotes, InMemoryOperatingCompanyRepository())
-    company = quote_service.create_operating_company(name="Dist", country="US", language="en")
+    quote_service = QuoteService(
+        quotes, InMemorySubsidiaryRepository(), InMemorySubsidiaryRouteRepository()
+    )
+    company = quote_service.create_subsidiary(name="Dist", country="US", language="en")
+    quote_service.set_erp_route(company.subsidiary_id, "conn_1")
     prices = prices or {"ANVIL": "19.99"}
+    kinds = kinds or {}
     quote = quote_service.issue_quote(
         tenant_id=TenantId("tnt_a"),
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
         valid_until=date.today() + timedelta(days=30),
         lines=[
-            QuoteLine(product_key=s, unit_price=Money(Decimal(p), "USD"), unit_of_measure="EA")
+            QuoteLine(
+                product_key=s,
+                unit_price=Money(Decimal(p), "USD"),
+                unit_of_measure="EA",
+                kind=kinds.get(s, "PHYSICAL"),
+            )
             for s, p in prices.items()
         ],
     )
-    svc = OrderService(repo, quotes, items, quote_service, references=projections)
+    svc = OrderService(repo, quotes, quote_service, references=projections)
     return svc, repo, bus, projections, quote.quote_id
 
 
@@ -72,7 +77,7 @@ def test_reseller_view_reflects_submission_and_hides_erp_identity() -> None:
     view = projections.get_reseller_view("tnt_a", order_id)
     assert view is not None
     assert view.client_reference == "PO-1"
-    assert view.status == "Submitted"
+    assert view.status == "SUBMITTED"
     assert [line.product_key for line in view.lines] == ["ANVIL"]
     assert view.parties.end_customer_name == "Downstream"  # parties are reseller-safe
     assert view.parties.ship_to == "1 Main St"
@@ -93,9 +98,7 @@ def test_order_resolves_quote_price_and_projection_computes_subtotal() -> None:
 
     view = projections.get_reseller_view("tnt_a", order_id)
     assert view is not None
-    assert view.lines[0].unit_price == Money(
-        Decimal("19.99"), "USD"
-    )  # from the quote, not the catalog
+    assert view.lines[0].unit_price == Money(Decimal("19.99"), "USD")  # from the quote
     assert view.lines[0].line_total == Money(Decimal("39.98"), "USD")  # 2 * 19.99
     assert view.subtotal == Money(Decimal("39.98"), "USD")
 
@@ -111,15 +114,8 @@ def test_line_not_on_quote_is_refused() -> None:
         )
 
 
-def test_line_kind_flows_from_catalog_to_projection() -> None:
-    items = InMemoryItemRepository()
-    CatalogService(items, CollectingFactPublisher()).sync_item(
-        sku="LIC",
-        name="A License",
-        owning_connection_id=ConnectionId("conn_1"),
-        kind=ItemKind.LICENSE,
-    )
-    svc, _repo, bus, projections, quote_id = _wire(items=items, prices={"LIC": "5.00"})
+def test_line_kind_flows_from_quote_line_to_projection() -> None:
+    svc, _repo, bus, projections, quote_id = _wire(prices={"LIC": "5.00"}, kinds={"LIC": "LICENSE"})
     order_id = svc.place_order(
         tenant_id=TenantId("tnt_a"),
         quote_id=quote_id,
@@ -156,8 +152,9 @@ def test_operator_view_exposes_erp_identity_and_timeline() -> None:
         tenant_id=TenantId("tnt_a"),
         client_reference="PO-1",
         lines=[_line("ANVIL", 1, "l_a")],
+        routed_to_connection_id="conn_1",
     )
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S00001")
     repo.save(order)
@@ -167,8 +164,8 @@ def test_operator_view_exposes_erp_identity_and_timeline() -> None:
     assert operator is not None
     assert operator.owning_connection_id == "conn_1"
     assert operator.erp_order_id == "S00001"
-    assert operator.status == "Sent to ERP"
-    assert operator.timeline[-1].status == "Sent to ERP"
+    assert operator.status == "SENT_TO_ERP"
+    assert operator.timeline[-1].status == "SENT_TO_ERP"
 
 
 def test_projector_feeds_reverse_routing_locator() -> None:
@@ -190,8 +187,9 @@ def test_projector_feeds_reverse_routing_locator() -> None:
         tenant_id=TenantId("t"),
         client_reference="r",
         lines=[_line("ANVIL", 1, "l_a")],
+        routed_to_connection_id="conn_1",
     )
-    order.validate(ConnectionId("conn_1"))
+    order.validate()
     order.accept()
     order.send_to_erp("S00099")
     repo.save(order)

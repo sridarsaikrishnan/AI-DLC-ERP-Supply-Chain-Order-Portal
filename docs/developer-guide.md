@@ -23,7 +23,7 @@ New to event sourcing? Read [event-sourcing-explained.md](event-sourcing-explain
   (`Shipment`, `Invoice`, `Payment`, `Return`), all on one shared `events`/`outbox`/`snapshots`
   store keyed by `aggregate_type` + `stream_id` (ADR-0002, amended by ADR-0014). Their state
   is the replay of their events. Reference/config data (connections, items, bindings, quotes,
-  operating companies, webhook endpoints) is ordinary rows.
+  subsidiaries, webhook endpoints) is ordinary rows.
 - **Writes go through events; reads go through projections** (CQRS). A GraphQL query never
   replays the event store — it reads the `orders` projection table.
 - **Nothing is dual-written.** An aggregate's events and their **outbox** rows commit in one
@@ -52,8 +52,8 @@ throughout the walkthrough.
 | `erp_connections` | `conn_odoo_eu` — `erp_type=ODOO`, `base_url=https://eu.odoo.example.com`, `credentials={"database":"odoo_eu","username":"admin"}`, `secret_ref=prod:odoo-eu-login`, `webhook_secret_ref=prod:odoo-eu-webhook`, `status=ACTIVE` | Operator |
 | `tenant_connection_bindings` | `bnd_771` — `tenant_id=tnt_acme`, `connection_id=conn_odoo_eu`, `erp_customer_id=CUST-9`, `status=VERIFIED` | Operator (customer id comes from the ERP) |
 | `items` | `item_anvil` — `sku=ANVIL-100`, `owning_connection_id=conn_odoo_eu`, `kind=PHYSICAL` | Operator |
-| `operating_companies` | `oc_eu` — `name=Acme Distribution EU`, `country=DE`, `language=de` | Operator |
-| `quotes` | `qot_55` — `tenant_id=tnt_acme`, `operating_company_id=oc_eu`, end customer `Downstream GmbH`/`Berlin`, `currency=USD`, valid `2026-01-01..2026-12-31`, `status=ISSUED`, lines `[{ANVIL-100, 19.99 USD, EA, tax VAT 0.20}]` | Operator |
+| `subsidiaries` | `sub_eu` — `name=Acme Distribution EU`, `country=DE`, `language=de` | Operator |
+| `quotes` | `qot_55` — `tenant_id=tnt_acme`, `subsidiary_id=sub_eu`, end customer `Downstream GmbH`/`Berlin`, `currency=USD`, valid `2026-01-01..2026-12-31`, `status=ISSUED`, lines `[{ANVIL-100, 19.99 USD, EA, tax VAT 0.20}]` | Operator |
 
 Secrets are **pointers** (`secret_ref`), resolved from Secrets Manager at call time — the
 raw credential is never stored in Postgres. The inbound-webhook secret is a *different*
@@ -104,7 +104,7 @@ The aggregate emits one event; it and its outbox row commit together.
               "tax_rates": [{"code": "VAT", "rate": "0.20", "inclusive": false}],
               "line_discount": null }],
   "product_keys": ["ANVIL-100"],
-  "quote_id": "qot_55", "operating_company_id": "oc_eu",
+  "quote_id": "qot_55", "subsidiary_id": "sub_eu",
   "end_customer_name": "Downstream GmbH", "ship_to": "Berlin"
 }
 ```
@@ -289,45 +289,100 @@ backward** updates (the lifecycle is monotonic), so out-of-order or duplicate we
 safe. Note `done` maps to `CONFIRMED`, not a "fulfilled" lifecycle state — delivery is a
 score/fact now, not a lifecycle step (FR-A6).
 
-### 4.3 Outbound notification to the reseller (optional)
+### 4.3 Order lifecycle — every transition and its guard
 
-Lifecycle events (`OrderSentToErp`, `OrderConfirmed`, `OrderClosed`, `OrderRejected`,
-`OrderRetrying`) are filtered to `webhook-dispatch.fifo` → `WebhookDispatchService`, which
-POSTs to each active reseller endpoint registered for that event:
+`OrderState` moves forward through a fixed sequence, with two exits (`REJECTED`,
+`CANCELLED`) that can interrupt it from most points. Every transition is guarded on the
+aggregate (`Order` methods in `ordering/domain/aggregate.py`) — calling one from the wrong
+state raises `OrderInvalidTransition`, it never silently does nothing (except the two
+documented idempotent no-ops below).
+
+```
+SUBMITTED ──validate()──▶ VALIDATED ──accept()──▶ ACCEPTED ──send_to_erp()──▶ SENT_TO_ERP ──confirm()──▶ CONFIRMED ──close()──▶ CLOSED
+    │                         │                       │                           │
+    │                         │                       └──mark_retrying()──▶ RETRYING ──send_to_erp()──▶ SENT_TO_ERP
+    │                         │                                                   (send_to_erp() also re-enters from RETRYING)
+    └──reject()────────▶ REJECTED (terminal)                        cancel() reaches CANCELLED from any non-terminal state
+```
+
+| Transition | Command | Guard (valid only from) | What actually triggers it |
+|---|---|---|---|
+| → `SUBMITTED` | `Order.submit(...)` | *(genesis)* | `placeOrder` mutation |
+| `SUBMITTED` → `VALIDATED` | `validate(owning_connection_id)` | `SUBMITTED` | `OrderProcessor` resolved routing successfully (one connection owns every line, tenant has a verified binding) |
+| `VALIDATED` → `ACCEPTED` | `accept()` | `VALIDATED` | same `OrderProcessor` pass, immediately after `validate()` |
+| `SUBMITTED` or `VALIDATED` → `REJECTED` | `reject(reason_code, message)` | `SUBMITTED`, `VALIDATED` | `OrderProcessor` routing failed — `reason_code` is one of `empty_order`, `unknown_item`, `mixed_erp`, `no_binding` |
+| `ACCEPTED` or `RETRYING` → `SENT_TO_ERP` | `send_to_erp(erp_order_id)` | `ACCEPTED`, `RETRYING` | `DeliveryHandler`: the ERP adapter's `submit()` returned success |
+| `ACCEPTED`, `RETRYING`, or `SENT_TO_ERP` → `RETRYING` | `mark_retrying(attempt, next_retry_at)` | `ACCEPTED`, `RETRYING`, `SENT_TO_ERP` | `DeliveryHandler`: `submit()` failed with a transient (`terminal=False`) error — the message is also re-raised so the queue redrives it |
+| *(any)* → `REJECTED` | `reject("erp_rejected"/"connection_unavailable"/"order_not_found", ...)` | not already terminal | `DeliveryHandler`: `submit()` failed with `terminal=True`, or the target connection/order payload couldn't be resolved at all |
+| `SENT_TO_ERP` → `CONFIRMED` | `confirm()` | `SENT_TO_ERP` (idempotent no-op if already `CONFIRMED`) | inbound ERP webhook/reconcile reports a native status that maps to `CanonicalStatus.CONFIRMED` |
+| `CONFIRMED` → `CLOSED` | `close()` | `CONFIRMED` (idempotent no-op if already `CLOSED`) | inbound ERP webhook/reconcile reports `CanonicalStatus.CLOSED` |
+| *(any non-terminal)* → `CANCELLED` | `cancel(reason)` | not already terminal (`CLOSED`/`CANCELLED`/`REJECTED`) | the reseller's `cancelOrder` mutation, **or** the ERP reports `CanonicalStatus.CANCELLED` (`reason="cancelled in ERP"`) |
+
+**Orthogonal to all of the above** (gated only by `state in {CONFIRMED, CLOSED}`, never
+changes `state` itself): `record_fulfillment(...)` and `record_invoice(...)` — these drive
+the three independent scores (§3.5), not the lifecycle.
+
+### 4.4 Outbound notification to the reseller (optional) — every dispatchable event
+
+Eight event types are filtered to `webhook-dispatch.fifo` → `WebhookDispatchService`
+(`DISPATCHABLE_EVENT_TYPES`), which POSTs to each active reseller endpoint registered for
+that event. **The body shape is identical for all eight** — `WebhookDispatchService`
+never includes an event's own extra fields (no `reason_code`, no `carrier`, no `attempt`);
+it only ever sends the event's name/id plus the order's current id/number/status. A
+reseller who needs an event's specific detail (why it was rejected, which carrier shipped
+it) has to follow up with a GraphQL query — the webhook is a "something changed, go look"
+nudge, not a full payload.
 
 ```http
 POST https://acme.example.com/hooks/orders
 X-Signature: t=1735689600,v1=9f86d08...   # HMAC-SHA256 over "t.body" with the endpoint secret
 Content-Type: application/json
 
-{ "event": "OrderConfirmed", "eventId": "evt_a9f3",
-  "order": { "id": "ord_8f3c1a90", "number": "PO-2024-1182", "status": "CONFIRMED" } }
+{ "event": "<name below>", "eventId": "evt_a9f3", "occurredAt": "2026-10-05T09:12:03Z",
+  "order": { "id": "ord_8f3c1a90", "number": "PO-2024-1182", "status": "<see §4.3>" } }
 ```
 
-Each attempt is tracked in `webhook_deliveries` (`DELIVERED` / `RETRYING` / `FAILED`, with an
-attempt count); transient failures raise for SQS redrive, and the delivery is marked
-`FAILED` after `MAX_ATTEMPTS` (5). The reseller reads these via the `deliveryLog` query.
-Shipment/invoice **score** changes are *not* pushed — the reseller reads them from the order.
+| Event | Sent when | `order.status` at that moment |
+|---|---|---|
+| `OrderSentToErp` | the ERP adapter accepted the order (`send_to_erp`, §4.3) | `SENT_TO_ERP` |
+| `OrderConfirmed` | the ERP reported `CanonicalStatus.CONFIRMED` | `CONFIRMED` |
+| `OrderClosed` | the ERP reported `CanonicalStatus.CLOSED` | `CLOSED` |
+| `OrderRejected` | routing failed at submission, **or** the ERP adapter failed terminally | `REJECTED` |
+| `OrderRetrying` | the ERP adapter failed transiently; will be retried automatically | `RETRYING` |
+| `OrderCancelled` | the reseller's `cancelOrder` mutation, or the ERP reported `CanonicalStatus.CANCELLED` | `CANCELLED` |
+| `ShipmentRecorded` | an operator recorded a shipment (`recordShipment` mutation) | whatever the order's lifecycle status already was — this event never changes it |
+| `InvoiceRecorded` | an operator recorded an invoice (`recordInvoice` mutation) | same — lifecycle status unaffected |
+
+Each delivery attempt is tracked in `webhook_deliveries` (`DELIVERED` / `RETRYING` /
+`FAILED`, with an attempt count); transient failures raise for SQS redrive, and the
+delivery is marked `FAILED` after `MAX_ATTEMPTS` (5). The reseller reads these via the
+`deliveryLog` query.
 
 ---
 
-## 5. The event catalog (every Order event)
+## 5. The event catalog (every Order event, plus the two cross-aggregate events resellers get notified about)
 
-| Event | Emitted by | Payload (beyond `order_id`) | Effect when applied |
-|---|---|---|---|
-| `OrderSubmitted` | `placeOrder` | tenant, client_reference, lines, product_keys, quote/party fields | creates the order, `SUBMITTED` |
-| `OrderValidated` | routing | `owning_connection_id` | `VALIDATED`, records owner |
-| `OrderReadyForDelivery` | routing | `owning_connection_id` | `ACCEPTED` |
-| `OrderRejected` | routing | `reason_code`, `reseller_message` | `REJECTED` (terminal) |
-| `OrderSentToErp` | delivery | `erp_order_id` | `SENT_TO_ERP` |
-| `OrderRetrying` | delivery | `attempt`, `next_retry_at` | `RETRYING` |
-| `OrderConfirmed` | status in | — | `CONFIRMED` |
-| `OrderClosed` | status in | — | `CLOSED` |
-| `OrderCancelled` | reseller / status in | `reason` | `CANCELLED` |
-| `OrderLineFulfilled` | fulfillment saga | `line_id`, `quantity`, `carrier?`, `proof_of_delivery?` | adds shipped qty; derives delivered |
-| `OrderLineInvoiced` | fulfillment saga | `line_id`, `quantity` | adds invoiced qty |
-| `OrderLineVendorDateSet` | `setVendorDate` | `line_id`, `vendor_date` | sets the line's "scheduled" date |
-| `OrderFulfilled` | — (legacy) | — | **no-op**; retained only so pre-Increment-5 streams still replay |
+"Dispatched" means it's one of the eight in `DISPATCHABLE_EVENT_TYPES` (§4.4) — the
+reseller's webhook endpoint hears about it. Everything else is visible only by reading the
+order back over GraphQL.
+
+| Event | Emitted by | Payload (beyond `order_id`) | Effect when applied | Dispatched to reseller? |
+|---|---|---|---|---|
+| `OrderSubmitted` | `placeOrder` | tenant, client_reference, lines, product_keys, quote/party fields | creates the order, `SUBMITTED` | No |
+| `OrderValidated` | routing | `owning_connection_id` | `VALIDATED`, records owner | No |
+| `OrderReadyForDelivery` | routing | `owning_connection_id` | `ACCEPTED` | No |
+| `OrderRejected` | routing or delivery | `reason_code`, `reseller_message` | `REJECTED` (terminal) | **Yes** |
+| `OrderSentToErp` | delivery | `erp_order_id` | `SENT_TO_ERP` | **Yes** |
+| `OrderRetrying` | delivery | `attempt`, `next_retry_at` | `RETRYING` | **Yes** |
+| `OrderConfirmed` | status in | — | `CONFIRMED` | **Yes** |
+| `OrderClosed` | status in | — | `CLOSED` | **Yes** |
+| `OrderCancelled` | reseller / status in | `reason` | `CANCELLED` | **Yes** |
+| `OrderLineFulfilled` | fulfillment saga | `line_id`, `quantity`, `carrier?`, `proof_of_delivery?` | adds shipped qty; derives delivered | No (the sibling `ShipmentRecorded` is, see below) |
+| `OrderLineInvoiced` | fulfillment saga | `line_id`, `quantity` | adds invoiced qty | No (the sibling `InvoiceRecorded` is) |
+| `OrderLineVendorDateSet` | `setVendorDate` | `line_id`, `vendor_date` | sets the line's "scheduled" date | No |
+| `OrderFulfilled` | — (legacy) | — | **no-op**; retained only so pre-Increment-5 streams still replay | No |
+| `ShipmentRecorded` *(Shipment aggregate, not Order)* | `recordShipment` | `order_id`, lines, `carrier?`, `tracking_number?`, `proof_of_delivery?`, `tenant_id` | triggers the saga that applies `OrderLineFulfilled` to the order | **Yes** |
+| `InvoiceRecorded` *(Invoice aggregate, not Order)* | `recordInvoice` | `order_id`, lines, `erp_invoice_id?`, `tenant_id` | triggers the saga that applies `OrderLineInvoiced` to the order | **Yes** |
 
 ---
 

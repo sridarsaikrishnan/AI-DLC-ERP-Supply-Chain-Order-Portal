@@ -1,8 +1,8 @@
 """Operator GraphQL schema. Requires the OPERATOR role; may expose ERP identity.
 
 Admin mutations here are thin wrappers around already-built application services
-(`ConnectionService`, `BindingService`, `CatalogService`, `QuoteService`, fulfillment
-services) — this schema holds no new business logic.
+(`ConnectionService`, `BindingService`, `QuoteService`, fulfillment services) — this
+schema holds no new business logic.
 """
 
 from __future__ import annotations
@@ -14,12 +14,10 @@ from typing import TYPE_CHECKING
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 
-from src.modules.reference.catalog.application.service import CatalogService
-from src.modules.reference.catalog.domain.models import Item, ItemKind
 from src.modules.reference.connections.application.service import ConnectionService
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType
 from src.modules.reference.tenancy.application.service import BindingService
-from src.modules.sales.quoting.domain.models import EndCustomer, OperatingCompany, Quote, QuoteLine
+from src.modules.sales.quoting.domain.models import EndCustomer, Quote, QuoteLine, Subsidiary
 from src.shared.money import Money, TaxRate
 from src.shared.types import BindingId, ConnectionId, TenantId
 
@@ -27,10 +25,8 @@ from .types import (
     BindingType,
     ConnectionType,
     InvoiceType,
-    ItemType,
     LineQuantityInput,
     MoneyType,
-    OperatingCompanyType,
     OperatorOrder,
     OperatorOrderLineType,
     OperatorPartiesType,
@@ -42,6 +38,7 @@ from .types import (
     QuoteType,
     ReturnType,
     ShipmentType,
+    SubsidiaryType,
 )
 
 if TYPE_CHECKING:
@@ -92,7 +89,7 @@ def _order_to_gql(view: OperatorOrderView) -> OperatorOrder:
         parties=OperatorPartiesType(
             end_customer_name=view.parties.end_customer_name,
             ship_to=view.parties.ship_to,
-            operating_company_id=view.parties.operating_company_id,
+            subsidiary_id=view.parties.subsidiary_id,
             quote_id=view.parties.quote_id,
         ),
     )
@@ -121,19 +118,9 @@ def _binding_to_gql(binding: TenantConnectionBinding) -> BindingType:
     )
 
 
-def _item_to_gql(item: Item) -> ItemType:
-    return ItemType(
-        item_id=str(item.item_id),
-        sku=item.sku,
-        name=item.name,
-        owning_connection_id=str(item.owning_connection_id),
-        kind=item.kind.value,
-    )
-
-
-def _company_to_gql(company: OperatingCompany) -> OperatingCompanyType:
-    return OperatingCompanyType(
-        operating_company_id=company.operating_company_id,
+def _company_to_gql(company: Subsidiary) -> SubsidiaryType:
+    return SubsidiaryType(
+        subsidiary_id=company.subsidiary_id,
         name=company.name,
         country=company.country,
         language=company.language,
@@ -144,16 +131,19 @@ def _quote_to_gql(quote: Quote) -> QuoteType:
     return QuoteType(
         quote_id=quote.quote_id,
         tenant_id=str(quote.tenant_id),
-        operating_company_id=quote.operating_company_id,
+        subsidiary_id=quote.subsidiary_id,
         end_customer_name=quote.end_customer.name,
         ship_to=quote.end_customer.ship_to,
         currency=quote.currency,
         valid_from=quote.valid_from.isoformat(),
         valid_until=quote.valid_until.isoformat(),
         status=quote.status.value,
+        routed_to_connection_id=quote.routed_to_connection_id,
         lines=[
             QuoteLineType(
                 product_key=line.product_key,
+                name=line.name,
+                kind=line.kind,
                 unit_price=MoneyType(
                     amount=str(line.unit_price.amount), currency=line.unit_price.currency
                 ),
@@ -215,16 +205,18 @@ class Query:
         return [_binding_to_gql(b) for b in ctx.container.bindings.list_all()]
 
     @strawberry.field
-    def items(self, info: Info[GraphQLContext, None]) -> list[ItemType]:
+    def subsidiaries(self, info: Info[GraphQLContext, None]) -> list[SubsidiaryType]:
         ctx = info.context
         ctx.require_role("OPERATOR")
-        return [_item_to_gql(i) for i in ctx.container.items.list_all()]
+        return [_company_to_gql(c) for c in ctx.container.quote_service.list_subsidiaries()]
 
     @strawberry.field
-    def operating_companies(self, info: Info[GraphQLContext, None]) -> list[OperatingCompanyType]:
+    def erp_route(self, info: Info[GraphQLContext, None], subsidiary_id: str) -> str | None:
+        """Which ERP connection this subsidiary's quotes currently route to — `None` until
+        an operator sets one (Increment 7); `issueQuote` refuses until it's set."""
         ctx = info.context
         ctx.require_role("OPERATOR")
-        return [_company_to_gql(c) for c in ctx.container.quote_service.list_operating_companies()]
+        return ctx.container.quote_service.get_erp_route(subsidiary_id)
 
     @strawberry.field
     def quotes(self, info: Info[GraphQLContext, None]) -> list[QuoteType]:
@@ -286,28 +278,6 @@ class Mutation:
         return _binding_to_gql(binding)
 
     @strawberry.mutation
-    def sync_item(
-        self,
-        info: Info[GraphQLContext, None],
-        sku: str,
-        name: str,
-        owning_connection_id: str,
-        kind: str = "PHYSICAL",
-    ) -> ItemType:
-        """Register/refresh a catalog item. No price here anymore (ADR-0016) — only what
-        the product is, including whether it's a box or a license."""
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        service = CatalogService(ctx.container.items, ctx.container.facts)
-        item = service.sync_item(
-            sku=sku,
-            name=name,
-            owning_connection_id=ConnectionId(owning_connection_id),
-            kind=ItemKind(kind),
-        )
-        return _item_to_gql(item)
-
-    @strawberry.mutation
     def pause_connection(
         self, info: Info[GraphQLContext, None], connection_id: str
     ) -> ConnectionType:
@@ -332,16 +302,30 @@ class Mutation:
         service = BindingService(ctx.container.bindings, ctx.container.facts)
         return _binding_to_gql(service.remove_binding(BindingId(binding_id)))
 
-    # --- operating company (office card) + quotes (FR-B / FR-C) ---
+    # --- subsidiary + quotes (FR-B / FR-C) ---
     @strawberry.mutation
-    def create_operating_company(
+    def create_subsidiary(
         self, info: Info[GraphQLContext, None], name: str, country: str, language: str
-    ) -> OperatingCompanyType:
+    ) -> SubsidiaryType:
         ctx = info.context
         ctx.require_role("OPERATOR")
-        company = ctx.container.quote_service.create_operating_company(
+        company = ctx.container.quote_service.create_subsidiary(
             name=name, country=country, language=language
         )
+        return _company_to_gql(company)
+
+    @strawberry.mutation
+    def set_erp_route(
+        self, info: Info[GraphQLContext, None], subsidiary_id: str, connection_id: str
+    ) -> SubsidiaryType:
+        """Which ERP connection this subsidiary's quotes route to (Increment 7) — replaces
+        whatever route it had before; quotes already issued keep the one they were
+        stamped with."""
+        ctx = info.context
+        ctx.require_role("OPERATOR")
+        ctx.container.quote_service.set_erp_route(subsidiary_id, connection_id)
+        company = ctx.container.quote_service.get_subsidiary(subsidiary_id)
+        assert company is not None
         return _company_to_gql(company)
 
     @strawberry.mutation
@@ -349,7 +333,7 @@ class Mutation:
         self,
         info: Info[GraphQLContext, None],
         tenant_id: str,
-        operating_company_id: str,
+        subsidiary_id: str,
         end_customer_name: str,
         ship_to: str,
         currency: str,
@@ -362,6 +346,8 @@ class Mutation:
         quote_lines = [
             QuoteLine(
                 product_key=li.product_key,
+                name=li.name,
+                kind=li.kind,
                 unit_price=Money(Decimal(str(li.unit_price)), currency),
                 unit_of_measure=li.unit_of_measure,
                 tax_rate=(
@@ -379,7 +365,7 @@ class Mutation:
         ]
         quote = ctx.container.quote_service.issue_quote(
             tenant_id=TenantId(tenant_id),
-            operating_company_id=operating_company_id,
+            subsidiary_id=subsidiary_id,
             end_customer=EndCustomer(name=end_customer_name, ship_to=ship_to),
             currency=currency,
             valid_from=date.fromisoformat(valid_from),

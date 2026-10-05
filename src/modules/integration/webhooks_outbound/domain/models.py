@@ -21,6 +21,11 @@ DISPATCHABLE_EVENT_TYPES = frozenset(
         "OrderClosed",
         "OrderRejected",
         "OrderRetrying",
+        # Previously a documented gap (a cancellation — reseller-initiated or
+        # ERP-reported — never reached a reseller's webhook, only visible on next
+        # GraphQL read). Closed: resellers now hear about it the same way as every
+        # other terminal/near-terminal transition.
+        "OrderCancelled",
         # ShipmentRecorded/InvoiceRecorded (not Order-prefixed, but still include
         # order_id in their own payload — see WebhookDispatchService._build_body) carry
         # the shipment/invoice facts resellers previously had no way to be notified of.

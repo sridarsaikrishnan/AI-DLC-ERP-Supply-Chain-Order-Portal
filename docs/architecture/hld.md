@@ -33,7 +33,7 @@ Interacting parties and systems:
 | Component | Purpose / responsibility | Key dependencies |
 |---|---|---|
 | **Reseller portal (SPA)** | Browser app: browse quotes, place orders, track status/scores, manage webhook endpoints. Never shows ERP identity (FR-19). | API host (GraphQL /reseller); Cognito (login) |
-| **Operator admin (SPA)** | Browser app: manage ERP connections, resellers/bindings, items, quotes, operating companies; view all orders and failures. | API host (GraphQL /operator); Cognito |
+| **Operator admin (SPA)** | Browser app: manage ERP connections, resellers/bindings, items, quotes, subsidiaries; view all orders and failures. | API host (GraphQL /operator); Cognito |
 | **API host** *(Python/FastAPI — the only HTTP server)* | Synchronous interface: GraphQL for both audiences, the inbound ERP-webhook HTTP route, request authentication/authorization, and reads/writes via the domain. | Domain modules; PostgreSQL; Cognito; Secrets Manager |
 | **Worker host** *(Python process — not HTTP, not FastAPI)* | Asynchronous processing: order routing, ERP delivery, read-model projection, outbound webhook dispatch, outbox relay, and the reconciliation scheduler (polling fallback). Same codebase/composition root as the API, different entrypoint. | Message bus; Domain modules; PostgreSQL; ERP; Secrets Manager |
 | **Domain modules** (shared) | The business logic shared by API + Worker, grouped by subdomain (ADR-0017): **`sales/`** (`ordering` — the event-sourced core — plus `quoting`, `shipment`, `invoicing`, `payments`, `returns`), **`reference/`** (`catalog`, `connections`, `tenancy`), **`integration/`** (`erp` adapters + registry, inbound/outbound `webhooks`). | PostgreSQL (via hosts) |
@@ -59,9 +59,9 @@ Interacting parties and systems:
    signed notification to the reseller's endpoint.
 
 3. **Operator administration** *(sync)*
-   Operator SPA → API `/operator` → issue quotes, create operating companies ("office
-   cards"), register ERP connections, link resellers to ERP customers, manage the catalog
-   (including box-vs-license item kind).
+   Operator SPA → API `/operator` → issue quotes, create subsidiaries, register ERP
+   connections, link resellers to ERP customers, manage the catalog (including
+   box-vs-license item kind).
 
 4. **Reconciliation fallback** *(async, scheduled)*
    The Worker's reconciliation scheduler periodically polls the ERP for orders whose
@@ -77,7 +77,7 @@ Interacting parties and systems:
 
 - **The domain (via API + Worker) owns PostgreSQL** — the single store holding the Order
   event stream + outbox + snapshots, the order read models (projections), and reference
-  data (catalog items, ERP connections, reseller bindings, quotes, operating companies,
+  data (catalog items, ERP connections, reseller bindings, quotes, subsidiaries,
   webhook endpoints/deliveries). The **transactional** aggregates are event-sourced —
   `Order` plus the fulfillment family (`Shipment`/`Invoice`/`Payment`/`Return`), all on the
   one shared `events`/`outbox`/`snapshots` store, keyed by `aggregate_type` + `stream_id`
@@ -99,7 +99,7 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 | `sales` | `invoicing` *(event-sourced)* | — | persists Invoice events via the kernel; `InvoiceRecorded` drives the `orders` invoiced-quantity score asynchronously via the `order-fulfillment` saga consumer (ADR-0018) |
 | `sales` | `payments` *(event-sourced)* | — | persists Payment events via the kernel (standalone; not yet wired to the order) |
 | `sales` | `returns` *(event-sourced)* | — | persists Return events via the kernel (standalone; not yet wired to the order) |
-| `sales` | `quoting` | `quotes`, `operating_companies` | — |
+| `sales` | `quoting` | `quotes`, `subsidiaries` | — |
 | `reference` | `catalog` | `items` | — |
 | `reference` | `tenancy` | `tenant_connection_bindings` | — |
 | `reference` | `connections` | `erp_connections` | — |

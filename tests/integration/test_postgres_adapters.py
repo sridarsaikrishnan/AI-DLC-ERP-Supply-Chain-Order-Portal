@@ -20,10 +20,6 @@ from src.modules.integration.webhooks_inbound.infrastructure.postgres import (  
     PostgresDedupStore,
     PostgresOrderLocator,
 )
-from src.modules.reference.catalog.domain.models import Item  # noqa: E402
-from src.modules.reference.catalog.infrastructure.postgres import (  # noqa: E402
-    PostgresItemRepository,
-)
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType  # noqa: E402
 from src.modules.reference.connections.infrastructure.postgres import (  # noqa: E402
     PostgresConnectionRepository,
@@ -39,7 +35,7 @@ from src.modules.sales.ordering.projections.postgres_store import (  # noqa: E40
 )
 from src.modules.sales.ordering.projections.read_models import OrderLineView  # noqa: E402
 from src.shared.persistence.engine import get_session_factory  # noqa: E402
-from src.shared.types import BindingId, ConnectionId, ItemId, OrderId, TenantId  # noqa: E402
+from src.shared.types import BindingId, ConnectionId, OrderId, TenantId  # noqa: E402
 
 try:
     _factory = get_session_factory()
@@ -80,10 +76,6 @@ def _cleanup():
                 {"ids": _created_connection_ids},
             )
             session.execute(
-                text("DELETE FROM items WHERE owning_connection_id = ANY(:ids)"),
-                {"ids": _created_connection_ids},
-            )
-            session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = ANY(:ids)"),
                 {"ids": _created_connection_ids},
             )
@@ -116,22 +108,6 @@ def test_connection_repository_roundtrip() -> None:
     conn = _make_connection()
     assert repo.get(conn.connection_id) == conn
     assert conn in repo.list_active()
-
-
-def test_item_repository_upserts_on_refresh() -> None:
-    repo = PostgresItemRepository(_factory)
-    owner = _make_connection().connection_id
-    item = Item(
-        item_id=ItemId(_id("item")), sku=_id("sku"), name="Widget", owning_connection_id=owner
-    )
-    repo.add(item)
-    item.name = "Widget v2"
-    repo.add(item)
-
-    refreshed = repo.find_by_sku(item.sku)
-    assert refreshed is not None
-    assert refreshed.name == "Widget v2"
-    assert repo.get(item.item_id) == refreshed
 
 
 def test_binding_repository_enforces_uniqueness_at_db() -> None:
@@ -171,7 +147,7 @@ def test_order_projection_store_reseller_view_excludes_erp_identity() -> None:
 
     reseller = store.get_reseller_view(tenant, order_id)
     assert reseller is not None
-    assert reseller.status == "Confirmed"
+    assert reseller.status == "CONFIRMED"
     # _line_from_json falls back line_id to product_key when the stored value is empty
     # (store.create was called with no explicit line_id above) — this is the documented
     # read-side fallback, not a round-trip bug.

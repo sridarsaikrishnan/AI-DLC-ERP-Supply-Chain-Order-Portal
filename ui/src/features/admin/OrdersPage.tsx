@@ -5,6 +5,7 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useOperatorOrders } from "../../hooks/useAdmin";
 import type { OperatorOrder } from "../../api/queries/admin";
+import { statusLabel } from "../../lib/statusLabel";
 
 /** Every order, across every tenant — the cross-tenant visibility an operator needs to
  * debug a specific reseller's order without knowing its id ahead of time. */
@@ -25,7 +26,7 @@ export function OrdersPage() {
     { key: "ref", header: "Reference", render: (o) => o.clientReference },
     { key: "connection", header: "Connection", render: (o) => o.owningConnectionId ?? "—" },
     { key: "erpOrderId", header: "ERP order", render: (o) => (o.erpOrderId ? <span className="mono">{o.erpOrderId}</span> : "—") },
-    { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+    { key: "status", header: "Status", render: (o) => <StatusBadge status={statusLabel(o.status)} /> },
   ];
 
   return (

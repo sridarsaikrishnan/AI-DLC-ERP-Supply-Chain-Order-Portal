@@ -36,7 +36,7 @@ export interface TimelineEntry {
 export interface Parties {
   endCustomerName: string;
   shipTo: string;
-  operatingCompanyId: string;
+  subsidiaryId: string;
   quoteId: string;
 }
 
@@ -55,13 +55,15 @@ export interface ResellerOrder {
 
 export interface QuoteLine {
   productKey: string;
+  name: string;
+  kind: string;
   unitPrice: Money;
   unitOfMeasure: string;
 }
 
 export interface Quote {
   quoteId: string;
-  operatingCompanyId: string;
+  subsidiaryId: string;
   endCustomerName: string;
   shipTo: string;
   currency: string;
@@ -78,7 +80,7 @@ const ORDER_FIELDS = /* GraphQL */ `
   fulfillmentStatus
   deliveryStatus
   invoiceStatus
-  parties { endCustomerName shipTo operatingCompanyId quoteId }
+  parties { endCustomerName shipTo subsidiaryId quoteId }
   lines {
     lineId productKey quantity unitOfMeasure kind
     unitPrice { amount currency } lineTotal { amount currency }
@@ -99,8 +101,8 @@ export const ORDER_QUERY = /* GraphQL */ `
 export const QUOTES_QUERY = /* GraphQL */ `
   query Quotes {
     quotes {
-      quoteId operatingCompanyId endCustomerName shipTo currency validFrom validUntil status
-      lines { productKey unitPrice { amount currency } unitOfMeasure }
+      quoteId subsidiaryId endCustomerName shipTo currency validFrom validUntil status
+      lines { productKey name kind unitPrice { amount currency } unitOfMeasure }
     }
   }
 `;

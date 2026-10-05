@@ -4,8 +4,9 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useOperatorOrders } from "../../hooks/useAdmin";
 import type { OperatorOrder } from "../../api/queries/admin";
+import { statusLabel } from "../../lib/statusLabel";
 
-const ATTENTION_STATUSES = new Set(["Retrying", "Rejected", "Cancelled"]);
+const ATTENTION_STATUSES = new Set(["RETRYING", "REJECTED", "CANCELLED"]);
 
 /** Orders that could not be delivered to an ERP (or were cancelled), across every
  * tenant — the cross-tenant debugging view. Built from the same order data as
@@ -15,16 +16,16 @@ export function FailedMessagesPage() {
 
   const attention = (orders ?? []).filter((o) => ATTENTION_STATUSES.has(o.status));
   const counts = {
-    retrying: attention.filter((o) => o.status === "Retrying").length,
-    rejected: attention.filter((o) => o.status === "Rejected").length,
-    cancelled: attention.filter((o) => o.status === "Cancelled").length,
+    retrying: attention.filter((o) => o.status === "RETRYING").length,
+    rejected: attention.filter((o) => o.status === "REJECTED").length,
+    cancelled: attention.filter((o) => o.status === "CANCELLED").length,
   };
 
   const columns: Column<OperatorOrder>[] = [
     { key: "orderId", header: "Order", render: (o) => <Link to={`/admin/orders/${o.orderId}`}>{o.orderId}</Link> },
     { key: "tenant", header: "Tenant", render: (o) => <span className="id">{o.tenantId}</span> },
     { key: "connection", header: "Connection", render: (o) => o.owningConnectionId ?? "—" },
-    { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+    { key: "status", header: "Status", render: (o) => <StatusBadge status={statusLabel(o.status)} /> },
   ];
 
   return (

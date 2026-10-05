@@ -58,7 +58,7 @@ orders_table = Table(
     Column("lines", JSONB, nullable=False),
     # Increment 5 party columns (reseller-safe — no ERP identity):
     Column("quote_id", String, nullable=False, server_default=""),
-    Column("operating_company_id", String, nullable=False, server_default=""),
+    Column("subsidiary_id", String, nullable=False, server_default=""),
     Column("end_customer_name", String, nullable=False, server_default=""),
     Column("ship_to", String, nullable=False, server_default=""),
 )
@@ -135,7 +135,7 @@ class PostgresOrderProjectionStore:
                     state=OrderState.SUBMITTED.value,
                     lines=[_line_to_json(line) for line in lines],
                     quote_id=parties.quote_id,
-                    operating_company_id=parties.operating_company_id,
+                    subsidiary_id=parties.subsidiary_id,
                     end_customer_name=parties.end_customer_name,
                     ship_to=parties.ship_to,
                 )
@@ -312,7 +312,7 @@ class PostgresOrderProjectionStore:
         return Parties(
             end_customer_name=row.end_customer_name or "",
             ship_to=row.ship_to or "",
-            operating_company_id=row.operating_company_id or "",
+            subsidiary_id=row.subsidiary_id or "",
             quote_id=row.quote_id or "",
         )
 

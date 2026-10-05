@@ -24,16 +24,22 @@ class OrderSubmitted(DomainEvent):
     # Increment 5 (FR-B2/FR-C): the order is a reply to a quote and names its parties.
     # Reseller-safe — no ERP identity here (FR-19).
     quote_id: str = ""
-    operating_company_id: str = ""
+    subsidiary_id: str = ""
     end_customer_name: str = ""
     ship_to: str = ""
+    # Increment 7: the quote already decided which ERP connection this order goes to
+    # (stamped at quote-issue time, from the issuing subsidiary's route) — no
+    # longer derived from line-item ownership at order time.
+    routed_to_connection_id: str = ""
 
 
 @register_event
 @dataclass(frozen=True, kw_only=True)
 class OrderValidated(DomainEvent):
+    """`owning_connection_id` is already known from `OrderSubmitted` (Increment 7) — this
+    event just marks that the tenant's binding to it was confirmed verified."""
+
     order_id: str
-    owning_connection_id: str
 
 
 @register_event
@@ -41,7 +47,11 @@ class OrderValidated(DomainEvent):
 class OrderReadyForDelivery(DomainEvent):
     """Historical event type name kept unchanged (Q2=A) even though the state it drives
     was renamed `READY_FOR_DELIVERY` -> `ACCEPTED` — renaming a persisted event type would
-    mean rewriting stored history. It means "routed, ready to send to the ERP"."""
+    mean rewriting stored history. It means "routed, ready to send to the ERP".
+
+    Carries `owning_connection_id` directly (even though it's already on `OrderSubmitted`
+    too) because `DeliveryHandler` only ever consumes this one event type — it has no
+    other way to learn which connection to deliver to without a second lookup."""
 
     order_id: str
     owning_connection_id: str

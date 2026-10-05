@@ -64,10 +64,9 @@ def _app():
 
 def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
     from fastapi.testclient import TestClient
-    from src.modules.reference.catalog.domain.models import Item
     from src.modules.reference.connections.domain.models import ErpConnection, ErpType
     from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
-    from src.shared.types import BindingId, ConnectionId, ItemId, TenantId
+    from src.shared.types import BindingId, ConnectionId, TenantId
 
     app = _app()
     container = app.state.container
@@ -93,11 +92,6 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             webhook_secret_ref=webhook_secret_name,
         )
     )
-    container.items.add(
-        Item(
-            item_id=ItemId(_id("item")), sku=sku, name="Widget", owning_connection_id=connection_id
-        )
-    )
     container.bindings.add(
         TenantConnectionBinding(
             binding_id=BindingId(_id("bind")),
@@ -114,12 +108,13 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
     from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
     from src.shared.money import Money
 
-    company = container.quote_service.create_operating_company(
+    company = container.quote_service.create_subsidiary(
         name="Webhook Co", country="US", language="en"
     )
+    container.quote_service.set_erp_route(company.subsidiary_id, connection)
     quote = container.quote_service.issue_quote(
         tenant_id=TenantId(tenant),
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
@@ -188,7 +183,7 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             container.order_projector.handle(event)
 
         operator = container.projections.get_operator_view(order_id)
-        assert operator.status == "Confirmed"
+        assert operator.status == "CONFIRMED"
     finally:
         _floci.delete_secret(SecretId=webhook_secret_name, ForceDeleteWithoutRecovery=True)
         _floci.delete_secret(SecretId=login_secret_name, ForceDeleteWithoutRecovery=True)
@@ -211,15 +206,16 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
                 {"cid": connection},
             )
             session.execute(
-                text("DELETE FROM items WHERE owning_connection_id = :cid"), {"cid": connection}
-            )
-            session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
             )
             session.execute(
                 text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote.quote_id}
             )
             session.execute(
-                text("DELETE FROM operating_companies WHERE operating_company_id = :ocid"),
-                {"ocid": company.operating_company_id},
+                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
+            )
+            session.execute(
+                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
+                {"ocid": company.subsidiary_id},
             )

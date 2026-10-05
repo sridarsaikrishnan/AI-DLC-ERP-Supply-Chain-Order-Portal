@@ -19,18 +19,23 @@ from ..domain.models import DeliveryStatus, FulfillmentStatus, InvoiceStatus, Or
 if TYPE_CHECKING:
     from src.shared.money import Money, TaxRate
 
-# Internal state -> reseller-facing lifecycle word (design README). ACCEPTED (formerly
-# READY_FOR_DELIVERY) keeps the "Validated" reseller label (Q2=A); FULFILLED is gone.
+# Internal state -> reseller-facing lifecycle word. SCREAMING_SNAKE_CASE, consistent with
+# fulfillment_status/delivery_status/invoice_status below (previously this table emitted
+# Title Case human text — e.g. "Sent to ERP" — while the other three always emitted their
+# raw enum value; that mismatch is why this table exists in this form now). Presentation
+# (human-friendly label, color) is the UI's job, not the API's — see ui/src/lib/statusLabel.ts.
+# ACCEPTED (formerly READY_FOR_DELIVERY) keeps the VALIDATED reseller label (Q2=A); FULFILLED
+# is gone.
 STATUS_LABELS: dict[OrderState, str] = {
-    OrderState.SUBMITTED: "Submitted",
-    OrderState.VALIDATED: "Validated",
-    OrderState.ACCEPTED: "Validated",
-    OrderState.SENT_TO_ERP: "Sent to ERP",
-    OrderState.CONFIRMED: "Confirmed",
-    OrderState.CLOSED: "Closed",
-    OrderState.REJECTED: "Rejected",
-    OrderState.RETRYING: "Retrying",
-    OrderState.CANCELLED: "Cancelled",
+    OrderState.SUBMITTED: "SUBMITTED",
+    OrderState.VALIDATED: "VALIDATED",
+    OrderState.ACCEPTED: "VALIDATED",
+    OrderState.SENT_TO_ERP: "SENT_TO_ERP",
+    OrderState.CONFIRMED: "CONFIRMED",
+    OrderState.CLOSED: "CLOSED",
+    OrderState.REJECTED: "REJECTED",
+    OrderState.RETRYING: "RETRYING",
+    OrderState.CANCELLED: "CANCELLED",
 }
 
 
@@ -113,7 +118,7 @@ class Parties:
 
     end_customer_name: str = ""
     ship_to: str = ""
-    operating_company_id: str = ""
+    subsidiary_id: str = ""
     quote_id: str = ""
 
 

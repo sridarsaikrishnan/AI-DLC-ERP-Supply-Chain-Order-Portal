@@ -40,7 +40,7 @@ class TimelineEntryType:
 class PartiesType:
     end_customer_name: str
     ship_to: str
-    operating_company_id: str
+    subsidiary_id: str
     quote_id: str
 
 
@@ -71,6 +71,8 @@ class OrderLineInput:
 @strawberry.type
 class QuoteLineType:
     product_key: str
+    name: str
+    kind: str
     unit_price: MoneyType
     unit_of_measure: str
 
@@ -81,7 +83,7 @@ class QuoteType:
     and where the goods go. No ERP identity."""
 
     quote_id: str
-    operating_company_id: str
+    subsidiary_id: str
     end_customer_name: str
     ship_to: str
     currency: str

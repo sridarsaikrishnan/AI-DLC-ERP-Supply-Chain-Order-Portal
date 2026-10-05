@@ -2,26 +2,28 @@ import { useState, type FormEvent } from "react";
 
 import { DataTable, type Column } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
-import { useIssueQuote, useOperatingCompanies, useOperatorQuotes } from "../../hooks/useAdmin";
+import { useIssueQuote, useSubsidiaries, useOperatorQuotes } from "../../hooks/useAdmin";
 import type { OperatorQuote } from "../../api/queries/admin";
 
 interface LineForm {
   productKey: string;
+  name: string;
+  kind: string;
   unitPrice: string;
   unitOfMeasure: string;
 }
 
-const EMPTY_LINE: LineForm = { productKey: "", unitPrice: "", unitOfMeasure: "EA" };
+const EMPTY_LINE: LineForm = { productKey: "", name: "", kind: "PHYSICAL", unitPrice: "", unitOfMeasure: "EA" };
 
 export function QuotesPage() {
   const { data: quotes, isLoading, error } = useOperatorQuotes();
-  const { data: companies } = useOperatingCompanies();
+  const { data: subsidiaries } = useSubsidiaries();
   const issueQuote = useIssueQuote();
 
   const today = new Date().toISOString().slice(0, 10);
   const EMPTY = {
     tenantId: "",
-    operatingCompanyId: "",
+    subsidiaryId: "",
     endCustomerName: "",
     shipTo: "",
     currency: "USD",
@@ -47,7 +49,13 @@ export function QuotesPage() {
       ...form,
       lines: lines
         .filter((l) => l.productKey && l.unitPrice)
-        .map((l) => ({ productKey: l.productKey, unitPrice: Number(l.unitPrice), unitOfMeasure: l.unitOfMeasure })),
+        .map((l) => ({
+          productKey: l.productKey,
+          name: l.name,
+          kind: l.kind,
+          unitPrice: Number(l.unitPrice),
+          unitOfMeasure: l.unitOfMeasure,
+        })),
     });
     setForm(EMPTY);
     setLines([{ ...EMPTY_LINE }]);
@@ -75,11 +83,11 @@ export function QuotesPage() {
               <input className="input" id="q-tenant" value={form.tenantId} onChange={(e) => setForm({ ...form, tenantId: e.target.value })} required />
             </div>
             <div className="field">
-              <label htmlFor="q-company">Operating company</label>
-              <select className="input" id="q-company" value={form.operatingCompanyId} onChange={(e) => setForm({ ...form, operatingCompanyId: e.target.value })} required>
-                <option value="">Select a company</option>
-                {(companies ?? []).map((c) => (
-                  <option key={c.operatingCompanyId} value={c.operatingCompanyId}>
+              <label htmlFor="q-subsidiary">Subsidiary</label>
+              <select className="input" id="q-subsidiary" value={form.subsidiaryId} onChange={(e) => setForm({ ...form, subsidiaryId: e.target.value })} required>
+                <option value="">Select a subsidiary</option>
+                {(subsidiaries ?? []).map((c) => (
+                  <option key={c.subsidiaryId} value={c.subsidiaryId}>
                     {c.name} ({c.country})
                   </option>
                 ))}
@@ -116,7 +124,9 @@ export function QuotesPage() {
             <table className="erp-table">
               <thead>
                 <tr>
-                  <th>Item (SKU)</th>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th>Kind</th>
                   <th className="num">Unit price</th>
                   <th>Unit</th>
                   <th></th>
@@ -127,6 +137,15 @@ export function QuotesPage() {
                   <tr key={i}>
                     <td>
                       <input className="input" value={line.productKey} onChange={(e) => setLines((p) => p.map((l, j) => (j === i ? { ...l, productKey: e.target.value } : l)))} required />
+                    </td>
+                    <td>
+                      <input className="input" value={line.name} onChange={(e) => setLines((p) => p.map((l, j) => (j === i ? { ...l, name: e.target.value } : l)))} required />
+                    </td>
+                    <td>
+                      <select className="input" style={{ width: 110 }} value={line.kind} onChange={(e) => setLines((p) => p.map((l, j) => (j === i ? { ...l, kind: e.target.value } : l)))}>
+                        <option value="PHYSICAL">Box</option>
+                        <option value="LICENSE">License</option>
+                      </select>
                     </td>
                     <td className="num">
                       <input className="input" type="number" step="0.01" min="0" style={{ width: 110 }} value={line.unitPrice} onChange={(e) => setLines((p) => p.map((l, j) => (j === i ? { ...l, unitPrice: e.target.value } : l)))} required />

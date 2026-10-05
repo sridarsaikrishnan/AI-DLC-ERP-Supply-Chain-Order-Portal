@@ -49,8 +49,9 @@ flowchart LR
 |---|---|---|---|
 | `order-processing.fifo` | `OrderSubmitted`, `OrderAmended` | `worker/consumers/order_processing.py` (validate + ownership routing) | `order-processing-dlq.fifo` |
 | `order-delivery.fifo` | `OrderReadyForDelivery`, `OrderCancellationRequested` | `worker/consumers/order_delivery.py` (ERP submit/cancel) | `order-delivery-dlq.fifo` |
+| `order-fulfillment.fifo` | `ShipmentRecorded`, `InvoiceRecorded` | `ordering.application.fulfillment_consumer` (the saga, ADR-0018 — bumps the order's shipped/invoiced scores) | `order-fulfillment-dlq.fifo` |
 | `projections.fifo` | all events | `worker/consumers/projector.py` (build read models) | `projections-dlq.fifo` |
-| `webhook-dispatch.fifo` *(optional/secondary)* | `OrderSentToErp`, `OrderConfirmed`, `OrderFulfilled`, `OrderClosed`, `OrderRejected`, `OrderRetrying` | `worker/consumers/webhook_dispatch.py` | `webhook-dispatch-dlq.fifo` |
+| `webhook-dispatch.fifo` *(optional/secondary)* | `OrderSentToErp`, `OrderConfirmed`, `OrderClosed`, `OrderRejected`, `OrderRetrying`, `OrderCancelled`, `ShipmentRecorded`, `InvoiceRecorded` | `worker/consumers/webhook_dispatch.py` | `webhook-dispatch-dlq.fifo` |
 
 **Not queues:** inbound ERP webhook = HTTP ingress → outbox → topic (no ingress queue in the base; add one only if inbound volume needs buffering). Reconciliation = EventBridge Scheduler (cron). Outbox relay = the publisher.
 

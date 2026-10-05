@@ -52,7 +52,7 @@ class Order(Aggregate):
         self.tenant_id: TenantId = TenantId("")
         self.client_reference: str = ""
         self.quote_id: str = ""
-        self.operating_company_id: str = ""
+        self.subsidiary_id: str = ""
         self.end_customer_name: str = ""
         self.ship_to: str = ""
         self.lines: list[OrderLine] = []
@@ -80,9 +80,10 @@ class Order(Aggregate):
         client_reference: str,
         lines: list[OrderLine],
         quote_id: str = "",
-        operating_company_id: str = "",
+        subsidiary_id: str = "",
         end_customer_name: str = "",
         ship_to: str = "",
+        routed_to_connection_id: str = "",
     ) -> Order:
         if not lines:
             raise ValueError("order must have at least one line")
@@ -105,16 +106,19 @@ class Order(Aggregate):
                 lines=[line.to_dict() for line in lines],
                 product_keys=[line.product_key for line in lines],
                 quote_id=quote_id,
-                operating_company_id=operating_company_id,
+                subsidiary_id=subsidiary_id,
                 end_customer_name=end_customer_name,
                 ship_to=ship_to,
+                routed_to_connection_id=routed_to_connection_id,
             )
         )
         return order
 
-    def validate(self, owning_connection_id: ConnectionId) -> None:
+    def validate(self) -> None:
+        """Marks the tenant's binding to `owning_connection_id` (already known from
+        submission, Increment 7) as confirmed verified."""
         self._require(OrderState.SUBMITTED, "validate")
-        self.emit(OrderValidated(order_id=self.id, owning_connection_id=str(owning_connection_id)))
+        self.emit(OrderValidated(order_id=self.id))
 
     def accept(self) -> None:
         """Routed and ready to send to the ERP (was `mark_ready_for_delivery`; the state
@@ -285,15 +289,17 @@ class Order(Aggregate):
         self.tenant_id = TenantId(e.tenant_id)
         self.client_reference = e.client_reference
         self.quote_id = e.quote_id
-        self.operating_company_id = e.operating_company_id
+        self.subsidiary_id = e.subsidiary_id
         self.end_customer_name = e.end_customer_name
         self.ship_to = e.ship_to
         self.lines = [OrderLine.from_dict(line) for line in e.lines]
         self.product_keys = list(e.product_keys)
+        # Increment 7: the connection is already decided (by the quote), not derived by
+        # routing later — set it here, at submission, not in OrderValidated.
+        self.owning_connection_id = ConnectionId(e.routed_to_connection_id)
         self.state = OrderState.SUBMITTED
 
     def _apply_OrderValidated(self, e: OrderValidated) -> None:
-        self.owning_connection_id = ConnectionId(e.owning_connection_id)
         self.state = OrderState.VALIDATED
 
     def _apply_OrderReadyForDelivery(self, e: OrderReadyForDelivery) -> None:
@@ -349,7 +355,7 @@ class Order(Aggregate):
             "tenant_id": str(self.tenant_id),
             "client_reference": self.client_reference,
             "quote_id": self.quote_id,
-            "operating_company_id": self.operating_company_id,
+            "subsidiary_id": self.subsidiary_id,
             "end_customer_name": self.end_customer_name,
             "ship_to": self.ship_to,
             "lines": [line.to_dict() for line in self.lines],
@@ -370,7 +376,7 @@ class Order(Aggregate):
         self.tenant_id = TenantId(state["tenant_id"])
         self.client_reference = state["client_reference"]
         self.quote_id = state.get("quote_id", "")
-        self.operating_company_id = state.get("operating_company_id", "")
+        self.subsidiary_id = state.get("subsidiary_id", "")
         self.end_customer_name = state.get("end_customer_name", "")
         self.ship_to = state.get("ship_to", "")
         self.lines = [OrderLine.from_dict(line) for line in state["lines"]]

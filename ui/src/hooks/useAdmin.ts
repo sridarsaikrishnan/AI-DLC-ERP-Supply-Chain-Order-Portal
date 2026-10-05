@@ -5,10 +5,10 @@ import {
   BINDINGS_QUERY,
   CONNECTIONS_QUERY,
   CREATE_BINDING_MUTATION,
-  CREATE_OPERATING_COMPANY_MUTATION,
+  CREATE_SUBSIDIARY_MUTATION,
+  ERP_ROUTE_QUERY,
   ISSUE_QUOTE_MUTATION,
-  ITEMS_QUERY,
-  OPERATING_COMPANIES_QUERY,
+  SUBSIDIARIES_QUERY,
   OPERATOR_ORDERS_QUERY,
   OPERATOR_ORDER_QUERY,
   OPERATOR_QUOTES_QUERY,
@@ -17,14 +17,13 @@ import {
   REGISTER_CONNECTION_MUTATION,
   REMOVE_BINDING_MUTATION,
   RESUME_CONNECTION_MUTATION,
+  SET_ERP_ROUTE_MUTATION,
   SET_VENDOR_DATE_MUTATION,
-  SYNC_ITEM_MUTATION,
   VERIFY_BINDING_MUTATION,
   type Binding,
   type Connection,
   type IssueQuoteLineInput,
-  type Item,
-  type OperatingCompany,
+  type Subsidiary,
   type OperatorOrder,
   type OperatorQuote,
 } from "../api/queries/admin";
@@ -53,12 +52,18 @@ export function useBindings() {
   });
 }
 
-export function useItems() {
+export function useErpRoute(subsidiaryId: string) {
   const { idToken, isAuthenticated } = useAuth();
   return useQuery({
-    queryKey: ["items"],
-    queryFn: () => graphqlRequest<{ items: Item[] }>("operator", ITEMS_QUERY, {}, idToken).then((d) => d.items),
-    enabled: isAuthenticated,
+    queryKey: ["erpRoute", subsidiaryId],
+    queryFn: () =>
+      graphqlRequest<{ erpRoute: string | null }, { subsidiaryId: string }>(
+        "operator",
+        ERP_ROUTE_QUERY,
+        { subsidiaryId },
+        idToken,
+      ).then((d) => d.erpRoute),
+    enabled: isAuthenticated && !!subsidiaryId,
   });
 }
 
@@ -178,43 +183,43 @@ export function useRemoveBinding() {
   });
 }
 
-export function useSyncItem() {
+export function useSetErpRoute() {
   const { idToken } = useAuth();
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { sku: string; name: string; owningConnectionId: string; kind: string }) =>
-      graphqlRequest("operator", SYNC_ITEM_MUTATION, input, idToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      notify("Item saved.");
+    mutationFn: (input: { subsidiaryId: string; connectionId: string }) =>
+      graphqlRequest("operator", SET_ERP_ROUTE_MUTATION, input, idToken),
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ["erpRoute", input.subsidiaryId] });
+      notify("Route saved.");
     },
     onError: (err) => notify((err as Error).message, "danger"),
   });
 }
 
-export function useOperatingCompanies() {
+export function useSubsidiaries() {
   const { idToken, isAuthenticated } = useAuth();
   return useQuery({
-    queryKey: ["operatingCompanies"],
+    queryKey: ["subsidiaries"],
     queryFn: () =>
-      graphqlRequest<{ operatingCompanies: OperatingCompany[] }>("operator", OPERATING_COMPANIES_QUERY, {}, idToken).then(
-        (d) => d.operatingCompanies,
+      graphqlRequest<{ subsidiaries: Subsidiary[] }>("operator", SUBSIDIARIES_QUERY, {}, idToken).then(
+        (d) => d.subsidiaries,
       ),
     enabled: isAuthenticated,
   });
 }
 
-export function useCreateOperatingCompany() {
+export function useCreateSubsidiary() {
   const { idToken } = useAuth();
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
     mutationFn: (input: { name: string; country: string; language: string }) =>
-      graphqlRequest("operator", CREATE_OPERATING_COMPANY_MUTATION, input, idToken),
+      graphqlRequest("operator", CREATE_SUBSIDIARY_MUTATION, input, idToken),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operatingCompanies"] });
-      notify("Operating company created.");
+      queryClient.invalidateQueries({ queryKey: ["subsidiaries"] });
+      notify("Subsidiary created.");
     },
     onError: (err) => notify((err as Error).message, "danger"),
   });
@@ -237,7 +242,7 @@ export function useIssueQuote() {
   return useMutation({
     mutationFn: (input: {
       tenantId: string;
-      operatingCompanyId: string;
+      subsidiaryId: string;
       endCustomerName: string;
       shipTo: string;
       currency: string;

@@ -5,14 +5,9 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { useAuth } from "../../auth/AuthContext";
 import { useCancelOrder, useOrder } from "../../hooks/useOrders";
 import { formatMoney } from "../../lib/money";
+import { statusLabel } from "../../lib/statusLabel";
 
-const CANCELLABLE = new Set(["Submitted", "Validated"]);
-
-function scoreLabel(value: string): string {
-  // UPPER_SNAKE enum value -> human words, e.g. PARTIALLY_FULFILLED -> "Partially fulfilled"
-  const s = value.replace(/_/g, " ").toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+const CANCELLABLE = new Set(["SUBMITTED", "VALIDATED"]);
 
 export function OrderDetailPage() {
   const { orderId = "" } = useParams();
@@ -38,7 +33,7 @@ export function OrderDetailPage() {
       <div className="pagehead">
         <div>
           <h1>
-            Order {order.orderId} <StatusBadge status={order.status} />
+            Order {order.orderId} <StatusBadge status={statusLabel(order.status)} />
           </h1>
           <p>Your reference {order.clientReference}.</p>
         </div>
@@ -100,11 +95,11 @@ export function OrderDetailPage() {
             <h2>Status</h2>
             <dl className="kv">
               <dt>Fulfillment</dt>
-              <dd><StatusBadge status={scoreLabel(order.fulfillmentStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.fulfillmentStatus)} /></dd>
               <dt>Delivery</dt>
-              <dd><StatusBadge status={scoreLabel(order.deliveryStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.deliveryStatus)} /></dd>
               <dt>Invoice</dt>
-              <dd><StatusBadge status={scoreLabel(order.invoiceStatus)} /></dd>
+              <dd><StatusBadge status={statusLabel(order.invoiceStatus)} /></dd>
             </dl>
           </section>
           <section className="panel">

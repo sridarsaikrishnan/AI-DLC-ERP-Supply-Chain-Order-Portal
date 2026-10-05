@@ -57,15 +57,15 @@ class OrderProjector:
                 parties=Parties(
                     end_customer_name=str(payload.get("end_customer_name", "")),
                     ship_to=str(payload.get("ship_to", "")),
-                    operating_company_id=str(payload.get("operating_company_id", "")),
+                    subsidiary_id=str(payload.get("subsidiary_id", "")),
                     quote_id=str(payload.get("quote_id", "")),
                 ),
             )
+            self._store.set_owning_connection(
+                order_id, str(payload.get("routed_to_connection_id", ""))
+            )
             self._store.set_state(order_id, OrderState.SUBMITTED, at)
             return
-
-        if event.event_type == "OrderValidated":
-            self._store.set_owning_connection(order_id, str(payload["owning_connection_id"]))
 
         if event.event_type == "OrderSentToErp":
             erp_order_id = str(payload["erp_order_id"])

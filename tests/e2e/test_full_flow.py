@@ -1,14 +1,15 @@
 """End-to-end, in-memory: the whole pipeline wired with real components.
 
-place order -> (bus) order-processing routes by ownership -> order-delivery submits to a
-stub ERP -> projections build the reseller read model + reverse-routing locator ->
-inbound ERP webhook (status change) is authenticated + attributed + applied -> the
-reseller read model reflects the new lifecycle status.
+place order (already routed to a connection by its quote) -> (bus) order-processing
+confirms the tenant's binding -> order-delivery submits to a stub ERP -> projections build
+the reseller read model + reverse-routing locator -> inbound ERP webhook (status change)
+is authenticated + attributed + applied -> the reseller read model reflects the new
+lifecycle status.
 
 Everything below is production code except the ERP adapter (stub), the connection
-resolver, and the ownership/binding queries (fakes standing in for the catalog/tenancy
-adapters). The message bus, event store, repository, projector, processor, delivery
-handler, status applier and webhook ingress are the real implementations.
+resolver, and the binding query (a fake standing in for the tenancy adapter). The message
+bus, event store, repository, projector, processor, delivery handler, status applier and
+webhook ingress are the real implementations.
 """
 
 from __future__ import annotations
@@ -29,7 +30,6 @@ from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
     InMemoryOrderLocator,
 )
-from src.modules.reference.catalog.infrastructure.memory import InMemoryItemRepository
 from src.modules.sales.ordering.application.adapters import (
     OrderCommandAdapter,
     OrderReaderAdapter,
@@ -43,8 +43,9 @@ from src.modules.sales.ordering.projections.store import OrderProjectionStore
 from src.modules.sales.quoting.application.service import QuoteService
 from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
 from src.modules.sales.quoting.infrastructure.memory import (
-    InMemoryOperatingCompanyRepository,
     InMemoryQuoteRepository,
+    InMemorySubsidiaryRepository,
+    InMemorySubsidiaryRouteRepository,
 )
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.messaging import InMemoryMessageBus
@@ -54,11 +55,6 @@ from src.shared.types import ConnectionId, TenantId
 _TENANT = TenantId("tnt_demo")
 _CONN = "conn_odoo_local"
 _SECRET = "whsec_demo"
-
-
-class FakeOwnership:
-    def owner_of(self, product_key: str) -> ConnectionId | None:
-        return ConnectionId(_CONN) if product_key in {"ANVIL", "SPRING"} else None
 
 
 class FakeBindings:
@@ -93,7 +89,7 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
     stub_adapter = StubErpAdapter()
 
     # --- consumers wired to the bus (real components) ---
-    processor = OrderProcessor(repo, FakeOwnership(), FakeBindings())
+    processor = OrderProcessor(repo, FakeBindings())
     delivery = DeliveryHandler(
         connections=FakeConnections(),
         orders_read=OrderReaderAdapter(projections),
@@ -106,11 +102,14 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
 
     # --- a quote the reseller replies to ---
     quotes = InMemoryQuoteRepository()
-    quote_service = QuoteService(quotes, InMemoryOperatingCompanyRepository())
-    company = quote_service.create_operating_company(name="Dist", country="US", language="en")
+    quote_service = QuoteService(
+        quotes, InMemorySubsidiaryRepository(), InMemorySubsidiaryRouteRepository()
+    )
+    company = quote_service.create_subsidiary(name="Dist", country="US", language="en")
+    quote_service.set_erp_route(company.subsidiary_id, _CONN)
     quote = quote_service.issue_quote(
         tenant_id=_TENANT,
-        operating_company_id=company.operating_company_id,
+        subsidiary_id=company.subsidiary_id,
         end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
         currency="USD",
         valid_from=date.today() - timedelta(days=1),
@@ -123,9 +122,7 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
     )
 
     # --- place an order and drain the pipeline ---
-    order_id = OrderService(
-        repo, quotes, InMemoryItemRepository(), quote_service, references=projections
-    ).place_order(
+    order_id = OrderService(repo, quotes, quote_service, references=projections).place_order(
         tenant_id=_TENANT,
         quote_id=quote.quote_id,
         client_reference="PO-1001",
@@ -135,7 +132,7 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
 
     # routed, delivered to the (stub) ERP, projection reflects it, no ERP identity leaked
     reseller = projections.get_reseller_view(_TENANT, order_id)
-    assert reseller is not None and reseller.status == "Sent to ERP"
+    assert reseller is not None and reseller.status == "SENT_TO_ERP"
     operator = projections.get_operator_view(order_id)
     assert operator is not None and operator.owning_connection_id == _CONN
     erp_order_id = operator.erp_order_id
@@ -164,6 +161,6 @@ def test_order_flows_place_to_confirmed_via_webhook() -> None:
 
     assert outcome is IngressOutcome.ACCEPTED
     reseller_after = projections.get_reseller_view(_TENANT, order_id)
-    assert reseller_after is not None and reseller_after.status == "Confirmed"
+    assert reseller_after is not None and reseller_after.status == "CONFIRMED"
     # reseller view still carries no ERP identity
     assert not hasattr(reseller_after, "erp_order_id")

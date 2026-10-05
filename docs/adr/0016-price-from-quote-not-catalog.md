@@ -14,7 +14,7 @@ now says only *what the product is*, so a line with no quoted price is refused.
 
 ## The decision
 - New `quoting` module (CRUD, operator-authored — consistent with ADR-0002: event-source
-  the `Order` only). A `Quote` carries the reseller (tenant), the operating company, the
+  the `Order` only). A `Quote` carries the reseller (tenant), the subsidiary, the
   end customer (name + ship-to), a currency, a validity window, and priced lines.
 - `OrderService.place_order` takes a `quote_id` + line quantities. It resolves each line's
   price/tax/discount from the quote, copies the parties onto the order, and **refuses** a

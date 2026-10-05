@@ -1,10 +1,12 @@
 import type { TimelineEntry } from "../api/queries/orders";
+import { statusLabel } from "../lib/statusLabel";
 
 // The canonical reseller-facing lifecycle (matches ordering/projections/read_models.py
-// STATUS_LABELS on the backend). "Retrying" and "Rejected"/"Cancelled" are exceptions
-// overlaid on this sequence, not steps in it — design/README.md's own rule.
-const LIFECYCLE_STEPS = ["Submitted", "Validated", "Sent to ERP", "Confirmed", "Fulfilled", "Closed"];
-const FAILURE_STATUSES = new Set(["Rejected", "Cancelled"]);
+// STATUS_LABELS on the backend — raw SCREAMING_SNAKE_CASE; statusLabel() renders it).
+// "RETRYING" and "REJECTED"/"CANCELLED" are exceptions overlaid on this sequence, not
+// steps in it — design/README.md's own rule.
+const LIFECYCLE_STEPS = ["SUBMITTED", "VALIDATED", "SENT_TO_ERP", "CONFIRMED", "FULFILLED", "CLOSED"];
+const FAILURE_STATUSES = new Set(["REJECTED", "CANCELLED"]);
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -32,9 +34,9 @@ interface OrderTimelineProps {
  * drawing steps that will never happen. */
 export function OrderTimeline({ timeline, currentStatus }: OrderTimelineProps) {
   const occurredAtByStatus = new Map(timeline.map((t) => [t.status, t.occurredAt]));
-  const isRetrying = currentStatus === "Retrying";
+  const isRetrying = currentStatus === "RETRYING";
   const isFailed = FAILURE_STATUSES.has(currentStatus);
-  const effectiveCurrent = isRetrying ? "Sent to ERP" : currentStatus;
+  const effectiveCurrent = isRetrying ? "SENT_TO_ERP" : currentStatus;
   const currentIndex = LIFECYCLE_STEPS.indexOf(effectiveCurrent);
 
   if (isFailed) {
@@ -49,7 +51,7 @@ export function OrderTimeline({ timeline, currentStatus }: OrderTimelineProps) {
             <li key={`${entry.status}-${entry.occurredAt}`} className={`erp-step erp-step--${state}`}>
               <span className="erp-step__mark">{state === "done" ? <CheckMark /> : <CrossMark />}</span>
               <div>
-                <span className="erp-step__label">{entry.status}</span>
+                <span className="erp-step__label">{statusLabel(entry.status)}</span>
               </div>
               <time className="erp-step__time data">{formatTime(entry.occurredAt)}</time>
             </li>
@@ -70,7 +72,7 @@ export function OrderTimeline({ timeline, currentStatus }: OrderTimelineProps) {
           <li key={step} className={`erp-step erp-step--${state}`}>
             <span className="erp-step__mark">{state === "done" ? <CheckMark /> : null}</span>
             <div>
-              <span className="erp-step__label">{step}</span>
+              <span className="erp-step__label">{statusLabel(step)}</span>
               {isCurrent && isRetrying && (
                 <span className="erp-step__note">Retrying — will be sent again automatically.</span>
               )}
