@@ -61,6 +61,7 @@ def _postgres_settings() -> Settings:
         domain_topic_arn=base.domain_topic_arn,
         erp_adapter_mode="stub",
         erp_odoo_timeout_seconds=base.erp_odoo_timeout_seconds,
+        erp_netsuite_timeout_seconds=base.erp_netsuite_timeout_seconds,
         log_level=base.log_level,
         reconcile_interval_seconds=base.reconcile_interval_seconds,
         worker_roles=base.worker_roles,

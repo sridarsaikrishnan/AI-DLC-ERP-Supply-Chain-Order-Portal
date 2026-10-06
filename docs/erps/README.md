@@ -21,7 +21,7 @@ The canonical-field ↔ ERP-field mapping tables live **in each ERP's own page h
 |---|---|---|
 | Odoo | Live, real adapter | [`odoo.md`](./odoo.md) |
 | ERPNext | Not registered (removed pending clean re-add — see `docs/adding-an-erp.md`) | — |
-| NetSuite | Not registered | — |
+| NetSuite | Live, real adapter | [`netsuite.md`](./netsuite.md) |
 
 ## Adding a new ERP's page
 
