@@ -16,6 +16,28 @@ def test_odoo_status_mapping() -> None:
     assert map_native_status("ODOO", {"state": "draft"}) is None
 
 
+def test_netsuite_status_mapping() -> None:
+    assert (
+        map_native_status("NETSUITE", {"fulfillmentstatus": "pending fulfillment"})
+        is CanonicalStatus.CONFIRMED
+    )
+    assert (
+        map_native_status("NETSUITE", {"fulfillmentstatus": "partially fulfilled"})
+        is CanonicalStatus.CONFIRMED
+    )
+    # "fulfilled" (fully delivered) maps to CONFIRMED, not its own status — delivery is
+    # a shipped fact tracked via Fulfillment records, not a lifecycle status (FR-A6),
+    # same reasoning as Odoo's "done".
+    assert (
+        map_native_status("NETSUITE", {"fulfillmentstatus": "fulfilled"})
+        is CanonicalStatus.CONFIRMED
+    )
+    # No approved field for CANCELLED/CLOSED yet (see the TODO in _map_netsuite) — an
+    # unrecognized native value is a safe no-op, not an invented guess.
+    assert map_native_status("NETSUITE", {"fulfillmentstatus": "cancelled"}) is None
+    assert map_native_status("NETSUITE", {}) is None
+
+
 def test_mapper_signature_is_a_field_bag_not_a_fixed_arity() -> None:
     """The generic signature must not force every ERP into Odoo's 2-field shape — a
     1-field ERP (just `status`) and an unused extra field must both be handled fine."""

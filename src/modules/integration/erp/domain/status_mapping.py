@@ -38,10 +38,35 @@ def _map_odoo(fields: dict[str, str]) -> CanonicalStatus | None:
     return None
 
 
+def _map_netsuite(fields: dict[str, str]) -> CanonicalStatus | None:
+    """Reads `fulfillmentstatus` — the human-reviewed field mapping for this ERP maps
+    NetSuite's `fulfillmentstatus` -> canonical `fulfillment_status` (confidence 99%,
+    see `docs/erps/netsuite.md`). Its three native values below are NetSuite's own
+    standard sales order fulfillment picklist, all mapping to CONFIRMED for the same
+    reason Odoo's "sale"/"done" both do: a fully-delivered order is a shipped *fact*
+    tracked via Fulfillment records, not a lifecycle status this mapper advances
+    (FR-A6) — so "fulfilled" doesn't get its own canonical status here.
+
+    TODO(account-specific): the approved field mapping for this ERP connection has no
+    field for CLOSED (billed/closed) or CANCELLED. NetSuite's own order lifecycle
+    tracks those via a separate status/billing concept beyond `fulfillmentstatus` (e.g.
+    a billing status, or a custom approval-workflow/order-status value) — which exact
+    field and native value(s) this account uses for "cancelled"/"closed" isn't known
+    without the live account (or that account's own saved-search/API setup). Add it
+    here once confirmed; until then this mapper only ever returns CONFIRMED or None —
+    never guess a value for the other two.
+    """
+    native = fields.get("fulfillmentstatus", "")
+    if native in ("pending fulfillment", "partially fulfilled", "fulfilled"):
+        return CanonicalStatus.CONFIRMED
+    return None
+
+
 # The one place a new ERP's status mapping is registered. Keyed by the same string an
 # `ErpConnection.erp_type`/`ErpTarget.erp_type` carries (upper-cased).
 STATUS_MAPPERS: dict[str, StatusMapper] = {
     "ODOO": _map_odoo,
+    "NETSUITE": _map_netsuite,
 }
 
 
