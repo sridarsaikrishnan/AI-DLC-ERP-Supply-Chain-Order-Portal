@@ -12,12 +12,13 @@ interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   emptyMessage?: string;
+  onRowClick?: (row: T) => void;
 }
 
 /** design/design-system/components/DataTable.md — .erp-table from bundle.css. Generic
  * over the row type so every list screen (orders, connections, bindings, items) shares
  * one table implementation instead of hand-rolling markup per screen. */
-export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No data" }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No data", onRowClick }: DataTableProps<T>) {
   return (
     <div className="erp-table-wrap">
       <table className="erp-table">
@@ -39,7 +40,7 @@ export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No data" }
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr key={rowKey(row)} onClick={onRowClick ? () => onRowClick(row) : undefined} style={onRowClick ? { cursor: "pointer" } : undefined}>
                 {columns.map((c) => (
                   <td key={c.key} className={c.align === "right" ? "num" : undefined}>
                     {c.render(row)}

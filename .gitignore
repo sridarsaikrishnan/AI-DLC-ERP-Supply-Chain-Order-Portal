@@ -29,6 +29,9 @@ portal_local.db
 .DS_Store
 Thumbs.db
 
+# Local process logs and pids (scripts/local.sh)
+.local/
+
 # Temp
 *.log
 smoke_results.txt

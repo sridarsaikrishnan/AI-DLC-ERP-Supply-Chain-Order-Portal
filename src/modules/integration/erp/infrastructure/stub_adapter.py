@@ -6,7 +6,13 @@ from typing import Any
 
 from src.shared.types import generate_id
 
-from ..application.ports import ErpInvoice, ErpShipment, ErpTarget, SubmissionResult
+from ..application.ports import (
+    ErpInvoice,
+    ErpPartnerOrder,
+    ErpShipment,
+    ErpTarget,
+    SubmissionResult,
+)
 
 
 class StubErpAdapter:
@@ -23,6 +29,9 @@ class StubErpAdapter:
         erp_order_id = generate_id("SO")
         self._status[erp_order_id] = "sale"
         return SubmissionResult(success=True, erp_order_id=erp_order_id)
+
+    def fetch_partner_orders(self, target: ErpTarget, partner_id: str) -> list[ErpPartnerOrder]:
+        return []
 
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None:
         status = self._status.get(erp_order_id)

@@ -3,20 +3,15 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 import { AppShell } from "./App";
 import { useAuth } from "./auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
-import { OrdersListPage } from "./features/orders/OrdersListPage";
 import { OrderDetailPage } from "./features/orders/OrderDetailPage";
-import { NewOrderPage } from "./features/orders/NewOrderPage";
-import { QuotesPage } from "./features/quotes/QuotesPage";
+import { NotificationsPage } from "./features/notifications/NotificationsPage";
 import { ConnectionsPage } from "./features/admin/ConnectionsPage";
 import { TenantsPage } from "./features/admin/TenantsPage";
 import { SubsidiariesPage } from "./features/admin/SubsidiariesPage";
-import { QuotesPage as OperatorQuotesPage } from "./features/admin/QuotesPage";
 import { OrdersPage as OperatorOrdersPage } from "./features/admin/OrdersPage";
 import { OrderDetailPage as OperatorOrderDetailPage } from "./features/admin/OrderDetailPage";
 import { FailedMessagesPage } from "./features/admin/FailedMessagesPage";
 import { OrderEventsPage } from "./features/events/OrderEventsPage";
-import { WebhookEndpointsPage } from "./features/webhooks/WebhookEndpointsPage";
-import { DeliveryLogPage } from "./features/webhooks/DeliveryLogPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -26,7 +21,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function HomeRedirect() {
   const { roles } = useAuth();
-  return <Navigate to={roles.includes("RESELLER") || !roles.includes("OPERATOR") ? "/orders" : "/admin/orders"} replace />;
+  return <Navigate to={roles.includes("RESELLER") || !roles.includes("OPERATOR") ? "/notifications" : "/admin/orders"} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -40,16 +35,11 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
-      { path: "orders", element: <OrdersListPage /> },
-      { path: "orders/new", element: <NewOrderPage /> },
+      { path: "notifications", element: <NotificationsPage /> },
       { path: "orders/:orderId", element: <OrderDetailPage /> },
       { path: "orders/:orderId/events", element: <OrderEventsPage /> },
-      { path: "quotes", element: <QuotesPage /> },
-      { path: "delivery-log", element: <DeliveryLogPage /> },
-      { path: "webhook-endpoints", element: <WebhookEndpointsPage /> },
       { path: "admin/orders", element: <OperatorOrdersPage /> },
       { path: "admin/orders/:orderId", element: <OperatorOrderDetailPage /> },
-      { path: "admin/quotes", element: <OperatorQuotesPage /> },
       { path: "admin/subsidiaries", element: <SubsidiariesPage /> },
       { path: "admin/connections", element: <ConnectionsPage /> },
       { path: "admin/tenants", element: <TenantsPage /> },

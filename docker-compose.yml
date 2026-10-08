@@ -1,7 +1,4 @@
-# Local development stack (Phase 1: backing services).
-# Brings up the infrastructure a developer needs: the portal Postgres, the AWS emulator
-# (floci) for SNS/SQS, and a local Odoo. The api/worker application services are added
-# here in Phase 2 once the GraphQL/worker hosts are built.
+# Local backing services. api, worker, and the portal run on the host via scripts/local.sh.
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,12 +16,19 @@ services:
       timeout: 3s
       retries: 10
 
-  # AWS emulator (SNS/SQS/Secrets Manager/...). Same boto3 code targets this locally
-  # and real AWS in prod — only AWS_ENDPOINT_URL differs.
+  # AWS emulator (SNS/SQS/Secrets Manager/Cognito). Same boto3 code targets this
+  # locally and real AWS in prod — only AWS_ENDPOINT_URL differs.
+  # The docker socket lets Floci start its browser console at http://localhost:4566/_floci/ui.
+  # FLOCI_BASE_URL is localhost because the api and worker run on the host, not in this network.
   floci:
     image: floci/floci:latest
+    user: root
     ports:
       - "4566:4566"
+    environment:
+      FLOCI_BASE_URL: http://localhost:4566
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   odoo-db:
     image: postgres:15
@@ -34,20 +38,27 @@ services:
       POSTGRES_PASSWORD: odoo
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   odoo:
     image: odoo:17
     depends_on:
-      - odoo-db
-    command: ["-d", "odoo", "-i", "base,contacts,sale_management"]
+      odoo-db:
+        condition: service_healthy
     environment:
       HOST: odoo-db
       USER: odoo
       PASSWORD: odoo
     ports:
       - "8069:8069"
+    entrypoint: ["/bin/bash", "/odoo-boot.sh"]
     volumes:
       - odoo-web:/var/lib/odoo
+      - ./scripts/odoo-boot.sh:/odoo-boot.sh:ro
 
 volumes:
   pgdata:

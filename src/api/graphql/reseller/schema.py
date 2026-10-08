@@ -6,25 +6,18 @@ Every resolver is tenant-scoped via the context.
 
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
 
 from src.modules.integration.webhooks_outbound.application.service import WebhookEndpointService
-from src.modules.sales.ordering.application.order_service import OrderLineInput as OrderLineCommand
-from src.modules.sales.ordering.domain.errors import DuplicateOrderReference
-from src.modules.sales.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
 from src.shared.types import OrderId, TenantId, WebhookEndpointId
 
 from .types import (
     MoneyType,
-    OrderLineInput,
     OrderLineType,
     PartiesType,
-    QuoteLineType,
-    QuoteType,
     ResellerOrder,
     TimelineEntryType,
     WebhookDeliveryType,
@@ -40,7 +33,6 @@ if TYPE_CHECKING:
         WebhookEndpoint,
     )
     from src.modules.sales.ordering.projections.read_models import ResellerOrderView
-    from src.modules.sales.quoting.domain.models import Quote
     from src.shared.money import Money
 
     from ..context import GraphQLContext
@@ -87,31 +79,6 @@ def _to_gql(view: ResellerOrderView) -> ResellerOrder:
     )
 
 
-def _quote_to_gql(quote: Quote) -> QuoteType:
-    return QuoteType(
-        quote_id=quote.quote_id,
-        subsidiary_id=quote.subsidiary_id,
-        end_customer_name=quote.end_customer.name,
-        ship_to=quote.end_customer.ship_to,
-        currency=quote.currency,
-        valid_from=quote.valid_from.isoformat(),
-        valid_until=quote.valid_until.isoformat(),
-        status=quote.status.value,
-        lines=[
-            QuoteLineType(
-                product_key=line.product_key,
-                name=line.name,
-                kind=line.kind,
-                unit_price=MoneyType(
-                    amount=str(line.unit_price.amount), currency=line.unit_price.currency
-                ),
-                unit_of_measure=line.unit_of_measure,
-            )
-            for line in quote.lines
-        ],
-    )
-
-
 def _endpoint_to_gql(endpoint: WebhookEndpoint) -> WebhookEndpointType:
     return WebhookEndpointType(
         endpoint_id=str(endpoint.endpoint_id),
@@ -150,25 +117,6 @@ class Query:
         return _to_gql(view) if view else None
 
     @strawberry.field
-    def quotes(self, info: Info[GraphQLContext, None]) -> list[QuoteType]:
-        """Quotes issued to this reseller — what you can place an order against."""
-        ctx = info.context
-        return [
-            _quote_to_gql(q)
-            for q in ctx.container.quote_service.list_quotes_for_tenant(TenantId(ctx.tenant_id))
-        ]
-
-    @strawberry.field
-    def quote(self, info: Info[GraphQLContext, None], quote_id: str) -> QuoteType | None:
-        ctx = info.context
-        quote = ctx.container.quote_service.get_quote(quote_id)
-        if (
-            quote is None or str(quote.tenant_id) != ctx.tenant_id
-        ):  # tenant scoping (FR-19 / fail-closed)
-            return None
-        return _quote_to_gql(quote)
-
-    @strawberry.field
     def webhook_endpoints(self, info: Info[GraphQLContext, None]) -> list[WebhookEndpointType]:
         ctx = info.context
         return [
@@ -189,35 +137,6 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    @strawberry.mutation
-    def place_order(
-        self,
-        info: Info[GraphQLContext, None],
-        quote_id: str,
-        client_reference: str,
-        lines: list[OrderLineInput],
-    ) -> str:
-        """Place an order as a reply to a quote (FR-B2). Price comes from the quote; a line
-        with no quoted price, or a missing/expired quote, is refused (FR-B3)."""
-        ctx = info.context
-        try:
-            order_id = ctx.container.order_service.place_order(
-                tenant_id=TenantId(ctx.tenant_id),
-                quote_id=quote_id,
-                client_reference=client_reference,
-                lines=[OrderLineCommand(li.product_key, Decimal(str(li.quantity))) for li in lines],
-            )
-        except (QuoteNotFound, QuoteNotValid) as exc:
-            raise ValueError(f"quote unavailable: {exc}") from exc
-        except PriceNotQuoted as exc:
-            raise ValueError(str(exc)) from exc
-        except DuplicateOrderReference as exc:
-            raise ValueError(str(exc)) from exc
-        # Memory profile drains inline; postgres profile no-ops here and the worker
-        # drains the queues asynchronously, so this call returns before delivery.
-        ctx.container.drain()
-        return order_id
-
     @strawberry.mutation
     def cancel_order(self, info: Info[GraphQLContext, None], order_id: str, reason: str) -> bool:
         ctx = info.context

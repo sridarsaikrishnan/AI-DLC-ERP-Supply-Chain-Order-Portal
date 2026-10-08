@@ -16,11 +16,22 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-## 3. Start backing services
+## 3. Start and stop
 ```bash
-docker compose up -d            # postgres, floci (:4566), odoo (:8069), odoo-db
+bash scripts/local.sh up
+bash scripts/local.sh down
 ```
-First Odoo boot takes a minute or two (module install). Odoo UI: http://localhost:8069 (admin/admin).
+`up` starts Postgres, Floci, and Odoo, applies migrations, provisions queues, seeds the
+demo tenant, and starts the api, worker, and (if `ui/node_modules` exists) the portal.
+`down` stops those processes and the containers. Volumes stay, so the next `up` keeps
+the database and the Odoo install.
+
+First Odoo boot installs modules and takes a few minutes. Every local URL, the demo
+logins, and what the Odoo push-service banner means are in the README's "Run locally"
+section. Floci's console needs the Docker socket mounted on the `floci` service, which
+`docker-compose.yml` does.
+
+The sections below are the same steps, run by hand.
 
 ## 4. Create the database schema
 ```bash
@@ -36,7 +47,7 @@ export AWS_ENDPOINT_URL=http://localhost:4566
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test
 python -m scripts.messaging_bootstrap
-python -m scripts.seed_demo    # a demo Odoo connection + verified binding + items
+python -m scripts.seed_demo    # connection, verified binding, subsidiary, quote qte_demo
 ```
 
 ## 6. Run the api + worker

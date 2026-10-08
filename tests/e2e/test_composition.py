@@ -1,22 +1,17 @@
-"""Verifies the composition root wires a working graph: seed config + a quote, place an
-order against the quote, drain the bus, and the reseller projection shows it reached the ERP."""
+"""The composition root adopts an ERP sales order and the reseller projection shows it."""
 
 from __future__ import annotations
 
 import os
-from datetime import date, timedelta
-from decimal import Decimal
 
 from src.composition import build_container
+from src.modules.integration.erp.application.ports import ErpPartnerOrderLine
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType
 from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
-from src.modules.sales.ordering.application.order_service import OrderLineInput
-from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
-from src.shared.money import Money
 from src.shared.types import BindingId, ConnectionId, TenantId
 
 
-def test_container_places_routes_and_delivers() -> None:
+def test_container_observes_an_erp_order() -> None:
     os.environ["ODOO_SECRET"] = "local-secret"
     container = build_container()
 
@@ -41,33 +36,16 @@ def test_container_places_routes_and_delivers() -> None:
         )
     )
 
-    company = container.quote_service.create_subsidiary(
-        name="Distributor Co", country="US", language="en"
-    )
-    container.quote_service.set_erp_route(company.subsidiary_id, str(conn))
-    quote = container.quote_service.issue_quote(
+    order_id = container.order_service.observe_erp_order(
         tenant_id=TenantId("tnt_demo"),
-        subsidiary_id=company.subsidiary_id,
-        end_customer=EndCustomer(name="Downstream Inc", ship_to="1 Main St"),
-        currency="USD",
-        valid_from=date.today() - timedelta(days=1),
-        valid_until=date.today() + timedelta(days=30),
-        lines=[
-            QuoteLine(
-                product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA"
-            )
-        ],
-    )
-
-    order_id = container.order_service.place_order(
-        tenant_id=TenantId("tnt_demo"),
-        quote_id=quote.quote_id,
-        client_reference="PO-1",
-        lines=[OrderLineInput("ANVIL", Decimal(2))],
+        connection_id=str(conn),
+        erp_order_id="S00042",
+        client_reference="S00042",
+        lines=[ErpPartnerOrderLine(product_key="ANVIL", quantity="2", unit_price="19.99")],
     )
     container.bus.run_until_empty()
 
     view = container.projections.get_reseller_view("tnt_demo", order_id)
     assert view is not None
     assert view.status == "SENT_TO_ERP"
-    assert view.parties.end_customer_name == "Downstream Inc"
+    assert view.lines[0].product_key == "ANVIL"

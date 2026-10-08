@@ -102,59 +102,20 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
         )
     )
 
-    from datetime import date, timedelta
-    from decimal import Decimal
-
-    from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
-    from src.shared.money import Money
-
-    company = container.quote_service.create_subsidiary(
-        name="Webhook Co", country="US", language="en"
-    )
-    container.quote_service.set_erp_route(company.subsidiary_id, connection)
-    quote = container.quote_service.issue_quote(
-        tenant_id=TenantId(tenant),
-        subsidiary_id=company.subsidiary_id,
-        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
-        currency="USD",
-        valid_from=date.today() - timedelta(days=1),
-        valid_until=date.today() + timedelta(days=30),
-        lines=[
-            QuoteLine(
-                product_key=sku, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA"
-            )
-        ],
-    )
+    from src.modules.integration.erp.application.ports import ErpPartnerOrderLine
 
     client = TestClient(app)
     order_id = None
     try:
-        resp = client.post(
-            "/graphql/reseller",
-            json={
-                "query": (
-                    "mutation($quoteId:String!,$ref:String!,$lines:[OrderLineInput!]!)"
-                    "{ placeOrder(quoteId:$quoteId, clientReference:$ref, lines:$lines) }"
-                ),
-                "variables": {
-                    "quoteId": quote.quote_id,
-                    "ref": "PO-WEBHOOK",
-                    "lines": [{"productKey": sku, "quantity": 1}],
-                },
-            },
-            headers={"x-tenant-id": tenant},
+        order_id = container.order_service.observe_erp_order(
+            tenant_id=TenantId(tenant),
+            connection_id=connection,
+            erp_order_id="S00042",
+            client_reference="S00042",
+            lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
         )
-        order_id = resp.json()["data"]["placeOrder"]
-
-        # Drive the order to SENT_TO_ERP the way the worker (item C) would, so there's a
-        # real (connection, erp_order_id) reverse-routing pivot for the webhook to attribute.
         event_store = PostgresEventStore(_factory)
-        container.order_processor.handle(event_store.load(order_id)[0])
-        events = event_store.load(order_id)
-        for event in events:
-            container.order_projector.handle(event)
-        container.delivery_handler.handle(events[-1])  # OrderReadyForDelivery -> stub ERP submit
-        for event in event_store.load(order_id)[len(events) :]:
+        for event in event_store.load(order_id):
             container.order_projector.handle(event)
 
         erp_order_id = container.projections.get_operator_view(order_id).erp_order_id
@@ -207,15 +168,4 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             )
             session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
-            )
-            session.execute(
-                text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote.quote_id}
-            )
-            session.execute(
-                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
-                {"ocid": company.subsidiary_id},
-            )
-            session.execute(
-                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
-                {"ocid": company.subsidiary_id},
             )

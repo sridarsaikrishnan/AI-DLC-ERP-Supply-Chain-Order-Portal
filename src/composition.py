@@ -346,7 +346,7 @@ def _build_memory_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, quote_service, references=projections),
+        order_service=OrderService(repo),
         projections=projections,
         ingress=ingress,
         bus=bus,
@@ -469,6 +469,40 @@ def _build_postgres_container(settings: Settings) -> Container:
         order_status=status_applier,
     )
 
+    order_service = OrderService(repo)
+
+    def discover(connection_id: ConnectionId) -> list[str]:
+        target = connections_resolver.resolve(connection_id)
+        if target is None:
+            return []
+        fetch = getattr(adapter_for(target.erp_type), "fetch_partner_orders", None)
+        if fetch is None:
+            return []
+        ids: list[str] = []
+        for binding in bindings.list_all():
+            if str(binding.connection_id) != str(connection_id) or not binding.is_verified:
+                continue
+            try:
+                found = fetch(target, binding.erp_customer_id)
+            except Exception:
+                log.exception(
+                    "could not list ERP orders connection=%s partner=%s",
+                    connection_id,
+                    binding.erp_customer_id,
+                )
+                continue
+            for erp_order in found:
+                adopted = order_service.observe_erp_order(
+                    tenant_id=binding.tenant_id,
+                    connection_id=str(connection_id),
+                    erp_order_id=erp_order.erp_order_id,
+                    client_reference=erp_order.client_reference,
+                    lines=erp_order.lines,
+                )
+                if adopted is not None:
+                    ids.append(erp_order.erp_order_id)
+        return ids
+
     reconcile_sweeper = ReconcileSweeper(
         connections=connections_resolver,
         adapter_for=adapter_for,
@@ -476,6 +510,7 @@ def _build_postgres_container(settings: Settings) -> Container:
         order_status=status_applier,
         sync_shipments=_erp_shipment_sync(repo, shipment_service),
         sync_invoices=_erp_invoice_sync(repo, invoice_service),
+        discover=discover,
     )
 
     webhook_endpoints = PostgresWebhookEndpointRepository(session_factory)
@@ -490,7 +525,7 @@ def _build_postgres_container(settings: Settings) -> Container:
 
     return Container(
         settings=settings,
-        order_service=OrderService(repo, quotes, quote_service, references=projections),
+        order_service=order_service,
         projections=projections,
         ingress=ingress,
         bus=None,

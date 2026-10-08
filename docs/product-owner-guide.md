@@ -6,7 +6,7 @@ of this is implemented, the [developer guide](developer-guide.md) traces it end 
 
 ## What it is
 
-A portal that lets a distributor's **resellers** place orders and track them, while the
+A portal that shows a distributor's **resellers** the notifications delivered to them, while the
 distributor's **operators** run the catalog, pricing, customer links and ERP connections.
 Orders are forwarded to the distributor's **ERP** (Odoo today) as the system of record, and
 the ERP's status changes flow back to the reseller. The portal is the one front door in
@@ -15,18 +15,18 @@ actually lives in.
 
 ## Who uses it
 
-- **Reseller** — a customer of the distributor. Places orders against quotes, tracks their
-  status, and (optionally) receives webhook notifications. Sees only their own data, and
-  never sees any ERP identity (which ERP, which instance, the ERP's own order/customer IDs).
-- **Operator** (distributor admin) — issues quotes, manages the catalog and the
-  subsidiaries, links resellers to their ERP customer records, registers ERP connections, and
-  records shipments/invoices. Sees across all resellers, including ERP identity.
+- **Reseller** — a customer of the distributor. The portal lists webhook notifications that
+  were actually delivered, and opens the order behind each one. Sees only their own data,
+  and never sees any ERP identity (which ERP, which instance, the ERP's own order/customer IDs).
+- **Operator** (distributor admin) — links resellers to their ERP customer records and
+  registers ERP connections. Sales orders are created in the ERP. Sees across all resellers,
+  including ERP identity.
 
 ## The core workflow
 
 ```
-operator issues a QUOTE  ──▶  reseller places an ORDER against it  ──▶  routed to the owning ERP
-                                                                              │
+ERP sales order for a bound customer  ──▶  portal adopts it
+                                              │
 reseller sees status + scores  ◀──  ERP status flows back (webhook / polling) ◀┘
 ERP deliveries and invoices  ──▶  reseller sees shipped / delivered / invoiced
 ```
@@ -90,10 +90,10 @@ that line. That date is what "scheduled" means to the reseller.
 
 ### Outbound notifications (optional, per reseller)
 - A reseller can register one or more webhook endpoints to be notified of order status
-  changes. Deliveries are HMAC-signed, retried on failure, and tracked in a delivery log
-  the reseller can inspect.
-- Notifications fire for **lifecycle** changes (sent to ERP, confirmed, closed, rejected,
-  retrying). Shipment/invoice score changes are read via the API, not pushed.
+  changes. A notification is recorded, with its order, only once that delivery succeeds.
+  The portal lists those. A status change with no endpoint is not a notification.
+- Those deliveries cover lifecycle changes (sent to ERP, confirmed, closed, rejected,
+  retrying, cancelled) and a recorded shipment or invoice.
 
 ### Operator administration
 - Register / pause / resume ERP connections (with generic, per-ERP credential parameters).

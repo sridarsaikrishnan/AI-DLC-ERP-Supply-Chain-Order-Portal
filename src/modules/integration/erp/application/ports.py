@@ -57,6 +57,23 @@ class ErpInvoice:
 
 
 @dataclass(frozen=True)
+class ErpPartnerOrderLine:
+    product_key: str
+    quantity: str
+    unit_price: str = ""
+    currency: str = "USD"
+
+
+@dataclass(frozen=True)
+class ErpPartnerOrder:
+    """A sales order that already exists in the ERP. `erp_order_id` is its document name."""
+
+    erp_order_id: str
+    client_reference: str
+    lines: tuple[ErpPartnerOrderLine, ...]
+
+
+@dataclass(frozen=True)
 class SubmissionResult:
     success: bool
     erp_order_id: str | None = None
@@ -80,6 +97,7 @@ class ErpAdapter(Protocol):
 
     def submit(self, target: ErpTarget, order_payload: dict[str, Any]) -> SubmissionResult: ...
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None: ...
+    def fetch_partner_orders(self, target: ErpTarget, partner_id: str) -> list[ErpPartnerOrder]: ...
     def fetch_shipments(self, target: ErpTarget, erp_order_id: str) -> list[ErpShipment]: ...
     def fetch_invoices(self, target: ErpTarget, erp_order_id: str) -> list[ErpInvoice]: ...
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult: ...

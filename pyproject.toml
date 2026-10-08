@@ -11,6 +11,8 @@ dependencies = [
     "alembic==1.13.3",
     "pydantic==2.9.2",
     "strawberry-graphql==0.246.2",
+    # 3.3 moved ExecutionContext; strawberry 0.246 cannot import it.
+    "graphql-core>=3.2.0,<3.3.0",
     "boto3==1.35.36",
     "PyJWT==2.9.0",
     "cryptography==50.0.1",  # PyJWT's RS256 backend — Cognito JWTs are always RS256

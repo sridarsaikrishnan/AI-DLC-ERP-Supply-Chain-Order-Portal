@@ -7,11 +7,9 @@ import {
   CREATE_BINDING_MUTATION,
   CREATE_SUBSIDIARY_MUTATION,
   ERP_ROUTE_QUERY,
-  ISSUE_QUOTE_MUTATION,
   SUBSIDIARIES_QUERY,
   OPERATOR_ORDERS_QUERY,
   OPERATOR_ORDER_QUERY,
-  OPERATOR_QUOTES_QUERY,
   PAUSE_CONNECTION_MUTATION,
   REGISTER_CONNECTION_MUTATION,
   REMOVE_BINDING_MUTATION,
@@ -21,10 +19,8 @@ import {
   VERIFY_BINDING_MUTATION,
   type Binding,
   type Connection,
-  type IssueQuoteLineInput,
   type Subsidiary,
   type OperatorOrder,
-  type OperatorQuote,
 } from "../api/queries/admin";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
@@ -219,39 +215,6 @@ export function useCreateSubsidiary() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subsidiaries"] });
       notify("Subsidiary created.");
-    },
-    onError: (err) => notify((err as Error).message, "danger"),
-  });
-}
-
-export function useOperatorQuotes() {
-  const { idToken, isAuthenticated } = useAuth();
-  return useQuery({
-    queryKey: ["operatorQuotes"],
-    queryFn: () =>
-      graphqlRequest<{ quotes: OperatorQuote[] }>("operator", OPERATOR_QUOTES_QUERY, {}, idToken).then((d) => d.quotes),
-    enabled: isAuthenticated,
-  });
-}
-
-export function useIssueQuote() {
-  const { idToken } = useAuth();
-  const queryClient = useQueryClient();
-  const { notify } = useToast();
-  return useMutation({
-    mutationFn: (input: {
-      tenantId: string;
-      subsidiaryId: string;
-      endCustomerName: string;
-      shipTo: string;
-      currency: string;
-      validFrom: string;
-      validUntil: string;
-      lines: IssueQuoteLineInput[];
-    }) => graphqlRequest("operator", ISSUE_QUOTE_MUTATION, input, idToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operatorQuotes"] });
-      notify("Quote issued.");
     },
     onError: (err) => notify((err as Error).message, "danger"),
   });

@@ -81,7 +81,9 @@ def get_settings() -> Settings:
         cognito_resource_server_id=os.environ.get("COGNITO_RESOURCE_SERVER_ID", "erp-portal"),
         cors_allowed_origins=[
             origin.strip()
-            for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+            for origin in os.environ.get(
+                "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+            ).split(",")
             if origin.strip()
         ],
     )

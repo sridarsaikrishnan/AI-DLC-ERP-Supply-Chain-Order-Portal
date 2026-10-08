@@ -37,6 +37,15 @@ or a falsy value on failure (mapped to a **terminal** error — wrong credential
 themselves on retry). That `uid` is passed on every subsequent `execute_kw` call alongside
 the password again (this flow issues no session token — every call re-authenticates).
 
+## How an order arrives
+
+This product does not create a quotation or a sales order. Each reconcile sweep reads
+`sale.order` rows whose `partner_id` is a verified binding's `erp_customer_id`. A row is
+adopted when it has a product line whose Internal Reference is set. Confirming the order,
+validating the delivery, and posting the invoice stay in Odoo. The next poll follows them.
+
+`submit` (below) is still on the adapter and is not called on this path.
+
 ## Outbound: canonical order → Odoo `sale.order`
 
 What `submit` sends, field by field:

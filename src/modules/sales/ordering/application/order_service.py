@@ -1,121 +1,90 @@
 """OrderService — the write side (commands) for orders.
 
-An order is a reply to a quote (Increment 5, FR-B2): placement resolves every line's
-price from the referenced quote and refuses a line with no quoted price (FR-B3). The
-catalog is consulted only for the line's kind (box/license, FR-D1) — never for price.
+Orders are sales orders that already exist in the ERP. `observe_erp_order` adopts one.
+Nothing here creates a quote or a purchase order.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date
+from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 
-from src.modules.sales.quoting.domain.errors import PriceNotQuoted, QuoteNotFound, QuoteNotValid
-from src.shared.types import OrderId, TenantId, generate_id
+from src.shared.eventsourcing import AggregateNotFound
+from src.shared.money import Money
+from src.shared.types import OrderId, TenantId
 
 from ..domain.aggregate import Order
-from ..domain.errors import DuplicateOrderReference
 from ..domain.models import OrderLine
 
 if TYPE_CHECKING:
-    from decimal import Decimal
-
-    from src.modules.sales.quoting.domain.models import Quote
     from src.shared.eventsourcing import EventSourcedRepository
 
 
-@dataclass(frozen=True)
-class OrderLineInput:
-    """What a reseller supplies when replying to a quote: a SKU and a quantity. No price —
-    price comes from the quote, never from the client (ADR-0016, continuing ADR-0011's
-    never-trust-the-client stance)."""
+class ObservedLine(Protocol):
+    """A product line the ERP adapter already translated. Sales does not import it."""
 
     product_key: str
-    quantity: Decimal
-
-
-class QuoteDirectory(Protocol):
-    def get(self, quote_id: str) -> Quote | None: ...
-
-
-class QuoteAcceptor(Protocol):
-    def mark_accepted(self, quote_id: str) -> None: ...
-
-
-class OrderReferenceLookup(Protocol):
-    """Narrow lookup so `place_order` can refuse a reseller re-using their own PO
-    number (`client_reference`) — reads the order projection store, so there's a known
-    race window documented on `DuplicateOrderReference` itself."""
-
-    def exists(self, tenant_id: str, client_reference: str) -> bool: ...
+    quantity: str
+    unit_price: str
+    currency: str
 
 
 class OrderService:
-    def __init__(
-        self,
-        repository: EventSourcedRepository[Order],
-        quotes: QuoteDirectory,
-        quote_acceptor: QuoteAcceptor | None = None,
-        *,
-        references: OrderReferenceLookup,
-    ) -> None:
+    def __init__(self, repository: EventSourcedRepository[Order]) -> None:
         self._repository = repository
-        self._quotes = quotes
-        self._quote_acceptor = quote_acceptor
-        self._references = references
 
-    def place_order(
+    def observe_erp_order(
         self,
         *,
         tenant_id: TenantId,
-        quote_id: str,
+        connection_id: str,
+        erp_order_id: str,
         client_reference: str,
-        lines: list[OrderLineInput],
-        today: date | None = None,
-    ) -> OrderId:
-        quote = self._quotes.get(quote_id)
-        if quote is None or quote.tenant_id != tenant_id:
-            raise QuoteNotFound(quote_id)
-        if not quote.is_valid_on(today or date.today()):
-            raise QuoteNotValid(quote_id)
-        if not lines:
-            raise ValueError("order must have at least one line")
-        if self._references.exists(str(tenant_id), client_reference):
-            raise DuplicateOrderReference(client_reference)
+        lines: list[ObservedLine] | tuple[ObservedLine, ...],
+    ) -> OrderId | None:
+        """Adopt `erp_order_id` if we have not already. The id is stable so a second poll
+        is a no-op even before the projection has caught up.
 
-        order_lines = [self._line_from_quote(quote, inp) for inp in lines]
-        order_id = OrderId(generate_id("ord"))
-        order = Order.submit(
+        Returns None when the ERP document has no product line we can follow.
+        """
+        order_id = OrderId(f"ord_{connection_id}_{erp_order_id}")
+        try:
+            self._repository.get(str(order_id))
+            return order_id
+        except AggregateNotFound:
+            pass
+
+        order_lines: list[OrderLine] = []
+        for index, line in enumerate(lines, start=1):
+            if not line.product_key:
+                continue
+            quantity = Decimal(str(line.quantity))
+            if quantity <= 0:
+                continue
+            price = None
+            if line.unit_price not in ("", None):
+                price = Money(Decimal(str(line.unit_price)), line.currency or "USD")
+            order_lines.append(
+                OrderLine(
+                    product_key=line.product_key,
+                    quantity=quantity,
+                    unit_of_measure="",
+                    line_id=f"{order_id}_{index}",
+                    unit_price=price,
+                )
+            )
+        if not order_lines:
+            return None
+        order = Order.observe(
             order_id=order_id,
             tenant_id=tenant_id,
-            client_reference=client_reference,
+            client_reference=client_reference or erp_order_id,
             lines=order_lines,
-            quote_id=quote.quote_id,
-            subsidiary_id=quote.subsidiary_id,
-            end_customer_name=quote.end_customer.name,
-            ship_to=quote.end_customer.ship_to,
-            routed_to_connection_id=quote.routed_to_connection_id,
+            connection_id=connection_id,
+            erp_order_id=erp_order_id,
         )
         self._repository.save(order)
-        if self._quote_acceptor is not None:
-            self._quote_acceptor.mark_accepted(quote.quote_id)
         return order_id
-
-    def _line_from_quote(self, quote: Quote, inp: OrderLineInput) -> OrderLine:
-        quote_line = quote.find_line(inp.product_key)
-        if quote_line is None:
-            raise PriceNotQuoted(inp.product_key)  # FR-B3: no quoted price -> refused
-        return OrderLine(
-            product_key=inp.product_key,
-            quantity=inp.quantity,
-            unit_of_measure=quote_line.unit_of_measure,
-            line_id=generate_id("ol"),
-            kind=quote_line.kind,
-            unit_price=quote_line.unit_price,
-            line_discount=quote_line.line_discount,
-            tax_rates=[quote_line.tax_rate] if quote_line.tax_rate is not None else [],
-        )
 
     def cancel_order(self, order_id: OrderId, reason: str) -> None:
         order = self._repository.get(order_id)

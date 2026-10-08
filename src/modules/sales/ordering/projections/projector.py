@@ -67,6 +67,28 @@ class OrderProjector:
             self._store.set_state(order_id, OrderState.SUBMITTED, at)
             return
 
+        if event.event_type == "OrderObserved":
+            self._store.create(
+                order_id=order_id,
+                tenant_id=str(payload["tenant_id"]),
+                client_reference=str(payload["client_reference"]),
+                lines=[self._line_view(line) for line in payload.get("lines", [])],
+                parties=Parties(
+                    end_customer_name="",
+                    ship_to="",
+                    subsidiary_id="",
+                    quote_id="",
+                ),
+            )
+            connection_id = str(payload.get("routed_to_connection_id", ""))
+            self._store.set_owning_connection(order_id, connection_id)
+            erp_order_id = str(payload["erp_order_id"])
+            self._store.set_erp_order_id(order_id, erp_order_id)
+            self._store.set_state(order_id, OrderState.SENT_TO_ERP, at)
+            if self._locator is not None and connection_id:
+                self._locator.record(ConnectionId(connection_id), erp_order_id, OrderId(order_id))
+            return
+
         if event.event_type == "OrderSentToErp":
             erp_order_id = str(payload["erp_order_id"])
             self._store.set_erp_order_id(order_id, erp_order_id)

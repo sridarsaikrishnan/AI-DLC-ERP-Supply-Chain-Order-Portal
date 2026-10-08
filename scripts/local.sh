@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Start or stop the local stack: Postgres, Floci, Odoo, then migrate, seed, api, worker.
+#   bash scripts/local.sh up
+#   bash scripts/local.sh down
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg2://portal:portal@localhost:5432/portal}"
+export AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-test}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-test}"
+export APP_PROFILE=postgres
+export ERP_ADAPTER_MODE="${ERP_ADAPTER_MODE:-real}"
+export RECONCILE_INTERVAL_SECONDS="${RECONCILE_INTERVAL_SECONDS:-30}"
+export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+
+if [[ -x .venv/Scripts/python.exe ]]; then
+  PY=".venv/Scripts/python.exe"
+elif [[ -x .venv/bin/python ]]; then
+  PY=".venv/bin/python"
+else
+  echo "No virtualenv. Create one with: python -m venv .venv && .venv/Scripts/python -m pip install -e \".[dev]\""
+  exit 1
+fi
+
+mkdir -p .local
+
+# Git Bash's $! is the job we backgrounded. On Windows that job is often a parent of
+# the real python/node process, so a plain kill leaves the listener on the port.
+stop_pid() {
+  local pid="$1"
+  if [[ -n "${MSYSTEM:-}" ]]; then
+    taskkill //F //T //PID "$pid" >/dev/null 2>&1 || true
+  fi
+  kill "$pid" 2>/dev/null || true
+}
+
+stop_bg() {
+  local f pid
+  for f in .local/*.pid; do
+    [[ -f "$f" ]] || continue
+    pid="$(cat "$f")"
+    stop_pid "$pid"
+    rm -f "$f"
+  done
+}
+
+start_bg() {
+  local name="$1"
+  shift
+  "$@" >".local/${name}.log" 2>&1 &
+  echo $! >".local/${name}.pid"
+  echo "$name started (log: .local/${name}.log)"
+}
+
+wait_for() {
+  local label="$1"
+  shift
+  local i
+  for i in $(seq 1 60); do
+    if "$@" >/dev/null 2>&1; then
+      echo "$label is up"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "$label did not become ready" >&2
+  return 1
+}
+
+up() {
+  docker compose up -d
+  wait_for "Postgres" docker compose exec -T postgres pg_isready -U portal
+  wait_for "Floci" curl -sf http://localhost:4566/_floci/health
+  "$PY" -m alembic upgrade head
+  "$PY" -m scripts.messaging_bootstrap
+  "$PY" -m scripts.seed_demo
+  "$PY" -m scripts.seed_cognito
+  set -a
+  # shellcheck disable=SC1091
+  source .local/cognito.env
+  set +a
+  # Restart the app processes every up so they load the env this run just wrote.
+  stop_bg
+  start_bg api "$PY" -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+  start_bg worker "$PY" -m src.worker.main
+  if [[ -d ui/node_modules ]]; then
+    start_bg ui npm --prefix ui run dev -- --host 127.0.0.1 --port 5173
+  else
+    echo "UI dependencies are not installed. From ui/: npm install"
+  fi
+  if ! wait_for "API" curl -sf http://127.0.0.1:8000/livez; then
+    echo "api failed. Last log lines:" >&2
+    tail -n 40 .local/api.log >&2 || true
+    exit 1
+  fi
+  cat <<'EOF'
+
+Local stack is up.
+  Portal                         http://localhost:5173
+                                 http://127.0.0.1:5173
+  API liveness                   http://127.0.0.1:8000/livez
+  API readiness                  http://127.0.0.1:8000/readyz
+  Reseller GraphQL               http://127.0.0.1:8000/graphql/reseller
+  Operator GraphQL               http://127.0.0.1:8000/graphql/operator
+  Odoo                           http://localhost:8069
+  Odoo webhook (demo secret)     http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo
+  Floci                          http://localhost:4566
+  Floci health                   http://localhost:4566/_floci/health
+  Floci console                  http://localhost:4566/_floci/ui
+
+Sign in as demo-operator or demo-reseller, password DemoPass123!. Odoo is admin / admin.
+Orders are read from Odoo for partner 1 (the demo binding). Set Internal Reference on each product line.
+A sticky Odoo banner about the push service is the browser refusing desktop notifications. Dismiss it.
+Stop with: bash scripts/local.sh down
+EOF
+}
+
+down() {
+  stop_bg
+  docker compose stop
+  echo "Stopped. Data is kept. Start again with: bash scripts/local.sh up"
+}
+
+case "${1:-}" in
+  up) up ;;
+  down) down ;;
+  *)
+    echo "usage: bash scripts/local.sh up|down" >&2
+    exit 1
+    ;;
+esac

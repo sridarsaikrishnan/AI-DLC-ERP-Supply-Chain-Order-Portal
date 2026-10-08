@@ -20,14 +20,6 @@ export interface OrderLine {
   scheduledDate: string | null; // vendor date — what "scheduled" means
 }
 
-// What a reseller submits: the quote being replied to + line quantities. No price and no
-// unit of measure — both come from the quote (ADR-0016). Trusting a client-supplied price
-// would be a real security hole, not just an unused field.
-export interface OrderLineInput {
-  productKey: string;
-  quantity: number;
-}
-
 export interface TimelineEntry {
   status: string;
   occurredAt: string;
@@ -53,26 +45,6 @@ export interface ResellerOrder {
   parties: Parties;
 }
 
-export interface QuoteLine {
-  productKey: string;
-  name: string;
-  kind: string;
-  unitPrice: Money;
-  unitOfMeasure: string;
-}
-
-export interface Quote {
-  quoteId: string;
-  subsidiaryId: string;
-  endCustomerName: string;
-  shipTo: string;
-  currency: string;
-  validFrom: string;
-  validUntil: string;
-  status: string;
-  lines: QuoteLine[];
-}
-
 const ORDER_FIELDS = /* GraphQL */ `
   orderId
   clientReference
@@ -90,27 +62,8 @@ const ORDER_FIELDS = /* GraphQL */ `
   subtotal { amount currency }
 `;
 
-export const ORDERS_QUERY = /* GraphQL */ `
-  query Orders { orders { ${ORDER_FIELDS} } }
-`;
-
 export const ORDER_QUERY = /* GraphQL */ `
   query Order($orderId: String!) { order(orderId: $orderId) { ${ORDER_FIELDS} } }
-`;
-
-export const QUOTES_QUERY = /* GraphQL */ `
-  query Quotes {
-    quotes {
-      quoteId subsidiaryId endCustomerName shipTo currency validFrom validUntil status
-      lines { productKey name kind unitPrice { amount currency } unitOfMeasure }
-    }
-  }
-`;
-
-export const PLACE_ORDER_MUTATION = /* GraphQL */ `
-  mutation PlaceOrder($quoteId: String!, $ref: String!, $lines: [OrderLineInput!]!) {
-    placeOrder(quoteId: $quoteId, clientReference: $ref, lines: $lines)
-  }
 `;
 
 export const CANCEL_ORDER_MUTATION = /* GraphQL */ `

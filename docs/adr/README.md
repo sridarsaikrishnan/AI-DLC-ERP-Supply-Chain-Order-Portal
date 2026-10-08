@@ -22,9 +22,10 @@ under a minute.
 | [0013](0013-flat-item-tax-and-discount.md) | Tax and discount are flat per-item catalog fields, same source as price | Superseded by 0016 |
 | [0014](0014-orthogonal-fulfillment-invoice-status.md) | Fulfillment/invoice status is derived and orthogonal to order lifecycle state. `Payment`/`Return` later removed | Accepted (amended) |
 | [0015](0015-erp-capabilities-declared-not-gated.md) | `ErpCapabilities` is declared now, gated later (once a 2nd adapter exists) | Accepted |
-| [0016](0016-price-from-quote-not-catalog.md) | Price lives on the quote, not the catalog; an order replies to a quote | Accepted (supersedes 0011, 0013) |
+| [0016](0016-price-from-quote-not-catalog.md) | Price lives on the quote, not the catalog; an order replies to a quote | Superseded on the live path by 0019 |
 | [0017](0017-module-grouping-and-fulfillment-split.md) | Group modules by subdomain (`sales`/`reference`/`integration`); split `fulfillment` into `shipment` and `invoicing` (`payments`/`returns` later removed) | Accepted (amended) |
 | [0018](0018-shipment-invoice-order-saga.md) | Shipment/invoice → order is an event-driven saga, not a cross-aggregate transaction | Accepted (supersedes FR-A4's atomic guarantee) |
+| [0019](0019-order-routing.md) | An existing ERP order is routed by the connection being read and the verified binding on it | Accepted |
 
 ## How to read one
 

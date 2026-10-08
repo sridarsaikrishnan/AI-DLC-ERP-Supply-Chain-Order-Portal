@@ -32,31 +32,6 @@ export interface Subsidiary {
   language: string;
 }
 
-export interface OperatorQuoteLine {
-  productKey: string;
-  name: string;
-  kind: string; // PHYSICAL (box) | LICENSE
-  unitPrice: Money;
-  unitOfMeasure: string;
-  taxCode: string | null;
-  taxRate: number | null;
-  lineDiscount: Money | null;
-}
-
-export interface OperatorQuote {
-  quoteId: string;
-  tenantId: string;
-  subsidiaryId: string;
-  endCustomerName: string;
-  shipTo: string;
-  currency: string;
-  validFrom: string;
-  validUntil: string;
-  routedToConnectionId: string;
-  status: string;
-  lines: OperatorQuoteLine[];
-}
-
 export interface OperatorOrderLine {
   lineId: string;
   productKey: string;
@@ -108,15 +83,6 @@ export const SUBSIDIARIES_QUERY = /* GraphQL */ `
 export const ERP_ROUTE_QUERY = /* GraphQL */ `
   query ErpRoute($subsidiaryId: String!) {
     erpRoute(subsidiaryId: $subsidiaryId)
-  }
-`;
-
-export const OPERATOR_QUOTES_QUERY = /* GraphQL */ `
-  query OperatorQuotes {
-    quotes {
-      quoteId tenantId subsidiaryId endCustomerName shipTo currency validFrom validUntil routedToConnectionId status
-      lines { productKey name kind unitPrice { amount currency } unitOfMeasure taxCode taxRate lineDiscount { amount currency } }
-    }
   }
 `;
 
@@ -214,44 +180,6 @@ export const CREATE_SUBSIDIARY_MUTATION = /* GraphQL */ `
   mutation CreateSubsidiary($name: String!, $country: String!, $language: String!) {
     createSubsidiary(name: $name, country: $country, language: $language) {
       subsidiaryId
-    }
-  }
-`;
-
-export interface IssueQuoteLineInput {
-  productKey: string;
-  name: string;
-  kind: string;
-  unitPrice: number;
-  unitOfMeasure: string;
-  taxCode?: string | null;
-  taxRate?: number | null;
-  taxInclusive?: boolean;
-  lineDiscount?: number | null;
-}
-
-export const ISSUE_QUOTE_MUTATION = /* GraphQL */ `
-  mutation IssueQuote(
-    $tenantId: String!
-    $subsidiaryId: String!
-    $endCustomerName: String!
-    $shipTo: String!
-    $currency: String!
-    $validFrom: String!
-    $validUntil: String!
-    $lines: [QuoteLineInput!]!
-  ) {
-    issueQuote(
-      tenantId: $tenantId
-      subsidiaryId: $subsidiaryId
-      endCustomerName: $endCustomerName
-      shipTo: $shipTo
-      currency: $currency
-      validFrom: $validFrom
-      validUntil: $validUntil
-      lines: $lines
-    ) {
-      quoteId
     }
   }
 `;

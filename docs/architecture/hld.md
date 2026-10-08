@@ -32,7 +32,7 @@ Interacting parties and systems:
 
 | Component | Purpose / responsibility | Key dependencies |
 |---|---|---|
-| **Reseller portal (SPA)** | Browser app: browse quotes, place orders, track status/scores, manage webhook endpoints. Never shows ERP identity (FR-19). | API host (GraphQL /reseller); Cognito (login) |
+| **Reseller portal (SPA)** | Browser app: a table of webhook notifications that were delivered, and the order behind each row. Never shows ERP identity (FR-19). | API host (GraphQL /reseller); Cognito (login) |
 | **Operator admin (SPA)** | Browser app: manage ERP connections, resellers/bindings, items, quotes, subsidiaries; view all orders and failures. | API host (GraphQL /operator); Cognito |
 | **API host** *(Python/FastAPI — the only HTTP server)* | Synchronous interface: GraphQL for both audiences, the inbound ERP-webhook HTTP route, request authentication/authorization, and reads/writes via the domain. | Domain modules; PostgreSQL; Cognito; Secrets Manager |
 | **Worker host** *(Python process — not HTTP, not FastAPI)* | Asynchronous processing: order routing, ERP delivery, read-model projection, outbound webhook dispatch, outbox relay, and the reconciliation scheduler (polling fallback). Same codebase/composition root as the API, different entrypoint. | Message bus; Domain modules; PostgreSQL; ERP; Secrets Manager |

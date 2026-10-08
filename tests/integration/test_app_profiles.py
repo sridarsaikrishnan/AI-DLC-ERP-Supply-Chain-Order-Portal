@@ -40,16 +40,10 @@ def _app(profile: str):
     return create_app()
 
 
-def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
-    """Seed a connection + verified binding + a subsidiary routed to it + an issued quote.
-    Returns (quote_id, subsidiary_id) — an order replies to the quote (Increment 5)."""
-    from datetime import date, timedelta
-    from decimal import Decimal
-
+def _seed(container, tenant: str, connection: str) -> None:
+    """Seed a connection and a verified binding. Orders are adopted from the ERP."""
     from src.modules.reference.connections.domain.models import ErpConnection, ErpType
     from src.modules.reference.tenancy.domain.models import BindingStatus, TenantConnectionBinding
-    from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
-    from src.shared.money import Money
     from src.shared.types import BindingId, ConnectionId, TenantId
 
     os.environ["SMOKE_ODOO_SECRET"] = "local-secret"  # resolved via EnvSecretStore (memory profile)
@@ -72,31 +66,7 @@ def _seed(container, tenant: str, connection: str, sku: str) -> tuple[str, str]:
             status=BindingStatus.VERIFIED,
         )
     )
-    company = container.quote_service.create_subsidiary(
-        name="Smoke Co", country="US", language="en"
-    )
-    container.quote_service.set_erp_route(company.subsidiary_id, connection)
-    quote = container.quote_service.issue_quote(
-        tenant_id=TenantId(tenant),
-        subsidiary_id=company.subsidiary_id,
-        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
-        currency="USD",
-        valid_from=date.today() - timedelta(days=1),
-        valid_until=date.today() + timedelta(days=30),
-        lines=[
-            QuoteLine(
-                product_key=sku, unit_price=Money(Decimal("10.00"), "USD"), unit_of_measure="EA"
-            )
-        ],
-    )
-    return quote.quote_id, company.subsidiary_id
 
-
-_PLACE_ORDER = """
-mutation($quoteId: String!, $ref: String!, $lines: [OrderLineInput!]!) {
-  placeOrder(quoteId: $quoteId, clientReference: $ref, lines: $lines)
-}
-"""
 
 _GET_ORDER = """
 query($id: String!) {
@@ -110,35 +80,27 @@ query($id: String!) {
 """
 
 
-def test_memory_profile_places_order_and_delivers_inline() -> None:
+def test_memory_profile_observes_order_and_reads_it() -> None:
     from fastapi.testclient import TestClient
+    from src.modules.integration.erp.application.ports import ErpPartnerOrderLine
+    from src.shared.types import TenantId
 
     app = _app("memory")
     tenant, connection, sku = _id("tnt"), _id("conn"), _id("SKU")
-    quote_id, _oc_id = _seed(app.state.container, tenant, connection, sku)
+    _seed(app.state.container, tenant, connection)
 
     client = TestClient(app)
     assert client.get("/livez").status_code == 200
 
-    resp = client.post(
-        "/graphql/reseller",
-        json={
-            "query": _PLACE_ORDER,
-            "variables": {
-                "quoteId": quote_id,
-                "ref": "PO-SMOKE",
-                "lines": [{"productKey": sku, "quantity": 1}],
-            },
-        },
-        headers={"x-tenant-id": tenant},
+    order_id = app.state.container.order_service.observe_erp_order(
+        tenant_id=TenantId(tenant),
+        connection_id=connection,
+        erp_order_id="S00042",
+        client_reference="S00042",
+        lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
     )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body.get("errors") is None, body
-    order_id = body["data"]["placeOrder"]
+    app.state.container.drain()
 
-    # memory profile drains inline (container.drain() -> bus.run_until_empty()) — by the
-    # time the mutation returns, routing + stub-ERP delivery have already happened.
     view = app.state.container.projections.get_reseller_view(tenant, order_id)
     assert view is not None
     assert view.status == "SENT_TO_ERP"
@@ -155,38 +117,26 @@ def test_memory_profile_places_order_and_delivers_inline() -> None:
     gql_body = resp.json()
     assert gql_body.get("errors") is None, gql_body
     assert gql_body["data"]["order"]["status"] == "SENT_TO_ERP"
-    assert gql_body["data"]["order"]["lines"] == [
-        {"productKey": sku, "quantity": 1.0, "unitOfMeasure": "EA"}
-    ]
+    assert gql_body["data"]["order"]["lines"][0]["productKey"] == sku
+    assert gql_body["data"]["order"]["lines"][0]["quantity"] == 1.0
 
 
-def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_worker() -> None:
-    from fastapi.testclient import TestClient
+def test_postgres_profile_observes_order_and_leaves_it_for_the_worker() -> None:
+    from src.modules.integration.erp.application.ports import ErpPartnerOrderLine
+    from src.shared.types import TenantId
 
     app = _app("postgres")
     tenant, connection, sku = _id("tnt"), _id("conn"), _id("SKU")
-    quote_id, oc_id = _seed(app.state.container, tenant, connection, sku)
+    _seed(app.state.container, tenant, connection)
     assert app.state.container.bus is None
 
-    client = TestClient(app)
-    resp = client.post(
-        "/graphql/reseller",
-        json={
-            "query": _PLACE_ORDER,
-            "variables": {
-                "quoteId": quote_id,
-                "ref": "PO-SMOKE",
-                "lines": [{"productKey": sku, "quantity": 1}],
-            },
-        },
-        headers={"x-tenant-id": tenant},
+    order_id = app.state.container.order_service.observe_erp_order(
+        tenant_id=TenantId(tenant),
+        connection_id=connection,
+        erp_order_id="S00042",
+        client_reference="S00042",
+        lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
     )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert (
-        body.get("errors") is None
-    ), body  # this is exactly what test_memory_profile catches if it regresses
-    order_id = body["data"]["placeOrder"]
 
     try:
         # Nothing has processed it yet — no worker (item C) is running — so the event and
@@ -199,7 +149,7 @@ def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_wo
             outbox_row = session.execute(
                 text("SELECT published_at FROM outbox WHERE stream_id = :oid"), {"oid": order_id}
             ).fetchall()
-        assert [r[0] for r in event_row] == ["OrderSubmitted"]
+        assert [r[0] for r in event_row] == ["OrderObserved"]
         assert len(outbox_row) == 1 and outbox_row[0][0] is None
 
         assert app.state.container.projections.get_reseller_view(tenant, order_id) is None
@@ -223,13 +173,4 @@ def test_postgres_profile_places_order_without_crashing_and_leaves_it_for_the_wo
             )
             session.execute(
                 text("DELETE FROM erp_connections WHERE connection_id = :cid"), {"cid": connection}
-            )
-            session.execute(text("DELETE FROM quotes WHERE quote_id = :qid"), {"qid": quote_id})
-            session.execute(
-                text("DELETE FROM subsidiary_routes WHERE subsidiary_id = :ocid"),
-                {"ocid": oc_id},
-            )
-            session.execute(
-                text("DELETE FROM subsidiaries WHERE subsidiary_id = :ocid"),
-                {"ocid": oc_id},
             )

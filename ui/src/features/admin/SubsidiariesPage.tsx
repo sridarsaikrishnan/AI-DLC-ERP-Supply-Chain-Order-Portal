@@ -77,7 +77,7 @@ export function SubsidiariesPage() {
         <div>
           <h1>Subsidiaries</h1>
           <p>
-            The company you are. Country and language live here <InfoTag text="So document numbers and emails have a home — the subsidiary record." />, and quotes are issued under one of these.
+            The company you are. Country and language live here <InfoTag text="So document numbers and emails have a home — the subsidiary record." />.
           </p>
         </div>
         <div className="actions">
@@ -112,7 +112,7 @@ export function SubsidiariesPage() {
       )}
       {error && <div className="callout callout--danger">Could not load subsidiaries: {error.message}</div>}
       <p className="hint">
-        A new subsidiary must be routed to an ERP connection before any quote can be issued under it <InfoTag text="Which ERP connection this subsidiary's quotes go to — decided once, here, not re-derived from order line items." />.
+        Sales orders are followed from the reseller's customer on an ERP connection, not from this page.
       </p>
       <DataTable columns={columns} rows={subsidiaries ?? []} rowKey={(c) => c.subsidiaryId} emptyMessage={isLoading ? "Loading…" : "No subsidiaries yet"} />
     </>

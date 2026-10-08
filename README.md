@@ -1,6 +1,6 @@
 # ERP & Supply Chain Order Portal
 
-A multi-tenant portal that routes reseller orders to the ERP system that owns each item
+A multi-tenant portal that routes a reseller order to the ERP on the quote's subsidiary
 (Odoo today; more via a small registration checklist — see `docs/adding-an-erp.md`), with
 event-sourced orders, a transactional-outbox/SNS/SQS async pipeline, and a GraphQL API
 split by audience (reseller vs. operator, so ERP identity never reaches a reseller — FR-19).
@@ -32,8 +32,8 @@ network failure modes) up front for a system that doesn't need it yet.
 | Process/service | What it does | Talks to |
 |---|---|---|
 | **`api`** (FastAPI) | Serves GraphQL (`/graphql/reseller`, `/graphql/operator`) and inbound ERP webhooks. Handles reads and synchronous writes (place/cancel an order). | Postgres, Cognito (auth) |
-| **`worker`** | 4 SQS consumers (order-processing, order-delivery, projections, webhook-dispatch) + the outbox relay + the reconciliation scheduler. Everything asynchronous — talking to the ERP, building read models, sending outbound webhooks — happens here, not in `api`. | Postgres, SQS/SNS, the ERP (Odoo), reseller webhook endpoints |
-| **`ui`** (React SPA) | The reseller and operator web app. Talks to `api` over GraphQL only — it has no direct database or queue access. | `api` |
+| **`worker`** | Five SQS consumers (order-processing, order-delivery, order-fulfillment, projections, webhook-dispatch), the outbox relay, and the reconciliation sweeper. Talking to the ERP, building read models, and sending webhooks happens here, not in `api`. | Postgres, SQS/SNS, the ERP (Odoo), reseller webhook endpoints |
+| **`ui`** (React SPA) | Reseller portal (notifications, then the order) and operator admin. Talks to `api` over GraphQL only. | `api` |
 
 ```mermaid
 flowchart LR
@@ -81,7 +81,8 @@ ui/                  # React SPA (reseller + operator web app) — see "Tech sta
 migrations/          # Alembic
 tests/e2e/           # full in-memory flow (place order -> deliver -> webhook -> projection)
 tests/integration/   # against real Postgres + floci (self-skip if unreachable)
-scripts/             # messaging_bootstrap.py (SNS/SQS topology), seed_demo.py,
+scripts/             # local.sh (start/stop), messaging_bootstrap.py, seed_demo.py,
+                     # seed_cognito.py, odoo-boot.sh,
                      # dev_webhook_receiver.py (dev-only test aid, NOT part of the app)
 docs/                # local-setup.md, database-schema.md, event-sourcing-explained.md,
                      # erp-integration-patterns.md, adding-an-erp.md, odoo-webhook-setup.md,
@@ -90,34 +91,58 @@ docs/                # local-setup.md, database-schema.md, event-sourcing-explai
 ```
 
 ## Run locally
-Full walkthrough (backing services, migrations, messaging topology, running the app and
-worker as real processes, optional real-Cognito setup): **`docs/local-setup.md`**.
 
-Quick version — backend:
-```bash
-docker compose up -d            # postgres, floci (AWS emulator), odoo
-export DATABASE_URL=postgresql+psycopg2://portal:portal@localhost:5432/portal
-alembic upgrade head
-export AWS_ENDPOINT_URL=http://localhost:4566 AWS_DEFAULT_REGION=us-east-1
-export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test
-python -m scripts.messaging_bootstrap
-python -m scripts.seed_demo
-APP_PROFILE=postgres ERP_ADAPTER_MODE=stub python -m src.worker.main &
-APP_PROFILE=postgres ERP_ADAPTER_MODE=stub uvicorn src.api.app:app --port 8000 &
-```
-GraphQL: `http://127.0.0.1:8000/graphql/reseller` (mutations: `placeOrder`,
-`cancelOrder`; queries: `orders`, `order`). Health: `GET /livez`.
+One-time setup, from the repo root:
 
-Quick version — frontend:
 ```bash
-cd ui
-npm install
-cp .env.example .env       # points at the local API + floci Cognito by default
-npm run dev                 # http://localhost:5173
+python -m venv .venv
+. .venv/Scripts/activate          # Windows Git Bash; source .venv/bin/activate on macOS/Linux
+pip install -e ".[dev]"
+cd ui && npm install && cd ..
 ```
-Sign in with a seeded demo user (see `docs/local-setup.md` §7 to provision one) — a
-reseller-role user lands on the order screens, an operator-role user lands on the admin
-screens. `npm run build` produces the static `dist/` folder that gets deployed as-is.
+
+Then:
+
+```bash
+bash scripts/local.sh up          # Postgres, Floci, Odoo, migrate, seed, api, worker, portal
+bash scripts/local.sh down        # stop those processes and containers; databases are kept
+```
+
+`up` is safe to run again. It restarts api, worker, and the portal so they pick up the
+current env, and it waits until `GET /livez` answers. Logs are `.local/api.log`,
+`.local/worker.log`, and `.local/ui.log`. The first Odoo boot installs modules and takes
+a few minutes. `down` does not delete Docker volumes.
+
+Sign in at the portal as `demo-operator` (operator admin) or `demo-reseller` (notifications
+only). Password for both: `DemoPass123!`. Odoo is `admin` / `admin`. The seeded quote is
+`qte_demo` for tenant `tnt_demo`, SKU `DEMO-BOX`. Set that Internal Reference on a product
+in Odoo before a live submit will find it.
+
+Odoo may show a sticky banner, "Registration failed - push service not available". That is
+the browser refusing desktop notifications on this local site. Dismiss it. It does not
+block sales.
+
+| What | URL |
+|---|---|
+| Reseller and operator portal | http://localhost:5173 and http://127.0.0.1:5173 |
+| API liveness | http://127.0.0.1:8000/livez |
+| API readiness | http://127.0.0.1:8000/readyz |
+| Reseller GraphQL | http://127.0.0.1:8000/graphql/reseller |
+| Operator GraphQL | http://127.0.0.1:8000/graphql/operator |
+| Odoo inbound webhook (shared secret in the path) | http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo |
+| HMAC inbound webhook | http://127.0.0.1:8000/erp/webhook/{connection_id} |
+| Odoo | http://localhost:8069 |
+| Floci (AWS emulator) | http://localhost:4566 |
+| Floci health | http://localhost:4566/_floci/health |
+| Floci console | http://localhost:4566/_floci/ui |
+| Portal Postgres | `localhost:5432`, database `portal`, user `portal`, password `portal` |
+
+The portal calls Floci Cognito through the Vite proxy at `/cognito-idp` (Floci does not
+send browser CORS headers). `scripts/local.sh` writes `ui/.env` with the pool and client
+ids. Do not copy `ui/.env.example` over that file after `up`.
+
+The same steps by hand, including a machine-to-machine token, are in `docs/local-setup.md`.
+`npm run build` in `ui/` produces the static `dist/` folder that gets deployed as-is.
 
 Optional — watch outbound webhook deliveries land during dev:
 ```bash

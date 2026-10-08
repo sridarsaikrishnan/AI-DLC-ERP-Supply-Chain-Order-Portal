@@ -109,8 +109,6 @@ export function OrderDetailPage() {
               <dd>{order.parties.endCustomerName || "—"}</dd>
               <dt>Ship to</dt>
               <dd>{order.parties.shipTo || "—"}</dd>
-              <dt>Quote</dt>
-              <dd className="id">{order.parties.quoteId || "—"}</dd>
             </dl>
           </section>
           <section className="panel">
@@ -131,7 +129,7 @@ export function OrderDetailPage() {
         </div>
       </div>
       <p>
-        <Link to="/orders">Back to orders</Link>
+        <Link to="/notifications">Back to notifications</Link>
       </p>
     </>
   );

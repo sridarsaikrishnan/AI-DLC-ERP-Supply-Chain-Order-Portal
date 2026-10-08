@@ -34,6 +34,7 @@ class ReconcileSweeper:
         order_status: OrderStatusPort,
         sync_shipments: Callable[[str, list[Any]], None] | None = None,
         sync_invoices: Callable[[str, list[Any]], None] | None = None,
+        discover: Callable[[ConnectionId], list[str]] | None = None,
     ) -> None:
         self._connections = connections
         self._adapter_for = adapter_for
@@ -41,9 +42,16 @@ class ReconcileSweeper:
         self._order_status = order_status
         self._sync_shipments = sync_shipments
         self._sync_invoices = sync_invoices
+        self._discover = discover
 
     def run(self, connection_id: ConnectionId, erp_order_ids: list[str]) -> int:
-        """Poll each ERP order; apply any canonical transition. Returns #transitions applied."""
+        """Poll each ERP order; apply any canonical transition. Returns #transitions applied.
+
+        `discover`, when set, adopts sales orders that already exist in the ERP and adds
+        their ids to this sweep.
+        """
+        if self._discover is not None:
+            erp_order_ids = list(dict.fromkeys([*self._discover(connection_id), *erp_order_ids]))
         target = self._connections.resolve(connection_id)
         if target is None:
             return 0

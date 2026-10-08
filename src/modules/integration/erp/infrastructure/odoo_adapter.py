@@ -15,6 +15,8 @@ from typing import Any
 
 from ..application.ports import (
     ErpInvoice,
+    ErpPartnerOrder,
+    ErpPartnerOrderLine,
     ErpShipment,
     ErpShipmentLine,
     ErpTarget,
@@ -128,6 +130,90 @@ class OdooAdapter:
             return SubmissionResult(success=True, erp_order_id=name)
         except _OdooError as exc:
             return SubmissionResult(success=False, error=str(exc), terminal=exc.terminal)
+
+    def fetch_partner_orders(self, target: ErpTarget, partner_id: str) -> list[ErpPartnerOrder]:
+        """Sales orders that already exist for this partner. We do not create them."""
+        try:
+            pid = int(partner_id)
+        except (TypeError, ValueError):
+            return []
+        try:
+            uid = self._authenticate(target)
+            orders = self._execute(
+                target,
+                uid,
+                "sale.order",
+                "search_read",
+                [[["partner_id", "=", pid]]],
+                {"fields": ["name", "client_order_ref", "order_line", "currency_id"]},
+            )
+            found: list[ErpPartnerOrder] = []
+            for order in orders:
+                line_ids = order.get("order_line") or []
+                if not line_ids or not order.get("name"):
+                    continue
+                raw_lines = self._execute(
+                    target,
+                    uid,
+                    "sale.order.line",
+                    "read",
+                    [line_ids],
+                    {"fields": ["product_id", "product_uom_qty", "price_unit", "display_type"]},
+                )
+                product_ids = [
+                    line["product_id"][0]
+                    for line in raw_lines
+                    if line.get("product_id")
+                    and line.get("display_type") in (False, None, "product")
+                ]
+                codes: dict[int, str] = {}
+                if product_ids:
+                    products = self._execute(
+                        target,
+                        uid,
+                        "product.product",
+                        "read",
+                        [product_ids],
+                        {"fields": ["default_code"]},
+                    )
+                    codes = {int(row["id"]): str(row.get("default_code") or "") for row in products}
+                currency = "USD"
+                currency_field = order.get("currency_id")
+                if isinstance(currency_field, list | tuple) and len(currency_field) > 1:
+                    currency = str(currency_field[1]) or "USD"
+                lines: list[ErpPartnerOrderLine] = []
+                for line in raw_lines:
+                    if not line.get("product_id") or line.get("display_type") not in (
+                        False,
+                        None,
+                        "product",
+                    ):
+                        continue
+                    code = codes.get(int(line["product_id"][0]), "")
+                    quantity = line.get("product_uom_qty") or 0
+                    if not code or not quantity:
+                        continue
+                    lines.append(
+                        ErpPartnerOrderLine(
+                            product_key=code,
+                            quantity=str(quantity),
+                            unit_price=str(line.get("price_unit") or ""),
+                            currency=currency,
+                        )
+                    )
+                if not lines:
+                    continue
+                name = str(order["name"])
+                found.append(
+                    ErpPartnerOrder(
+                        erp_order_id=name,
+                        client_reference=str(order.get("client_order_ref") or name),
+                        lines=tuple(lines),
+                    )
+                )
+            return found
+        except _OdooError:
+            return []
 
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None:
         try:

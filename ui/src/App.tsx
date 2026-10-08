@@ -2,15 +2,9 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
 
-const RESELLER_NAV = [
-  { to: "/orders", label: "Orders" },
-  { to: "/quotes", label: "Quotes" },
-  { to: "/delivery-log", label: "Delivery log" },
-  { to: "/webhook-endpoints", label: "Webhook endpoints" },
-];
+const RESELLER_NAV = [{ to: "/notifications", label: "Notifications" }];
 const OPERATOR_NAV = [
   { to: "/admin/orders", label: "Orders" },
-  { to: "/admin/quotes", label: "Quotes" },
   { to: "/admin/subsidiaries", label: "Subsidiaries" },
   { to: "/admin/connections", label: "ERP connections" },
   { to: "/admin/tenants", label: "Resellers" },
@@ -18,15 +12,10 @@ const OPERATOR_NAV = [
 ];
 
 function crumbFor(pathname: string): string {
-  if (pathname === "/orders/new") return "Orders / New order";
-  if (/^\/orders\/[^/]+\/events$/.test(pathname)) return "Orders / Order events";
-  if (/^\/orders\/[^/]+$/.test(pathname)) return "Orders / Order detail";
-  if (pathname.startsWith("/orders")) return "Orders";
-  if (pathname.startsWith("/quotes")) return "Quotes";
-  if (pathname.startsWith("/delivery-log")) return "Delivery log";
-  if (pathname.startsWith("/webhook-endpoints")) return "Webhook endpoints";
+  if (/^\/orders\/[^/]+\/events$/.test(pathname)) return "Notifications / Order events";
+  if (/^\/orders\/[^/]+$/.test(pathname)) return "Notifications / Order";
+  if (pathname.startsWith("/notifications")) return "Notifications";
   if (pathname.startsWith("/admin/orders")) return "Operator / Orders";
-  if (pathname.startsWith("/admin/quotes")) return "Operator / Quotes";
   if (pathname.startsWith("/admin/subsidiaries")) return "Operator / Subsidiaries";
   if (pathname.startsWith("/admin/connections")) return "Operator / ERP connections";
   if (pathname.startsWith("/admin/tenants")) return "Operator / Resellers";

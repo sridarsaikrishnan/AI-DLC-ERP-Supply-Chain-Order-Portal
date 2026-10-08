@@ -7,8 +7,6 @@ schema holds no new business logic.
 
 from __future__ import annotations
 
-from datetime import date
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import strawberry
@@ -17,8 +15,6 @@ from strawberry.extensions import QueryDepthLimiter
 from src.modules.reference.connections.application.service import ConnectionService
 from src.modules.reference.connections.domain.models import ErpConnection, ErpType
 from src.modules.reference.tenancy.application.service import BindingService
-from src.modules.sales.quoting.domain.models import EndCustomer, Quote, QuoteLine, Subsidiary
-from src.shared.money import Money, TaxRate
 from src.shared.types import BindingId, ConnectionId, TenantId
 
 from .types import (
@@ -30,9 +26,6 @@ from .types import (
     OperatorPartiesType,
     OperatorTimelineEntryType,
     OrderEventType,
-    QuoteLineInput,
-    QuoteLineType,
-    QuoteType,
     SubsidiaryType,
 )
 
@@ -41,6 +34,8 @@ if TYPE_CHECKING:
 
     from src.modules.reference.tenancy.domain.models import TenantConnectionBinding
     from src.modules.sales.ordering.projections.read_models import OperatorOrderView
+    from src.modules.sales.quoting.domain.models import Subsidiary
+    from src.shared.money import Money
 
     from ..context import GraphQLContext
 
@@ -122,36 +117,6 @@ def _company_to_gql(company: Subsidiary) -> SubsidiaryType:
     )
 
 
-def _quote_to_gql(quote: Quote) -> QuoteType:
-    return QuoteType(
-        quote_id=quote.quote_id,
-        tenant_id=str(quote.tenant_id),
-        subsidiary_id=quote.subsidiary_id,
-        end_customer_name=quote.end_customer.name,
-        ship_to=quote.end_customer.ship_to,
-        currency=quote.currency,
-        valid_from=quote.valid_from.isoformat(),
-        valid_until=quote.valid_until.isoformat(),
-        status=quote.status.value,
-        routed_to_connection_id=quote.routed_to_connection_id,
-        lines=[
-            QuoteLineType(
-                product_key=line.product_key,
-                name=line.name,
-                kind=line.kind,
-                unit_price=MoneyType(
-                    amount=str(line.unit_price.amount), currency=line.unit_price.currency
-                ),
-                unit_of_measure=line.unit_of_measure,
-                tax_code=line.tax_rate.code if line.tax_rate else None,
-                tax_rate=float(line.tax_rate.rate) if line.tax_rate else None,
-                line_discount=_money_to_gql(line.line_discount),
-            )
-            for line in quote.lines
-        ],
-    )
-
-
 @strawberry.type
 class Query:
     @strawberry.field
@@ -207,17 +172,9 @@ class Query:
 
     @strawberry.field
     def erp_route(self, info: Info[GraphQLContext, None], subsidiary_id: str) -> str | None:
-        """Which ERP connection this subsidiary's quotes currently route to — `None` until
-        an operator sets one (Increment 7); `issueQuote` refuses until it's set."""
         ctx = info.context
         ctx.require_role("OPERATOR")
         return ctx.container.quote_service.get_erp_route(subsidiary_id)
-
-    @strawberry.field
-    def quotes(self, info: Info[GraphQLContext, None]) -> list[QuoteType]:
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        return [_quote_to_gql(q) for q in ctx.container.quote_service.list_quotes()]
 
 
 @strawberry.type
@@ -322,52 +279,6 @@ class Mutation:
         company = ctx.container.quote_service.get_subsidiary(subsidiary_id)
         assert company is not None
         return _company_to_gql(company)
-
-    @strawberry.mutation
-    def issue_quote(
-        self,
-        info: Info[GraphQLContext, None],
-        tenant_id: str,
-        subsidiary_id: str,
-        end_customer_name: str,
-        ship_to: str,
-        currency: str,
-        valid_from: str,
-        valid_until: str,
-        lines: list[QuoteLineInput],
-    ) -> QuoteType:
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        quote_lines = [
-            QuoteLine(
-                product_key=li.product_key,
-                name=li.name,
-                kind=li.kind,
-                unit_price=Money(Decimal(str(li.unit_price)), currency),
-                unit_of_measure=li.unit_of_measure,
-                tax_rate=(
-                    TaxRate(
-                        code=li.tax_code, rate=Decimal(str(li.tax_rate)), inclusive=li.tax_inclusive
-                    )
-                    if li.tax_code is not None and li.tax_rate is not None
-                    else None
-                ),
-                line_discount=Money(Decimal(str(li.line_discount)), currency)
-                if li.line_discount is not None
-                else None,
-            )
-            for li in lines
-        ]
-        quote = ctx.container.quote_service.issue_quote(
-            tenant_id=TenantId(tenant_id),
-            subsidiary_id=subsidiary_id,
-            end_customer=EndCustomer(name=end_customer_name, ship_to=ship_to),
-            currency=currency,
-            valid_from=date.fromisoformat(valid_from),
-            valid_until=date.fromisoformat(valid_until),
-            lines=quote_lines,
-        )
-        return _quote_to_gql(quote)
 
     @strawberry.mutation
     def set_vendor_date(

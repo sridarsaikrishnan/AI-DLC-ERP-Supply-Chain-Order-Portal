@@ -22,6 +22,7 @@ from .events import (
     OrderLineFulfilled,
     OrderLineInvoiced,
     OrderLineVendorDateSet,
+    OrderObserved,
     OrderReadyForDelivery,
     OrderRejected,
     OrderRetrying,
@@ -110,6 +111,42 @@ class Order(Aggregate):
                 end_customer_name=end_customer_name,
                 ship_to=ship_to,
                 routed_to_connection_id=routed_to_connection_id,
+            )
+        )
+        return order
+
+    @classmethod
+    def observe(
+        cls,
+        *,
+        order_id: OrderId,
+        tenant_id: TenantId,
+        client_reference: str,
+        lines: list[OrderLine],
+        connection_id: str,
+        erp_order_id: str,
+    ) -> Order:
+        """Adopt a sales order that already exists in the ERP. Does not emit
+        `OrderReadyForDelivery`, so nothing turns around and creates one."""
+        if not lines:
+            raise ValueError("order must have at least one line")
+        for line in lines:
+            if not line.product_key:
+                raise ValueError("line requires a product_key")
+            if not line.line_id:
+                raise ValueError("line requires a line_id")
+            if line.quantity <= 0:
+                raise ValueError("line quantity must be positive")
+        order = cls(order_id)
+        order.emit(
+            OrderObserved(
+                order_id=order_id,
+                tenant_id=tenant_id,
+                client_reference=client_reference,
+                lines=[line.to_dict() for line in lines],
+                product_keys=[line.product_key for line in lines],
+                routed_to_connection_id=connection_id,
+                erp_order_id=erp_order_id,
             )
         )
         return order
@@ -298,6 +335,15 @@ class Order(Aggregate):
         # routing later — set it here, at submission, not in OrderValidated.
         self.owning_connection_id = ConnectionId(e.routed_to_connection_id)
         self.state = OrderState.SUBMITTED
+
+    def _apply_OrderObserved(self, e: OrderObserved) -> None:
+        self.tenant_id = TenantId(e.tenant_id)
+        self.client_reference = e.client_reference
+        self.lines = [OrderLine.from_dict(line) for line in e.lines]
+        self.product_keys = list(e.product_keys)
+        self.owning_connection_id = ConnectionId(e.routed_to_connection_id)
+        self.erp_order_id = e.erp_order_id
+        self.state = OrderState.SENT_TO_ERP
 
     def _apply_OrderValidated(self, e: OrderValidated) -> None:
         self.state = OrderState.VALIDATED

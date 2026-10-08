@@ -35,6 +35,25 @@ class OrderSubmitted(DomainEvent):
 
 @register_event
 @dataclass(frozen=True, kw_only=True)
+class OrderObserved(DomainEvent):
+    """A sales order that already existed in the ERP. We do not create it.
+
+    Lands the order in SENT_TO_ERP with `erp_order_id` set, so status, shipment, and
+    invoice polling can follow it. Not a notification: nothing was sent to the reseller
+    just because we noticed the document.
+    """
+
+    order_id: str
+    tenant_id: str
+    client_reference: str
+    lines: list[dict[str, Any]]
+    product_keys: list[str]
+    routed_to_connection_id: str
+    erp_order_id: str
+
+
+@register_event
+@dataclass(frozen=True, kw_only=True)
 class OrderValidated(DomainEvent):
     """`owning_connection_id` is already known from `OrderSubmitted` (Increment 7) — this
     event just marks that the tenant's binding to it was confirmed verified."""

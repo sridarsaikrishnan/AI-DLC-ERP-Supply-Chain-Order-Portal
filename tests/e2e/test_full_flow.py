@@ -1,25 +1,8 @@
-"""End-to-end, in-memory: the whole pipeline wired with real components.
-
-place order (already routed to a connection by its quote) -> (bus) order-processing
-confirms the tenant's binding -> order-delivery submits to a stub ERP -> projections build
-the reseller read model + reverse-routing locator -> inbound ERP webhook (status change)
-is authenticated + attributed + applied -> the reseller read model reflects the new
-lifecycle status.
-
-Everything below is production code except the ERP adapter (stub), the connection
-resolver, and the binding query (a fake standing in for the tenancy adapter). The message
-bus, event store, repository, projector, processor, delivery handler, status applier and
-webhook ingress are the real implementations.
-"""
+"""An order already in the ERP is adopted, then an inbound webhook confirms it."""
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-from decimal import Decimal
-
-from src.modules.integration.erp.application.delivery import DeliveryHandler
-from src.modules.integration.erp.application.ports import ErpTarget
-from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapter
+from src.modules.integration.erp.application.ports import ErpPartnerOrderLine
 from src.modules.integration.webhooks_inbound.application.ingress import (
     InboundWebhook,
     InboundWebhookService,
@@ -30,26 +13,13 @@ from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
     InMemoryOrderLocator,
 )
-from src.modules.sales.ordering.application.adapters import (
-    OrderCommandAdapter,
-    OrderReaderAdapter,
-    StatusApplier,
-)
-from src.modules.sales.ordering.application.order_service import OrderLineInput, OrderService
-from src.modules.sales.ordering.application.processing import OrderProcessor
+from src.modules.sales.ordering.application.adapters import StatusApplier
+from src.modules.sales.ordering.application.order_service import OrderService
 from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.projections.projector import OrderProjector
 from src.modules.sales.ordering.projections.store import OrderProjectionStore
-from src.modules.sales.quoting.application.service import QuoteService
-from src.modules.sales.quoting.domain.models import EndCustomer, QuoteLine
-from src.modules.sales.quoting.infrastructure.memory import (
-    InMemoryQuoteRepository,
-    InMemorySubsidiaryRepository,
-    InMemorySubsidiaryRouteRepository,
-)
 from src.shared.eventsourcing import EventSourcedRepository, InMemoryEventStore
 from src.shared.messaging import InMemoryMessageBus
-from src.shared.money import Money
 from src.shared.types import ConnectionId, TenantId
 
 _TENANT = TenantId("tnt_demo")
@@ -57,76 +27,25 @@ _CONN = "conn_odoo_local"
 _SECRET = "whsec_demo"
 
 
-class FakeBindings:
-    def is_bound(self, tenant_id: TenantId, connection_id: ConnectionId) -> bool:
-        return str(tenant_id) == _TENANT and str(connection_id) == _CONN
-
-
-class FakeConnections:
-    def resolve(self, connection_id: ConnectionId) -> ErpTarget | None:
-        if str(connection_id) != _CONN:
-            return None
-        return ErpTarget(
-            erp_type="ODOO",
-            base_url="http://odoo",
-            credentials={"database": "odoo", "username": "admin"},
-            secret="x",
-        )
-
-
 class FakeSecrets:
     def secret_for(self, connection_id: ConnectionId) -> str | None:
         return _SECRET if str(connection_id) == _CONN else None
 
 
-def test_order_flows_place_to_confirmed_via_webhook() -> None:
-    # --- shared infra ---
+def test_observed_order_confirms_via_webhook() -> None:
     store = InMemoryEventStore()
     bus = InMemoryMessageBus()
     repo: EventSourcedRepository[Order] = EventSourcedRepository(store, Order, publisher=bus)
     projections = OrderProjectionStore()
     locator = InMemoryOrderLocator()
-    stub_adapter = StubErpAdapter()
-
-    # --- consumers wired to the bus (real components) ---
-    processor = OrderProcessor(repo, FakeBindings())
-    delivery = DeliveryHandler(
-        connections=FakeConnections(),
-        orders_read=OrderReaderAdapter(projections),
-        orders_cmd=OrderCommandAdapter(repo),
-        adapter_for=lambda _erp_type: stub_adapter,
-    )
     bus.subscribe("projections", OrderProjector(projections, locator=locator).handle)
-    bus.subscribe("order-processing", processor.handle, event_types={"OrderSubmitted"})
-    bus.subscribe("order-delivery", delivery.handle, event_types={"OrderReadyForDelivery"})
 
-    # --- a quote the reseller replies to ---
-    quotes = InMemoryQuoteRepository()
-    quote_service = QuoteService(
-        quotes, InMemorySubsidiaryRepository(), InMemorySubsidiaryRouteRepository()
-    )
-    company = quote_service.create_subsidiary(name="Dist", country="US", language="en")
-    quote_service.set_erp_route(company.subsidiary_id, _CONN)
-    quote = quote_service.issue_quote(
+    order_id = OrderService(repo).observe_erp_order(
         tenant_id=_TENANT,
-        subsidiary_id=company.subsidiary_id,
-        end_customer=EndCustomer(name="Downstream", ship_to="1 Main St"),
-        currency="USD",
-        valid_from=date.today() - timedelta(days=1),
-        valid_until=date.today() + timedelta(days=30),
-        lines=[
-            QuoteLine(
-                product_key="ANVIL", unit_price=Money(Decimal("19.99"), "USD"), unit_of_measure="EA"
-            )
-        ],
-    )
-
-    # --- place an order and drain the pipeline ---
-    order_id = OrderService(repo, quotes, quote_service, references=projections).place_order(
-        tenant_id=_TENANT,
-        quote_id=quote.quote_id,
-        client_reference="PO-1001",
-        lines=[OrderLineInput("ANVIL", Decimal(3))],
+        connection_id=_CONN,
+        erp_order_id="S00042",
+        client_reference="S00042",
+        lines=[ErpPartnerOrderLine(product_key="ANVIL", quantity="3", unit_price="19.99")],
     )
     bus.run_until_empty()
 

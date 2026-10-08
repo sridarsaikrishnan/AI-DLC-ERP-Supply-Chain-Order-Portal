@@ -2,8 +2,13 @@
 
 | | |
 |---|---|
-| Status | Accepted |
+| Status | Accepted — **amended by [ADR-0019](0019-order-routing.md)** |
 | Affects | `integration`, `connections` modules |
+
+> **Amendment (ADR-0019):** a new order no longer picks its instance from line-item
+> `owning_connection_id`. The worker is already sweeping one connection. The verified
+> binding on that connection says which customer, and which reseller, the order belongs to.
+> The subsidiary route remains the lookup for a future send.
 
 ## In one sentence
 A second instance of an already-registered ERP type (e.g. a second Odoo database) is a
