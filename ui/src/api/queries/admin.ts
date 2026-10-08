@@ -256,26 +256,6 @@ export const ISSUE_QUOTE_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const RECORD_SHIPMENT_MUTATION = /* GraphQL */ `
-  mutation RecordShipment(
-    $orderId: String!
-    $lines: [LineQuantityInput!]!
-    $carrier: String
-    $trackingNumber: String
-    $proofOfDelivery: String
-  ) {
-    recordShipment(
-      orderId: $orderId
-      lines: $lines
-      carrier: $carrier
-      trackingNumber: $trackingNumber
-      proofOfDelivery: $proofOfDelivery
-    ) {
-      shipmentId
-    }
-  }
-`;
-
 export const SET_VENDOR_DATE_MUTATION = /* GraphQL */ `
   mutation SetVendorDate($orderId: String!, $lineId: String!, $vendorDate: String!) {
     setVendorDate(orderId: $orderId, lineId: $lineId, vendorDate: $vendorDate)

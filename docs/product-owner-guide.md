@@ -28,7 +28,7 @@ actually lives in.
 operator issues a QUOTE  ──▶  reseller places an ORDER against it  ──▶  routed to the owning ERP
                                                                               │
 reseller sees status + scores  ◀──  ERP status flows back (webhook / polling) ◀┘
-operator records shipments / invoices  ──▶  reseller sees shipped / delivered / invoiced
+ERP deliveries and operator invoices  ──▶  reseller sees shipped / delivered / invoiced
 ```
 
 An order is always a reply to a quote. The quote carries the prices, how long they hold,
@@ -74,9 +74,9 @@ what's been recorded against its lines:
   **license** counts as delivered the moment it ships.
 - **Invoicing**: `Not invoiced → Partially invoiced → Invoiced`.
 
-An operator records a shipment (optionally with carrier / tracking / proof-of-delivery) or
-an invoice against specific lines and quantities; the scores move accordingly. Partial
-shipments are supported and are additive.
+A done delivery in the ERP becomes a shipment (partial deliveries included). An operator
+records an invoice against specific lines and quantities. The scores move accordingly and
+are additive.
 
 ### Vendor date ("scheduled")
 When purchasing actually buys a line from the maker, an operator records a vendor date on
@@ -123,9 +123,9 @@ surprise:
 
 - **A second ERP** (SAP, ERPNext, NetSuite, …). The design supports it; no second adapter
   is written yet.
-- **Automatic shipment/invoice capture from the ERP.** Shipments and invoices are recorded
-  by an operator today; nothing yet reads Odoo's own delivery/invoice records to fill them
-  in automatically.
+- **Automatic invoice capture from the ERP.** Invoices are recorded by an operator today;
+  nothing yet reads Odoo's own invoice records. Shipments already come from done ERP
+  deliveries.
 - **A standalone Vendor Order document.** The vendor date exists; a separate purchase-order
   document with its own number does not.
 - **Richer tax/pricing**: multi-jurisdiction tax, promotional/volume discount codes.

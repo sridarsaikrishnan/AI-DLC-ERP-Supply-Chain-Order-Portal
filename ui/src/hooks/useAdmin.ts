@@ -13,7 +13,6 @@ import {
   OPERATOR_ORDER_QUERY,
   OPERATOR_QUOTES_QUERY,
   PAUSE_CONNECTION_MUTATION,
-  RECORD_SHIPMENT_MUTATION,
   REGISTER_CONNECTION_MUTATION,
   REMOVE_BINDING_MUTATION,
   RESUME_CONNECTION_MUTATION,
@@ -253,26 +252,6 @@ export function useIssueQuote() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["operatorQuotes"] });
       notify("Quote issued.");
-    },
-    onError: (err) => notify((err as Error).message, "danger"),
-  });
-}
-
-export function useRecordShipment(orderId: string) {
-  const { idToken } = useAuth();
-  const queryClient = useQueryClient();
-  const { notify } = useToast();
-  return useMutation({
-    mutationFn: (input: {
-      orderId: string;
-      lines: { lineId: string; quantity: number }[];
-      carrier?: string | null;
-      trackingNumber?: string | null;
-      proofOfDelivery?: string | null;
-    }) => graphqlRequest("operator", RECORD_SHIPMENT_MUTATION, input, idToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operatorOrder", orderId] });
-      notify("Shipment recorded.");
     },
     onError: (err) => notify((err as Error).message, "danger"),
   });

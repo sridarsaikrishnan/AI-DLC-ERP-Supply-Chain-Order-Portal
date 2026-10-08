@@ -31,6 +31,23 @@ class ErpTarget:
 
 
 @dataclass(frozen=True)
+class ErpShipmentLine:
+    product_key: str
+    quantity: str  # decimal as text, same shape the shipment event already carries
+
+
+@dataclass(frozen=True)
+class ErpShipment:
+    """One done delivery in the ERP. `erp_shipment_id` is the ERP's own id, stable across polls."""
+
+    erp_shipment_id: str
+    lines: tuple[ErpShipmentLine, ...]
+    carrier: str | None = None
+    tracking_number: str | None = None
+    proof_of_delivery: str | None = None
+
+
+@dataclass(frozen=True)
 class SubmissionResult:
     success: bool
     erp_order_id: str | None = None
@@ -54,6 +71,7 @@ class ErpAdapter(Protocol):
 
     def submit(self, target: ErpTarget, order_payload: dict[str, Any]) -> SubmissionResult: ...
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None: ...
+    def fetch_shipments(self, target: ErpTarget, erp_order_id: str) -> list[ErpShipment]: ...
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult: ...
 
 

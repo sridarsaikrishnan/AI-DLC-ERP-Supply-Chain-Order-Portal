@@ -32,7 +32,9 @@ The flat `src/modules/*` list is regrouped into three subdomain folders — `sal
 **Split** — `fulfillment` → `shipment` + `invoicing`, each its own module and event-sourced
 aggregate. (`payments` and `returns` were created in the same split and later removed.)
 The dispatch aggregate is named **`Shipment`**
-(`ShipmentRecorded` event, `recordShipment` mutation, `shipment_service` on the container).
+(`ShipmentRecorded` event, `shipment_service` on the container). The operator
+`recordShipment` mutation was later removed: a shipment is a done ERP delivery, recorded
+by the reconciliation sweeper.
 "Delivery" is deliberately *not* used as the aggregate name — it is a downstream status a
 carrier-tracking integration (e.g. AfterShip) would later drive, not the act of dispatch.
 

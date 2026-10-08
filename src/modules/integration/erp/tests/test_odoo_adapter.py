@@ -28,7 +28,13 @@ _TARGET = ErpTarget(
 
 def test_capabilities_are_declared() -> None:
     """ADR-0015: a declared, inspectable contract — not yet gated on, but real."""
-    assert OdooAdapter.capabilities == {"tax", "uom", "idempotency", "fail_closed_product"}
+    assert OdooAdapter.capabilities == {
+        "tax",
+        "uom",
+        "idempotency",
+        "fail_closed_product",
+        "partial_fulfillment",
+    }
 
 
 def test_build_sale_order_lines_defaults_bad_quantity_to_one() -> None:
@@ -310,6 +316,34 @@ def test_fetch_status_returns_state_and_invoice_status() -> None:
         fields = adapter.fetch_status(_TARGET, "S00001")
 
     assert fields == {"state": "sale", "invoice_status": "invoiced"}
+
+
+def test_fetch_shipments_reads_done_pickings() -> None:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
+        if model == "sale.order":
+            return [{"picking_ids": [9]}]
+        if model == "stock.picking":
+            return [{"id": 9, "name": "WH/OUT/00009", "state": "done", "move_ids": [3]}]
+        if model == "stock.move":
+            return [{"product_id": [4, "Anvil"], "quantity": 2, "state": "done"}]
+        if model == "product.product":
+            return [{"id": 4, "default_code": "ANVIL"}]
+        raise AssertionError(model)
+
+    adapter = OdooAdapter()
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
+    ):
+        shipments = adapter.fetch_shipments(_TARGET, "S00001")
+
+    assert len(shipments) == 1
+    assert shipments[0].erp_shipment_id == "9"
+    assert shipments[0].proof_of_delivery == "WH/OUT/00009"
+    assert shipments[0].lines[0].product_key == "ANVIL"
+    assert shipments[0].lines[0].quantity == "2"
 
 
 def test_fetch_status_returns_none_when_order_not_found() -> None:

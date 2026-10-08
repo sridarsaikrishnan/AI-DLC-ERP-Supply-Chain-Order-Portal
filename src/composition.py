@@ -21,7 +21,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from src.modules.integration.erp.application.delivery import DeliveryHandler
-from src.modules.integration.erp.application.ports import ErpAdapter, ErpTarget, UnknownErpType
+from src.modules.integration.erp.application.ports import (
+    ErpAdapter,
+    ErpShipment,
+    ErpTarget,
+    UnknownErpType,
+)
 from src.modules.integration.erp.application.reconcile import ReconcileSweeper
 from src.modules.integration.erp.infrastructure.registry import build_adapter_registry
 from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapter
@@ -208,6 +213,35 @@ class Container:
     quotes: QuoteRepository
     subsidiaries: SubsidiaryRepository
     subsidiary_routes: SubsidiaryRouteRepository
+
+
+def _erp_shipment_sync(orders: EventSourcedRepository[Order], shipments: ShipmentService):
+    """Turn ERP deliveries into shipment records. A repeat poll of the same picking is a no-op."""
+
+    def sync(order_id: str, erp_shipments: list[ErpShipment]) -> None:
+        order = orders.get(order_id)
+        line_for: dict[str, str] = {}
+        for line in order.lines:
+            line_for.setdefault(line.product_key, line.line_id)
+        for erp_shipment in erp_shipments:
+            lines = [
+                {"line_id": line_for[item.product_key], "quantity": item.quantity}
+                for item in erp_shipment.lines
+                if item.product_key in line_for
+            ]
+            if not lines:
+                continue
+            shipments.record_once(
+                shipment_id=f"shp_{erp_shipment.erp_shipment_id}",
+                order_id=order_id,
+                lines=lines,
+                carrier=erp_shipment.carrier,
+                tracking_number=erp_shipment.tracking_number,
+                proof_of_delivery=erp_shipment.proof_of_delivery,
+                tenant_id=str(order.tenant_id),
+            )
+
+    return sync
 
 
 def build_container(settings: Settings | None = None) -> Container:
@@ -414,6 +448,7 @@ def _build_postgres_container(settings: Settings) -> Container:
         adapter_for=adapter_for,
         locator=locator,
         order_status=status_applier,
+        sync_shipments=_erp_shipment_sync(repo, shipment_service),
     )
 
     webhook_endpoints = PostgresWebhookEndpointRepository(session_factory)

@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from ..application.ports import ErpTarget, SubmissionResult
+from ..application.ports import ErpShipment, ErpShipmentLine, ErpTarget, SubmissionResult
 
 
 class _OdooError(Exception):
@@ -56,11 +56,11 @@ def build_sale_order_lines(order_payload: dict[str, Any]) -> list[dict[str, Any]
 
 
 class OdooAdapter:
-    # Declared per ADR-0015 — what this adapter actually uses from the canonical
-    # payload. `partial_fulfillment`/`multi_currency` are deliberately absent: nothing
-    # here reads per-line shipped/invoiced data from Odoo yet, and there's no
-    # multi-currency handling (one currency assumed throughout).
-    capabilities = frozenset({"tax", "uom", "idempotency", "fail_closed_product"})
+    # Declared per ADR-0015. `partial_fulfillment` is the done-picking read in
+    # `fetch_shipments`. `multi_currency` stays absent: one currency assumed throughout.
+    capabilities = frozenset(
+        {"tax", "uom", "idempotency", "fail_closed_product", "partial_fulfillment"}
+    )
 
     def __init__(self, timeout_seconds: float = 10.0) -> None:
         self._timeout = timeout_seconds
@@ -142,6 +142,78 @@ class OdooAdapter:
             }
         except _OdooError:
             return None
+
+    def fetch_shipments(self, target: ErpTarget, erp_order_id: str) -> list[ErpShipment]:
+        """Done `stock.picking`s on this sales order. The picking name is the proof of delivery."""
+        try:
+            uid = self._authenticate(target)
+            orders = self._execute(
+                target,
+                uid,
+                "sale.order",
+                "search_read",
+                [[["name", "=", erp_order_id]]],
+                {"fields": ["picking_ids"], "limit": 1},
+            )
+            if not orders or not orders[0].get("picking_ids"):
+                return []
+            pickings = self._execute(
+                target,
+                uid,
+                "stock.picking",
+                "read",
+                [orders[0]["picking_ids"]],
+                {"fields": ["name", "state", "move_ids"]},
+            )
+            shipments: list[ErpShipment] = []
+            for picking in pickings:
+                if picking.get("state") != "done" or not picking.get("move_ids"):
+                    continue
+                moves = self._execute(
+                    target,
+                    uid,
+                    "stock.move",
+                    "read",
+                    [picking["move_ids"]],
+                    {"fields": ["product_id", "quantity", "state"]},
+                )
+                product_ids = [
+                    move["product_id"][0]
+                    for move in moves
+                    if move.get("state") == "done" and move.get("product_id")
+                ]
+                codes: dict[int, str] = {}
+                if product_ids:
+                    products = self._execute(
+                        target,
+                        uid,
+                        "product.product",
+                        "read",
+                        [product_ids],
+                        {"fields": ["default_code"]},
+                    )
+                    codes = {int(row["id"]): str(row.get("default_code") or "") for row in products}
+                lines: list[ErpShipmentLine] = []
+                for move in moves:
+                    if move.get("state") != "done" or not move.get("product_id"):
+                        continue
+                    code = codes.get(int(move["product_id"][0]), "")
+                    quantity = move.get("quantity") or 0
+                    if not code or not quantity:
+                        continue
+                    lines.append(ErpShipmentLine(product_key=code, quantity=str(quantity)))
+                if not lines:
+                    continue
+                shipments.append(
+                    ErpShipment(
+                        erp_shipment_id=str(picking["id"]),
+                        lines=tuple(lines),
+                        proof_of_delivery=str(picking.get("name") or picking["id"]),
+                    )
+                )
+            return shipments
+        except _OdooError:
+            return []
 
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult:
         try:

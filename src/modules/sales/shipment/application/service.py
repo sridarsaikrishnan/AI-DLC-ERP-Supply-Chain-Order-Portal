@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from src.shared.eventsourcing.errors import AggregateNotFound
 from src.shared.types import generate_id
 
 from ..domain.aggregate import Shipment
@@ -34,6 +35,36 @@ class ShipmentService:
     ) -> Shipment:
         shipment = Shipment.record(
             shipment_id=generate_id("shp"),
+            order_id=order_id,
+            lines=lines,
+            carrier=carrier,
+            tracking_number=tracking_number,
+            proof_of_delivery=proof_of_delivery,
+            tenant_id=tenant_id,
+        )
+        self._shipments.save(shipment)
+        return shipment
+
+    def record_once(
+        self,
+        *,
+        shipment_id: str,
+        order_id: str,
+        lines: list[dict[str, Any]],
+        carrier: str | None = None,
+        tracking_number: str | None = None,
+        proof_of_delivery: str | None = None,
+        tenant_id: str = "",
+    ) -> Shipment | None:
+        """Record an ERP delivery the first time we see its id. A later poll is a no-op."""
+        try:
+            self._shipments.get(shipment_id)
+        except AggregateNotFound:
+            pass
+        else:
+            return None
+        shipment = Shipment.record(
+            shipment_id=shipment_id,
             order_id=order_id,
             lines=lines,
             carrier=carrier,

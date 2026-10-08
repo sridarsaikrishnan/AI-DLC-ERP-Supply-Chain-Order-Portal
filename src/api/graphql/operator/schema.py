@@ -35,7 +35,6 @@ from .types import (
     QuoteLineInput,
     QuoteLineType,
     QuoteType,
-    ShipmentType,
     SubsidiaryType,
 )
 
@@ -371,39 +370,6 @@ class Mutation:
             lines=quote_lines,
         )
         return _quote_to_gql(quote)
-
-    @strawberry.mutation
-    def record_shipment(
-        self,
-        info: Info[GraphQLContext, None],
-        order_id: str,
-        lines: list[LineQuantityInput],
-        carrier: str | None = None,
-        tracking_number: str | None = None,
-        proof_of_delivery: str | None = None,
-    ) -> ShipmentType:
-        """Updates the order's shipped/delivered facts (FR-D2/ADR-0014) — not its `state`.
-        A physical line is delivered only with a carrier or proof-of-delivery; a license is
-        delivered on ship."""
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        tenant_id = str(ctx.container.orders.get(order_id).tenant_id)
-        shipment = ctx.container.shipment_service.record(
-            order_id=order_id,
-            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
-            carrier=carrier,
-            tracking_number=tracking_number,
-            proof_of_delivery=proof_of_delivery,
-            tenant_id=tenant_id,
-        )
-        ctx.container.drain()
-        return ShipmentType(
-            shipment_id=shipment.id,
-            order_id=shipment.order_id,
-            carrier=shipment.carrier,
-            tracking_number=shipment.tracking_number,
-            proof_of_delivery=shipment.proof_of_delivery,
-        )
 
     @strawberry.mutation
     def record_invoice(

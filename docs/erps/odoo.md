@@ -113,6 +113,6 @@ Real limitations discovered while building/running this, not hidden:
   order — a missing tax config is visible in Odoo itself.
 - **`res.partner` is never auto-created.** The order is placed as the binding's
   `erp_customer_id` directly; an unlinked reseller is a terminal error, by design (FR-A1).
-- **No automatic shipment/invoice capture.** `fetch_status` reads only `sale.order.state`
-  and `invoice_status` — nothing reads Odoo's `stock.picking`/`account.move`, so shipments
-  and invoices are operator-recorded, not pulled from Odoo. (See the HLD's "known gaps" card.)
+- **Shipments come from done `stock.picking`s** on the sales order (`fetch_shipments`).
+  The picking name is the proof of delivery. Invoices are still operator-recorded —
+  nothing reads `account.move`.

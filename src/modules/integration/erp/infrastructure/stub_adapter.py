@@ -6,7 +6,7 @@ from typing import Any
 
 from src.shared.types import generate_id
 
-from ..application.ports import ErpTarget, SubmissionResult
+from ..application.ports import ErpShipment, ErpTarget, SubmissionResult
 
 
 class StubErpAdapter:
@@ -27,6 +27,9 @@ class StubErpAdapter:
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None:
         status = self._status.get(erp_order_id)
         return {"state": status} if status is not None else None
+
+    def fetch_shipments(self, target: ErpTarget, erp_order_id: str) -> list[ErpShipment]:
+        return []
 
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult:
         self._status[erp_order_id] = "cancel"

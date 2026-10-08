@@ -7,7 +7,7 @@ are the fast path; this guarantees eventual correctness.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 # reuse the inbound status port shape (order_id, CanonicalStatus)
 from ..domain.status_mapping import map_native_status
@@ -32,11 +32,13 @@ class ReconcileSweeper:
         adapter_for: Callable[[str], ErpAdapter],
         locator: OrderLocator,
         order_status: OrderStatusPort,
+        sync_shipments: Callable[[str, list[Any]], None] | None = None,
     ) -> None:
         self._connections = connections
         self._adapter_for = adapter_for
         self._locator = locator
         self._order_status = order_status
+        self._sync_shipments = sync_shipments
 
     def run(self, connection_id: ConnectionId, erp_order_ids: list[str]) -> int:
         """Poll each ERP order; apply any canonical transition. Returns #transitions applied."""
@@ -49,12 +51,13 @@ class ReconcileSweeper:
             native_fields = adapter.fetch_status(target, erp_order_id)
             if native_fields is None:
                 continue
-            status = map_native_status(target.erp_type, native_fields)
-            if status is None:
-                continue
             order_id = self._locator.find_order(connection_id, erp_order_id)
             if order_id is None:
                 continue
-            self._order_status.apply_status(order_id, status)
-            applied += 1
+            status = map_native_status(target.erp_type, native_fields)
+            if status is not None:
+                self._order_status.apply_status(order_id, status)
+                applied += 1
+            if self._sync_shipments is not None:
+                self._sync_shipments(str(order_id), adapter.fetch_shipments(target, erp_order_id))
         return applied

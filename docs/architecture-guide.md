@@ -142,8 +142,8 @@ Scoped future work, each additive rather than a rewrite — recorded so they're 
 surprises:
 
 - **A second ERP adapter** — the design's main proof point; nothing is written yet.
-- **Automatic shipment/invoice capture from the ERP** — today these are operator-recorded;
-  no adapter reads Odoo's `stock.picking`/`account.move`.
+- **Automatic invoice capture from the ERP** — invoices are still operator-recorded;
+  nothing reads Odoo's `account.move`. Shipments already come from done `stock.picking`s.
 - **Activating row-level security** with a dedicated app DB role (policies exist; the app
   currently connects as the table owner, which is RLS-exempt).
 - **`app`/`worker` as docker-compose services** — today they run from the venv alongside the

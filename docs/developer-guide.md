@@ -177,23 +177,16 @@ so at-least-once redelivery is safe.
 This is the newest piece and the one most worth understanding. Recording a shipment does
 **not** touch the order in the same call — it's an event-driven saga across two aggregates.
 
-### 3.1 The request (GraphQL, operator schema)
+### 3.1 Where a shipment comes from
 
-```graphql
-mutation {
-  recordShipment(
-    orderId: "ord_8f3c1a90",
-    lines: [{ lineId: "ol_3f2a", quantity: 2 }],
-    carrier: "UPS",
-    proofOfDelivery: null
-  ) { shipmentId }
-}
-```
+The reconciliation sweeper asks the ERP for done deliveries (`stock.picking` on Odoo) and
+records each one once, keyed by the ERP picking id. The portal has no "record a shipment"
+action. An invoice is still recorded by an operator (`recordInvoice`).
 
-### 3.2 What the mutation does — and does *not* do
+### 3.2 What recording a shipment does — and does *not* do
 
-`ShipmentService.record` saves a **`Shipment`** aggregate (its own event stream) and nothing
-else. It emits:
+`ShipmentService.record_once` saves a **`Shipment`** aggregate (its own event stream) and
+nothing else. A later poll of the same picking does not append another event. It emits:
 
 ```json
 // ShipmentRecorded (stream = shipment id "shp_7"), payload:
@@ -202,8 +195,8 @@ else. It emits:
   "carrier": "UPS", "tracking_number": null, "proof_of_delivery": null }
 ```
 
-The order is **not** loaded or modified here. The mutation returns immediately. (The same is
-true of `recordInvoice` → `InvoiceRecorded`.)
+The order is **not** loaded or modified here. (The same is true of `recordInvoice` →
+`InvoiceRecorded`.)
 
 ### 3.3 The ordering side reacts (the saga consumer)
 
@@ -231,7 +224,7 @@ event, so the reseller's `fulfillmentStatus` / `deliveryStatus` / `invoiceStatus
 
 ### 3.4 Why it's a hop, not an instant
 
-Between `recordShipment` returning and the order's score updating there is one bus/queue
+Between the shipment being saved and the order's score updating there is one bus/queue
 hop. Locally (`APP_PROFILE=memory`) the API drains the in-memory bus inline so it looks
 synchronous in tests; on Postgres/AWS the worker consumes it (sub-second to queue-speed).
 A failure after the shipment is saved but before the order consumer succeeds is self-healed
@@ -350,7 +343,7 @@ Content-Type: application/json
 | `OrderRejected` | routing failed at submission, **or** the ERP adapter failed terminally | `REJECTED` |
 | `OrderRetrying` | the ERP adapter failed transiently; will be retried automatically | `RETRYING` |
 | `OrderCancelled` | the reseller's `cancelOrder` mutation, or the ERP reported `CanonicalStatus.CANCELLED` | `CANCELLED` |
-| `ShipmentRecorded` | an operator recorded a shipment (`recordShipment` mutation) | whatever the order's lifecycle status already was — this event never changes it |
+| `ShipmentRecorded` | the sweeper recorded a done ERP delivery | whatever the order's lifecycle status already was — this event never changes it |
 | `InvoiceRecorded` | an operator recorded an invoice (`recordInvoice` mutation) | same — lifecycle status unaffected |
 
 Each delivery attempt is tracked in `webhook_deliveries` (`DELIVERED` / `RETRYING` /
@@ -381,7 +374,7 @@ order back over GraphQL.
 | `OrderLineInvoiced` | fulfillment saga | `line_id`, `quantity` | adds invoiced qty | No (the sibling `InvoiceRecorded` is) |
 | `OrderLineVendorDateSet` | `setVendorDate` | `line_id`, `vendor_date` | sets the line's "scheduled" date | No |
 | `OrderFulfilled` | — (legacy) | — | **no-op**; retained only so pre-Increment-5 streams still replay | No |
-| `ShipmentRecorded` *(Shipment aggregate, not Order)* | `recordShipment` | `order_id`, lines, `carrier?`, `tracking_number?`, `proof_of_delivery?`, `tenant_id` | triggers the saga that applies `OrderLineFulfilled` to the order | **Yes** |
+| `ShipmentRecorded` *(Shipment aggregate, not Order)* | ERP delivery poll | `order_id`, lines, `carrier?`, `tracking_number?`, `proof_of_delivery?`, `tenant_id` | triggers the saga that applies `OrderLineFulfilled` to the order | **Yes** |
 | `InvoiceRecorded` *(Invoice aggregate, not Order)* | `recordInvoice` | `order_id`, lines, `erp_invoice_id?`, `tenant_id` | triggers the saga that applies `OrderLineInvoiced` to the order | **Yes** |
 
 ---

@@ -74,6 +74,22 @@ def test_shipment_service_records_without_touching_an_order() -> None:
     assert shipment_repo.get(shipment.id).carrier == "UPS"
 
 
+def test_record_once_ignores_a_repeat_of_the_same_erp_shipment() -> None:
+    shipment_repo: EventSourcedRepository[Shipment] = EventSourcedRepository(
+        InMemoryEventStore(), Shipment
+    )
+    service = ShipmentService(shipment_repo)
+    first = service.record_once(
+        shipment_id="shp_9", order_id="ord_1", lines=[{"line_id": "l_a", "quantity": "2"}]
+    )
+    second = service.record_once(
+        shipment_id="shp_9", order_id="ord_1", lines=[{"line_id": "l_a", "quantity": "2"}]
+    )
+    assert first is not None
+    assert second is None
+    assert shipment_repo.get("shp_9").version == 1
+
+
 # --- saga: recording a shipment eventually bumps the order's score via events --------
 
 

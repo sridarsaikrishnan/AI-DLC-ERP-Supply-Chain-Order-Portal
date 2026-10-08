@@ -62,15 +62,6 @@ class OperatorOrder:
 
 
 @strawberry.type
-class ShipmentType:
-    shipment_id: str
-    order_id: str
-    carrier: str | None
-    tracking_number: str | None
-    proof_of_delivery: str | None
-
-
-@strawberry.type
 class InvoiceType:
     invoice_id: str
     order_id: str
@@ -79,7 +70,7 @@ class InvoiceType:
 
 @strawberry.input
 class LineQuantityInput:
-    """A line reference plus a quantity — shared by record_shipment / record_invoice."""
+    """A line reference plus a quantity — used by record_invoice."""
 
     line_id: str
     quantity: float
