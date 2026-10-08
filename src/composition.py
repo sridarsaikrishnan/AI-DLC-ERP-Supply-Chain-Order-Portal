@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from src.modules.integration.erp.application.delivery import DeliveryHandler
 from src.modules.integration.erp.application.ports import (
     ErpAdapter,
+    ErpInvoice,
     ErpShipment,
     ErpTarget,
     UnknownErpType,
@@ -215,20 +216,25 @@ class Container:
     subsidiary_routes: SubsidiaryRouteRepository
 
 
+def _matched_lines(order: Order, items: list) -> list[dict[str, str]]:
+    """Map an ERP document's SKUs onto this order's line ids. An unknown SKU is skipped."""
+    line_for: dict[str, str] = {}
+    for line in order.lines:
+        line_for.setdefault(line.product_key, line.line_id)
+    return [
+        {"line_id": line_for[item.product_key], "quantity": item.quantity}
+        for item in items
+        if item.product_key in line_for
+    ]
+
+
 def _erp_shipment_sync(orders: EventSourcedRepository[Order], shipments: ShipmentService):
     """Turn ERP deliveries into shipment records. A repeat poll of the same picking is a no-op."""
 
     def sync(order_id: str, erp_shipments: list[ErpShipment]) -> None:
         order = orders.get(order_id)
-        line_for: dict[str, str] = {}
-        for line in order.lines:
-            line_for.setdefault(line.product_key, line.line_id)
         for erp_shipment in erp_shipments:
-            lines = [
-                {"line_id": line_for[item.product_key], "quantity": item.quantity}
-                for item in erp_shipment.lines
-                if item.product_key in line_for
-            ]
+            lines = _matched_lines(order, list(erp_shipment.lines))
             if not lines:
                 continue
             shipments.record_once(
@@ -238,6 +244,26 @@ def _erp_shipment_sync(orders: EventSourcedRepository[Order], shipments: Shipmen
                 carrier=erp_shipment.carrier,
                 tracking_number=erp_shipment.tracking_number,
                 proof_of_delivery=erp_shipment.proof_of_delivery,
+                tenant_id=str(order.tenant_id),
+            )
+
+    return sync
+
+
+def _erp_invoice_sync(orders: EventSourcedRepository[Order], invoices: InvoiceService):
+    """Turn ERP invoices into invoice records. A repeat poll of the same invoice is a no-op."""
+
+    def sync(order_id: str, erp_invoices: list[ErpInvoice]) -> None:
+        order = orders.get(order_id)
+        for erp_invoice in erp_invoices:
+            lines = _matched_lines(order, list(erp_invoice.lines))
+            if not lines:
+                continue
+            invoices.record_once(
+                invoice_id=f"inv_{erp_invoice.erp_invoice_id}",
+                order_id=order_id,
+                lines=lines,
+                erp_invoice_id=erp_invoice.number or erp_invoice.erp_invoice_id,
                 tenant_id=str(order.tenant_id),
             )
 
@@ -449,6 +475,7 @@ def _build_postgres_container(settings: Settings) -> Container:
         locator=locator,
         order_status=status_applier,
         sync_shipments=_erp_shipment_sync(repo, shipment_service),
+        sync_invoices=_erp_invoice_sync(repo, invoice_service),
     )
 
     webhook_endpoints = PostgresWebhookEndpointRepository(session_factory)

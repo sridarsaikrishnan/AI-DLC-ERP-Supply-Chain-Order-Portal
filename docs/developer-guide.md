@@ -179,14 +179,16 @@ This is the newest piece and the one most worth understanding. Recording a shipm
 
 ### 3.1 Where a shipment comes from
 
-The reconciliation sweeper asks the ERP for done deliveries (`stock.picking` on Odoo) and
-records each one once, keyed by the ERP picking id. The portal has no "record a shipment"
-action. An invoice is still recorded by an operator (`recordInvoice`).
+The reconciliation sweeper asks the ERP adapter for done deliveries and posted customer
+invoices, and records each one once, keyed by the ERP's own id. Odoo reads `stock.picking`
+and `account.move`. An adapter for an ERP that has neither returns an empty list. The
+portal does not record shipments or invoices.
 
 ### 3.2 What recording a shipment does — and does *not* do
 
 `ShipmentService.record_once` saves a **`Shipment`** aggregate (its own event stream) and
-nothing else. A later poll of the same picking does not append another event. It emits:
+nothing else. A later poll of the same picking or invoice does not append another event.
+A shipment emits:
 
 ```json
 // ShipmentRecorded (stream = shipment id "shp_7"), payload:
@@ -195,8 +197,8 @@ nothing else. A later poll of the same picking does not append another event. It
   "carrier": "UPS", "tracking_number": null, "proof_of_delivery": null }
 ```
 
-The order is **not** loaded or modified here. (The same is true of `recordInvoice` →
-`InvoiceRecorded`.)
+The order is **not** loaded or modified here. `InvoiceService.record_once` does the same
+for `InvoiceRecorded`.
 
 ### 3.3 The ordering side reacts (the saga consumer)
 
@@ -344,7 +346,7 @@ Content-Type: application/json
 | `OrderRetrying` | the ERP adapter failed transiently; will be retried automatically | `RETRYING` |
 | `OrderCancelled` | the reseller's `cancelOrder` mutation, or the ERP reported `CanonicalStatus.CANCELLED` | `CANCELLED` |
 | `ShipmentRecorded` | the sweeper recorded a done ERP delivery | whatever the order's lifecycle status already was — this event never changes it |
-| `InvoiceRecorded` | an operator recorded an invoice (`recordInvoice` mutation) | same — lifecycle status unaffected |
+| `InvoiceRecorded` | the sweeper recorded a posted ERP customer invoice | same — lifecycle status unaffected |
 
 Each delivery attempt is tracked in `webhook_deliveries` (`DELIVERED` / `RETRYING` /
 `FAILED`, with an attempt count); transient failures raise for SQS redrive, and the
@@ -375,7 +377,7 @@ order back over GraphQL.
 | `OrderLineVendorDateSet` | `setVendorDate` | `line_id`, `vendor_date` | sets the line's "scheduled" date | No |
 | `OrderFulfilled` | — (legacy) | — | **no-op**; retained only so pre-Increment-5 streams still replay | No |
 | `ShipmentRecorded` *(Shipment aggregate, not Order)* | ERP delivery poll | `order_id`, lines, `carrier?`, `tracking_number?`, `proof_of_delivery?`, `tenant_id` | triggers the saga that applies `OrderLineFulfilled` to the order | **Yes** |
-| `InvoiceRecorded` *(Invoice aggregate, not Order)* | `recordInvoice` | `order_id`, lines, `erp_invoice_id?`, `tenant_id` | triggers the saga that applies `OrderLineInvoiced` to the order | **Yes** |
+| `InvoiceRecorded` *(Invoice aggregate, not Order)* | ERP invoice poll | `order_id`, lines, `erp_invoice_id?`, `tenant_id` | triggers the saga that applies `OrderLineInvoiced` to the order | **Yes** |
 
 ---
 

@@ -48,6 +48,15 @@ class ErpShipment:
 
 
 @dataclass(frozen=True)
+class ErpInvoice:
+    """One posted customer invoice in the ERP. `erp_invoice_id` is stable across polls."""
+
+    erp_invoice_id: str
+    lines: tuple[ErpShipmentLine, ...]
+    number: str | None = None
+
+
+@dataclass(frozen=True)
 class SubmissionResult:
     success: bool
     erp_order_id: str | None = None
@@ -72,6 +81,7 @@ class ErpAdapter(Protocol):
     def submit(self, target: ErpTarget, order_payload: dict[str, Any]) -> SubmissionResult: ...
     def fetch_status(self, target: ErpTarget, erp_order_id: str) -> dict[str, str] | None: ...
     def fetch_shipments(self, target: ErpTarget, erp_order_id: str) -> list[ErpShipment]: ...
+    def fetch_invoices(self, target: ErpTarget, erp_order_id: str) -> list[ErpInvoice]: ...
     def cancel(self, target: ErpTarget, erp_order_id: str) -> SubmissionResult: ...
 
 

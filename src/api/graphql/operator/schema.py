@@ -24,8 +24,6 @@ from src.shared.types import BindingId, ConnectionId, TenantId
 from .types import (
     BindingType,
     ConnectionType,
-    InvoiceType,
-    LineQuantityInput,
     MoneyType,
     OperatorOrder,
     OperatorOrderLineType,
@@ -370,28 +368,6 @@ class Mutation:
             lines=quote_lines,
         )
         return _quote_to_gql(quote)
-
-    @strawberry.mutation
-    def record_invoice(
-        self,
-        info: Info[GraphQLContext, None],
-        order_id: str,
-        lines: list[LineQuantityInput],
-        erp_invoice_id: str | None = None,
-    ) -> InvoiceType:
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        tenant_id = str(ctx.container.orders.get(order_id).tenant_id)
-        invoice = ctx.container.invoice_service.record(
-            order_id=order_id,
-            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
-            erp_invoice_id=erp_invoice_id,
-            tenant_id=tenant_id,
-        )
-        ctx.container.drain()
-        return InvoiceType(
-            invoice_id=invoice.id, order_id=invoice.order_id, erp_invoice_id=invoice.erp_invoice_id
-        )
 
     @strawberry.mutation
     def set_vendor_date(

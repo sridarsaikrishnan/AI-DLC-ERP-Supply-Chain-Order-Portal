@@ -27,8 +27,9 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
    ```
 
 2. **Adapter** — new `src/modules/integration/erp/infrastructure/<erp>_adapter.py`
-   implementing the `ErpAdapter` protocol (`submit` / `fetch_status` / `cancel`) from
-   `integration/application/ports.py`. `fetch_status` returns `dict[str, str] | None` —
+   implementing the `ErpAdapter` protocol (`submit` / `fetch_status` / `fetch_shipments` /
+   `fetch_invoices` / `cancel`) from `integration/application/ports.py`. `fetch_status`
+   returns `dict[str, str] | None` —
    the same field bag the status mapper reads, so return whatever fields your status
    mapper needs (Odoo's returns `{"state": ..., "invoice_status": ...}`). Follow
    `odoo_adapter.py`'s shape: stdlib-only HTTP (no new dependency for a simple REST/RPC
@@ -41,6 +42,10 @@ adding another one (ERPNext, SAP, NetSuite, …) — four files, no scattered ed
    ERP: an idempotency check before creating anything (search for an existing record by
    your own reference first), and failing closed on an unresolvable reference (don't
    silently auto-create a phantom record in the ERP for a typo'd SKU/ID).
+   `fetch_shipments` and `fetch_invoices` return the ERP's own done deliveries and posted
+   customer invoices for one order. Return `[]` when that ERP has no such documents — the
+   sweeper records whatever comes back, once per ERP id, and skips a SKU that is not on
+   the order.
 
 3. **Registration** — one line in `src/modules/integration/erp/infrastructure/registry.py`'s
    `build_adapter_registry`:

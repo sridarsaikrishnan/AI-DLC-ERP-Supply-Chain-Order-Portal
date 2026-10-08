@@ -136,7 +136,7 @@ Full detail (file/line, failure scenario, fix trigger) is on diagram **page 3**.
 
 | # | Gap | Status |
 |---|---|---|
-| 1 | Reconciliation reads done `stock.picking`s for shipments. It still does not read `account.move`, so an invoice raised in Odoo stays invisible until an operator records it. | Open (invoices only) |
+| 1 | Reconciliation reads done `stock.picking`s and posted customer `account.move`s. A credit note (`out_refund`) is not applied back onto the invoiced quantity. | Open (credit notes) |
 | 2 | `ShipmentRecorded`/`InvoiceRecorded` were excluded from the reseller webhook's dispatchable set, and `OrderFulfilled` (dead since Increment 5) was still on it. | **Fixed** — both added (with `tenant_id` now stamped on `Shipment`/`Invoice`), dead entry removed. |
 | 3 | `orders.client_reference` (the reseller's own PO number) had no `UNIQUE` constraint, per-tenant or otherwise. | **Fixed** — app-level check in `OrderService.place_order` (`DuplicateOrderReference`) plus a DB-level `UNIQUE(tenant_id, client_reference)` backstop (migration 0009) for the race window; verified against live Postgres. |
 | 4 | `MoneyType.amount` is `float` on both GraphQL schemas, even though the internal `Money`/`TaxRate` value objects are Decimal-exact. | **Fixed** — `amount` is now `String!` on both schemas (verified via printed SDL); UI `Money` type + `formatMoney` updated to parse it for display only, never arithmetic. |

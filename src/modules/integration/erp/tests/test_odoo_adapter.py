@@ -346,6 +346,52 @@ def test_fetch_shipments_reads_done_pickings() -> None:
     assert shipments[0].lines[0].quantity == "2"
 
 
+def test_fetch_invoices_reads_posted_customer_invoices() -> None:
+    def fake_execute(
+        target: Any, uid: int, model: str, method: str, args: list, kwargs: dict | None = None
+    ) -> Any:
+        if model == "sale.order":
+            return [{"invoice_ids": [12]}]
+        if model == "account.move":
+            return [
+                {
+                    "id": 12,
+                    "name": "INV/2024/00012",
+                    "state": "posted",
+                    "move_type": "out_invoice",
+                    "invoice_line_ids": [7],
+                },
+                {
+                    "id": 13,
+                    "name": "RINV/2024/00013",
+                    "state": "posted",
+                    "move_type": "out_refund",
+                    "invoice_line_ids": [8],
+                },
+            ]
+        if model == "account.move.line":
+            return [
+                {"product_id": [4, "Anvil"], "quantity": 3, "display_type": "product"},
+                {"product_id": False, "quantity": 0, "display_type": "line_section"},
+            ]
+        if model == "product.product":
+            return [{"id": 4, "default_code": "ANVIL"}]
+        raise AssertionError(model)
+
+    adapter = OdooAdapter()
+    with (
+        patch.object(OdooAdapter, "_authenticate", return_value=1),
+        patch.object(OdooAdapter, "_execute", side_effect=fake_execute),
+    ):
+        invoices = adapter.fetch_invoices(_TARGET, "S00001")
+
+    assert len(invoices) == 1
+    assert invoices[0].erp_invoice_id == "12"
+    assert invoices[0].number == "INV/2024/00012"
+    assert invoices[0].lines[0].product_key == "ANVIL"
+    assert invoices[0].lines[0].quantity == "3"
+
+
 def test_fetch_status_returns_none_when_order_not_found() -> None:
     adapter = OdooAdapter()
     with (

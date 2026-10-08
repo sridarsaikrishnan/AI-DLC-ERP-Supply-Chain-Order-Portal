@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from src.modules.integration.erp.application.ports import ErpShipment, ErpShipmentLine, ErpTarget
+from src.modules.integration.erp.application.ports import (
+    ErpInvoice,
+    ErpShipment,
+    ErpShipmentLine,
+    ErpTarget,
+)
 from src.modules.integration.erp.application.reconcile import ReconcileSweeper
 from src.modules.integration.erp.domain.status_mapping import CanonicalStatus
 from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapter
@@ -78,3 +83,32 @@ def test_reconcile_passes_erp_shipments_to_the_sync() -> None:
     sweeper.run(_CONN, [erp_order_id])
 
     assert seen == [("ord_1", [shipment])]
+
+
+def test_reconcile_passes_erp_invoices_to_the_sync() -> None:
+    adapter = StubErpAdapter()
+    target = FakeConnections().resolve(_CONN)
+    assert target is not None
+    erp_order_id = adapter.submit(target, {}).erp_order_id
+    assert erp_order_id is not None
+    invoice = ErpInvoice(
+        erp_invoice_id="12",
+        lines=(ErpShipmentLine(product_key="ANVIL", quantity="3"),),
+        number="INV/2024/00012",
+    )
+    adapter.fetch_invoices = lambda _target, _erp_order_id: [invoice]  # type: ignore[method-assign]
+
+    locator = InMemoryOrderLocator()
+    locator.record(_CONN, erp_order_id, OrderId("ord_1"))
+    seen: list[tuple[str, list[ErpInvoice]]] = []
+
+    sweeper = ReconcileSweeper(
+        connections=FakeConnections(),
+        adapter_for=lambda _t: adapter,
+        locator=locator,
+        order_status=RecordingStatus(),
+        sync_invoices=lambda order_id, invoices: seen.append((order_id, invoices)),
+    )
+    sweeper.run(_CONN, [erp_order_id])
+
+    assert seen == [("ord_1", [invoice])]

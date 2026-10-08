@@ -57,6 +57,28 @@ def test_invoice_service_records_without_touching_an_order() -> None:
     assert invoice_repo.get(invoice.id).erp_invoice_id == "INV-042"
 
 
+def test_record_once_ignores_a_repeat_of_the_same_erp_invoice() -> None:
+    invoice_repo: EventSourcedRepository[Invoice] = EventSourcedRepository(
+        InMemoryEventStore(), Invoice
+    )
+    service = InvoiceService(invoice_repo)
+    first = service.record_once(
+        invoice_id="inv_9",
+        order_id="ord_1",
+        lines=[{"line_id": "l_a", "quantity": "4"}],
+        erp_invoice_id="INV/2024/00009",
+    )
+    second = service.record_once(
+        invoice_id="inv_9",
+        order_id="ord_1",
+        lines=[{"line_id": "l_a", "quantity": "4"}],
+        erp_invoice_id="INV/2024/00009",
+    )
+    assert first is not None
+    assert second is None
+    assert invoice_repo.get("inv_9").version == 1
+
+
 def test_recording_an_invoice_updates_the_order_via_the_saga() -> None:
     store = InMemoryEventStore()
     order_repo, order_id = _confirmed_order(store)

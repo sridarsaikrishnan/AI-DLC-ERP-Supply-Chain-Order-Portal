@@ -113,6 +113,7 @@ Real limitations discovered while building/running this, not hidden:
   order — a missing tax config is visible in Odoo itself.
 - **`res.partner` is never auto-created.** The order is placed as the binding's
   `erp_customer_id` directly; an unlinked reseller is a terminal error, by design (FR-A1).
-- **Shipments come from done `stock.picking`s** on the sales order (`fetch_shipments`).
-  The picking name is the proof of delivery. Invoices are still operator-recorded —
-  nothing reads `account.move`.
+- **Shipments come from done `stock.picking`s** (`fetch_shipments`). The picking name is
+  the proof of delivery. **Invoices come from posted customer `account.move`s**
+  (`fetch_invoices`, `move_type = out_invoice`). Credit notes are left out. Both methods
+  are on `ErpAdapter`, so another ERP implements the same two calls against its own documents.

@@ -33,12 +33,14 @@ class ReconcileSweeper:
         locator: OrderLocator,
         order_status: OrderStatusPort,
         sync_shipments: Callable[[str, list[Any]], None] | None = None,
+        sync_invoices: Callable[[str, list[Any]], None] | None = None,
     ) -> None:
         self._connections = connections
         self._adapter_for = adapter_for
         self._locator = locator
         self._order_status = order_status
         self._sync_shipments = sync_shipments
+        self._sync_invoices = sync_invoices
 
     def run(self, connection_id: ConnectionId, erp_order_ids: list[str]) -> int:
         """Poll each ERP order; apply any canonical transition. Returns #transitions applied."""
@@ -60,4 +62,6 @@ class ReconcileSweeper:
                 applied += 1
             if self._sync_shipments is not None:
                 self._sync_shipments(str(order_id), adapter.fetch_shipments(target, erp_order_id))
+            if self._sync_invoices is not None:
+                self._sync_invoices(str(order_id), adapter.fetch_invoices(target, erp_order_id))
         return applied

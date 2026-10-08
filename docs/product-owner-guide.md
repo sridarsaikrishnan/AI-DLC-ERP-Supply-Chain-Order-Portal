@@ -28,7 +28,7 @@ actually lives in.
 operator issues a QUOTE  ──▶  reseller places an ORDER against it  ──▶  routed to the owning ERP
                                                                               │
 reseller sees status + scores  ◀──  ERP status flows back (webhook / polling) ◀┘
-ERP deliveries and operator invoices  ──▶  reseller sees shipped / delivered / invoiced
+ERP deliveries and invoices  ──▶  reseller sees shipped / delivered / invoiced
 ```
 
 An order is always a reply to a quote. The quote carries the prices, how long they hold,
@@ -74,9 +74,9 @@ what's been recorded against its lines:
   **license** counts as delivered the moment it ships.
 - **Invoicing**: `Not invoiced → Partially invoiced → Invoiced`.
 
-A done delivery in the ERP becomes a shipment (partial deliveries included). An operator
-records an invoice against specific lines and quantities. The scores move accordingly and
-are additive.
+A done delivery in the ERP becomes a shipment, and a posted customer invoice becomes an
+invoice (partial quantities included). The scores move accordingly and are additive. A
+repeat poll of the same ERP document does not add the quantity again.
 
 ### Vendor date ("scheduled")
 When purchasing actually buys a line from the maker, an operator records a vendor date on
@@ -108,8 +108,8 @@ that line. That date is what "scheduled" means to the reseller.
 - **No price without a quote.** This is the rule that makes the product a distributor tool.
 - **Resellers never see ERP identity** (which ERP/instance, ERP order/customer IDs). This is
   a hard boundary, not a display preference.
-- **Status is eventually consistent.** After the ERP changes, or after an operator records a
-  shipment, the reseller's view updates within the time it takes a background worker to
+- **Status is eventually consistent.** After the ERP changes a delivery or an invoice, the
+  reseller's view updates within the time it takes a background worker to
   process the event (sub-second locally; as fast as the queue in production) — not in the
   same instant. This is a deliberate design trade for reliability and scale.
 - **Money is exact** (no floating-point drift) and single-currency per order/quote.
@@ -123,9 +123,8 @@ surprise:
 
 - **A second ERP** (SAP, ERPNext, NetSuite, …). The design supports it; no second adapter
   is written yet.
-- **Automatic invoice capture from the ERP.** Invoices are recorded by an operator today;
-  nothing yet reads Odoo's own invoice records. Shipments already come from done ERP
-  deliveries.
+- **Credit notes.** A posted customer invoice is pulled from the ERP. A refund is not
+  applied back onto the invoiced quantity.
 - **A standalone Vendor Order document.** The vendor date exists; a separate purchase-order
   document with its own number does not.
 - **Richer tax/pricing**: multi-jurisdiction tax, promotional/volume discount codes.

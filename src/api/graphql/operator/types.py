@@ -62,21 +62,6 @@ class OperatorOrder:
 
 
 @strawberry.type
-class InvoiceType:
-    invoice_id: str
-    order_id: str
-    erp_invoice_id: str | None
-
-
-@strawberry.input
-class LineQuantityInput:
-    """A line reference plus a quantity — used by record_invoice."""
-
-    line_id: str
-    quantity: float
-
-
-@strawberry.type
 class ConnectionType:
     connection_id: str
     erp_type: str

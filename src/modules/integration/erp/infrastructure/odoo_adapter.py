@@ -13,7 +13,13 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from ..application.ports import ErpShipment, ErpShipmentLine, ErpTarget, SubmissionResult
+from ..application.ports import (
+    ErpInvoice,
+    ErpShipment,
+    ErpShipmentLine,
+    ErpTarget,
+    SubmissionResult,
+)
 
 
 class _OdooError(Exception):
@@ -212,6 +218,85 @@ class OdooAdapter:
                     )
                 )
             return shipments
+        except _OdooError:
+            return []
+
+    def fetch_invoices(self, target: ErpTarget, erp_order_id: str) -> list[ErpInvoice]:
+        """Posted customer invoices on this sales order. Credit notes are skipped."""
+        try:
+            uid = self._authenticate(target)
+            orders = self._execute(
+                target,
+                uid,
+                "sale.order",
+                "search_read",
+                [[["name", "=", erp_order_id]]],
+                {"fields": ["invoice_ids"], "limit": 1},
+            )
+            if not orders or not orders[0].get("invoice_ids"):
+                return []
+            moves = self._execute(
+                target,
+                uid,
+                "account.move",
+                "read",
+                [orders[0]["invoice_ids"]],
+                {"fields": ["name", "state", "move_type", "invoice_line_ids"]},
+            )
+            invoices: list[ErpInvoice] = []
+            for move in moves:
+                if move.get("state") != "posted" or move.get("move_type") != "out_invoice":
+                    continue
+                if not move.get("invoice_line_ids"):
+                    continue
+                raw_lines = self._execute(
+                    target,
+                    uid,
+                    "account.move.line",
+                    "read",
+                    [move["invoice_line_ids"]],
+                    {"fields": ["product_id", "quantity", "display_type"]},
+                )
+                product_ids = [
+                    line["product_id"][0]
+                    for line in raw_lines
+                    if line.get("product_id")
+                    and line.get("display_type") in (False, None, "product")
+                ]
+                codes: dict[int, str] = {}
+                if product_ids:
+                    products = self._execute(
+                        target,
+                        uid,
+                        "product.product",
+                        "read",
+                        [product_ids],
+                        {"fields": ["default_code"]},
+                    )
+                    codes = {int(row["id"]): str(row.get("default_code") or "") for row in products}
+                lines: list[ErpShipmentLine] = []
+                for line in raw_lines:
+                    if not line.get("product_id") or line.get("display_type") not in (
+                        False,
+                        None,
+                        "product",
+                    ):
+                        continue
+                    code = codes.get(int(line["product_id"][0]), "")
+                    quantity = line.get("quantity") or 0
+                    if not code or not quantity:
+                        continue
+                    lines.append(ErpShipmentLine(product_key=code, quantity=str(quantity)))
+                if not lines:
+                    continue
+                invoices.append(
+                    ErpInvoice(
+                        erp_invoice_id=str(move["id"]),
+                        lines=tuple(lines),
+                        number=str(move.get("name") or move["id"]),
+                    )
+                )
+            return invoices
         except _OdooError:
             return []
 
