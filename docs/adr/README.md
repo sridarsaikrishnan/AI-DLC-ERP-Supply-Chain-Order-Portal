@@ -8,7 +8,7 @@ under a minute.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-modular-monolith.md) | Modular monolith (`api` + `worker`), not microservices | Accepted |
-| [0002](0002-event-source-order-only.md) | Event-source transactional aggregates (`Order`; later the fulfillment family via 0014); reference/config stays CRUD | Accepted (amended by 0014) |
+| [0002](0002-event-source-order-only.md) | Event-source transactional aggregates (`Order`, `Shipment`, `Invoice`); reference/config stays CRUD | Accepted (amended by 0014) |
 | [0003](0003-erp-adapter-registry.md) | ERPs plug in via an adapter + registry pattern, not per-ERP conditionals | Accepted |
 | [0004](0004-single-shared-postgres.md) | One shared Postgres for event store + outbox + projections + CRUD | Accepted |
 | [0005](0005-tenant-erp-identity-binding.md) | Tenant↔ERP identity resolved by a binding table, not an identity-resolution service | Accepted |
@@ -20,10 +20,10 @@ under a minute.
 | [0011](0011-catalog-price-source.md) | Order line price is resolved from the catalog, never trusted from the client | Superseded by 0016 |
 | [0012](0012-generic-connection-credentials.md) | ERP connection credentials are a generic bag, not fixed `database`/`username` fields | Accepted |
 | [0013](0013-flat-item-tax-and-discount.md) | Tax and discount are flat per-item catalog fields, same source as price | Superseded by 0016 |
-| [0014](0014-orthogonal-fulfillment-invoice-status.md) | Fulfillment/invoice status is derived and orthogonal to order lifecycle state | Accepted |
+| [0014](0014-orthogonal-fulfillment-invoice-status.md) | Fulfillment/invoice status is derived and orthogonal to order lifecycle state. `Payment`/`Return` later removed | Accepted (amended) |
 | [0015](0015-erp-capabilities-declared-not-gated.md) | `ErpCapabilities` is declared now, gated later (once a 2nd adapter exists) | Accepted |
 | [0016](0016-price-from-quote-not-catalog.md) | Price lives on the quote, not the catalog; an order replies to a quote | Accepted (supersedes 0011, 0013) |
-| [0017](0017-module-grouping-and-fulfillment-split.md) | Group modules by subdomain (`sales`/`reference`/`integration`); split `fulfillment` into `shipment`/`invoicing`/`payments`/`returns` | Accepted |
+| [0017](0017-module-grouping-and-fulfillment-split.md) | Group modules by subdomain (`sales`/`reference`/`integration`); split `fulfillment` into `shipment` and `invoicing` (`payments`/`returns` later removed) | Accepted (amended) |
 | [0018](0018-shipment-invoice-order-saga.md) | Shipment/invoice → order is an event-driven saga, not a cross-aggregate transaction | Accepted (supersedes FR-A4's atomic guarantee) |
 
 ## How to read one

@@ -130,8 +130,7 @@ class DeliveryStatus(str, Enum):
 
 
 class InvoiceStatus(str, Enum):
-    """The invoiced "score" — derived from `invoiced_qty_by_line`. Does not yet derive
-    `PAID` (ADR-0014) — that needs `Payment` records wired in, deliberately not done yet."""
+    """The invoiced "score" — derived from `invoiced_qty_by_line` (ADR-0014)."""
 
     NOT_INVOICED = "NOT_INVOICED"
     PARTIALLY_INVOICED = "PARTIALLY_INVOICED"

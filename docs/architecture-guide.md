@@ -19,7 +19,7 @@ Business logic is a shared library grouped by subdomain (ADR-0017), under `src/m
 
 | Group | Modules | Responsibility |
 |---|---|---|
-| **`sales/`** (order lifecycle) | `ordering`, `quoting`, `shipment`, `invoicing`, `payments`, `returns` | Everything from quote to order to the shipment/invoice/payment/return facts recorded against it. `ordering` and the fulfillment family (`shipment`/`invoicing`/`payments`/`returns`) are event-sourced; `quoting` is CRUD. |
+| **`sales/`** (order lifecycle) | `ordering`, `quoting`, `shipment`, `invoicing` | Everything from quote to order to the shipment and invoice facts recorded against it. `ordering`, `shipment`, and `invoicing` are event-sourced; `quoting` is CRUD. |
 | **`reference/`** (master data) | `catalog`, `connections`, `tenancy` | The lookup data orders are routed and priced against. A **leaf**: it imports neither of the other groups. |
 | **`integration/`** (edges) | `erp` (adapters + registry + status mapping), `webhooks_inbound`, `webhooks_outbound` | Everything that talks to a system outside ours. |
 
@@ -58,8 +58,8 @@ Three layers, each a deliberate choice:
 
 1. **Event sourcing for the transactional aggregates** (ADR-0002, amended by ADR-0014).
    `Order` has a real state machine and a history worth replaying (its timeline *is* its
-   events); the fulfillment family (`Shipment`/`Invoice`/`Payment`/`Return`) are event-sourced
-   too, reusing the same kernel. Reference/config data — connections, items, bindings,
+   events); `Shipment` and `Invoice` are event-sourced too, reusing the same kernel.
+   Reference/config data — connections, items, bindings,
    quotes, subsidiaries — are plain rows. Event sourcing is applied where it earns
    its keep, not as a house style.
 2. **Per-aggregate transactional outbox** (ADR-0007). An aggregate's events and their outbox
@@ -131,7 +131,7 @@ instance/tenant): [erp-integration-patterns.md](erp-integration-patterns.md).
 | [0007](adr/0007-async-outbox-reconciliation.md) | Async outbox delivery + polling fallback |
 | [0014](adr/0014-orthogonal-fulfillment-invoice-status.md) | Fulfillment/invoice status derived, orthogonal to lifecycle |
 | [0016](adr/0016-price-from-quote-not-catalog.md) | Price lives on the quote; an order replies to a quote |
-| [0017](adr/0017-module-grouping-and-fulfillment-split.md) | Subdomain grouping; split `fulfillment` into four modules |
+| [0017](adr/0017-module-grouping-and-fulfillment-split.md) | Subdomain grouping; split `fulfillment` into `shipment` and `invoicing` |
 | [0018](adr/0018-shipment-invoice-order-saga.md) | Shipment/invoice → order is an event-driven saga |
 
 The full index (all 18) is in [adr/README.md](adr/README.md).
@@ -144,9 +144,6 @@ surprises:
 - **A second ERP adapter** — the design's main proof point; nothing is written yet.
 - **Automatic shipment/invoice capture from the ERP** — today these are operator-recorded;
   no adapter reads Odoo's `stock.picking`/`account.move`.
-- **`Payment`/`Return` wired into the scores** — recorded as standalone aggregates; whether a
-  payment moves `invoiceStatus` to a `PAID` state, or a return reopens fulfillment, is an
-  undecided business policy (ADR-0014's "revisit when").
 - **Activating row-level security** with a dedicated app DB role (policies exist; the app
   currently connects as the table owner, which is RLS-exempt).
 - **`app`/`worker` as docker-compose services** — today they run from the venv alongside the

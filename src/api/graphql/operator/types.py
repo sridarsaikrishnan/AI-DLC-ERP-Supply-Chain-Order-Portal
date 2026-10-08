@@ -77,25 +77,9 @@ class InvoiceType:
     erp_invoice_id: str | None
 
 
-@strawberry.type
-class PaymentType:
-    payment_id: str
-    order_id: str
-    amount: MoneyType
-    method: str
-
-
-@strawberry.type
-class ReturnType:
-    return_id: str
-    order_id: str
-    reason_code: str
-
-
 @strawberry.input
 class LineQuantityInput:
-    """A line reference plus a quantity — shared by record_shipment / record_invoice /
-    record_return (each records a per-line quantity against an order)."""
+    """A line reference plus a quantity — shared by record_shipment / record_invoice."""
 
     line_id: str
     quantity: float

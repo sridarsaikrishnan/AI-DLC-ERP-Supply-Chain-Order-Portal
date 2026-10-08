@@ -398,7 +398,9 @@
 - [x] Quality gates — **all green**: `ruff format` stable; `ruff check` All checks passed; `lint-imports` **4 kept / 0 broken** (new sales⊥integration contract KEPT); `APP_PROFILE=memory pytest src tests` **179 passed / 5 skipped** (+5 saga/consumer tests over the 174 baseline). UI unchanged this commit (not a required gate; pre-commit still runs tsc).
 
 ### Increment 6 — DONE
-Both commits landed. The four split modules (`shipment`/`invoicing`/`payments`/`returns`) are now independently extractable: no shared write transaction with `ordering`, and `sales ⊥ integration` is machine-enforced. Still deferred (not drift): per-ERP `integration/erp/adapters/<erp>/` move (YAGNI until a 2nd ERP); `Payment`/`Return` feeding back into the order's statuses (needs a business-policy decision).
+Both commits landed. `shipment` and `invoicing` are independently extractable: no shared write transaction with `ordering`, and `sales ⊥ integration` is machine-enforced. Still deferred (not drift): per-ERP `integration/erp/adapters/<erp>/` move (YAGNI until a 2nd ERP).
+
+**Later removal:** `sales/payments` and `sales/returns`, and the operator mutations `recordPayment` / `recordReturn`, were deleted. They recorded a fact and never changed `invoice_status` or `fulfillment_status`. They come back only when there is a rule for what "paid" or a return does to those scores (ADR-0014 amendment).
 
 ### Known environment constraint
 - Terminal intermittently hangs/times out on piped or large-output bash commands and `git commit` heredocs. Workaround: commit via message file (`git commit -q -F <file>` then remove it); use the `grep_search` tool instead of bash `grep`.

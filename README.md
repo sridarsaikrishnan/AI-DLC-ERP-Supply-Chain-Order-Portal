@@ -15,8 +15,9 @@ drafted), `docs/database-schema.md` (every table), and
 ## New here? What you're actually getting into
 
 **It's a modular monolith, not microservices.** Every bounded context in `src/modules/`
-(catalog, connections, tenancy, ordering, integration, webhooks_inbound,
-webhooks_outbound) runs inside the **same two Python processes** — `api` and `worker` —
+(`sales/` — ordering, quoting, shipment, invoicing; `reference/` — connections, tenancy;
+`integration/` — erp, webhooks_inbound, webhooks_outbound) runs inside the **same two
+Python processes** — `api` and `worker` —
 sharing one codebase and one Postgres database. Modules call each other through plain
 Python function calls behind ports (interfaces), not network calls; nothing is deployed
 or scaled independently. The only real process boundary is `api` ↔ `worker`, and even
@@ -46,10 +47,10 @@ flowchart LR
     ODOO -->|inbound webhook| API
 ```
 
-**One database, two read models.** Writes to the `Order` aggregate go through events
-(`docs/event-sourcing-explained.md`); everything else (connections, items, bindings) is
-plain CRUD rows. Same Postgres instance either way — there's no second datastore to stand
-up.
+**One database, two read models.** Writes to the transactional aggregates (`Order`,
+`Shipment`, `Invoice`) go through events (`docs/event-sourcing-explained.md`); everything
+else (connections, bindings, quotes) is plain CRUD rows. Same Postgres instance either
+way — there's no second datastore to stand up.
 
 ## Tech stack
 **Backend**: Python 3.11 · FastAPI + Strawberry GraphQL · SQLAlchemy + PostgreSQL (event
@@ -68,9 +69,10 @@ src/
   api/               # FastAPI app: GraphQL (reseller + operator schemas), HTTP webhooks/health
   worker/            # SQS consumers, outbox relay, reconciliation scheduler
   composition.py     # the one place the object graph is wired (memory | postgres profile)
-  modules/           # bounded contexts: catalog, connections, tenancy, ordering,
-                     # integration (ERP adapters + status mapping), webhooks_inbound,
-                     # webhooks_outbound (outbound reseller notifications)
+  modules/           # sales/ (ordering, quoting, shipment, invoicing),
+                     # reference/ (connections, tenancy),
+                     # integration/ (ERP adapters + status mapping, webhooks_inbound,
+                     # webhooks_outbound)
                      # each has domain/ (pure), application/ (ports+services),
                      # infrastructure/ (memory + postgres adapters), tests/ (co-located)
   shared/            # eventsourcing kernel, messaging, persistence, secrets, config, types

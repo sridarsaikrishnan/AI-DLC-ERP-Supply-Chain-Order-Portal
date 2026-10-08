@@ -32,11 +32,9 @@ from .types import (
     OperatorPartiesType,
     OperatorTimelineEntryType,
     OrderEventType,
-    PaymentType,
     QuoteLineInput,
     QuoteLineType,
     QuoteType,
-    ReturnType,
     ShipmentType,
     SubsidiaryType,
 )
@@ -442,50 +440,6 @@ class Mutation:
         ctx.container.orders.save(order)
         ctx.container.drain()
         return True
-
-    @strawberry.mutation
-    def record_payment(
-        self,
-        info: Info[GraphQLContext, None],
-        order_id: str,
-        amount: float,
-        currency: str,
-        method: str,
-        invoice_id: str | None = None,
-    ) -> PaymentType:
-        """Standalone record (ADR-0014) — not yet wired into `invoice_status`'s `PAID`."""
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        payment = ctx.container.payment_service.record(
-            order_id=order_id,
-            amount={"amount": str(amount), "currency": currency},
-            method=method,
-            invoice_id=invoice_id,
-        )
-        return PaymentType(
-            payment_id=payment.id,
-            order_id=payment.order_id,
-            amount=MoneyType(amount=payment.amount["amount"], currency=payment.amount["currency"]),
-            method=method,
-        )
-
-    @strawberry.mutation
-    def record_return(
-        self,
-        info: Info[GraphQLContext, None],
-        order_id: str,
-        lines: list[LineQuantityInput],
-        reason_code: str,
-    ) -> ReturnType:
-        """Standalone record (ADR-0014) — not yet wired into `fulfillment_status`."""
-        ctx = info.context
-        ctx.require_role("OPERATOR")
-        ret = ctx.container.return_service.record(
-            order_id=order_id,
-            lines=[{"line_id": line.line_id, "quantity": str(line.quantity)} for line in lines],
-            reason_code=reason_code,
-        )
-        return ReturnType(return_id=ret.id, order_id=ret.order_id, reason_code=ret.reason_code)
 
 
 def build_operator_schema() -> strawberry.Schema:

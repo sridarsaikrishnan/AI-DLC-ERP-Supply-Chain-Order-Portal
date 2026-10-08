@@ -36,7 +36,7 @@ Interacting parties and systems:
 | **Operator admin (SPA)** | Browser app: manage ERP connections, resellers/bindings, items, quotes, subsidiaries; view all orders and failures. | API host (GraphQL /operator); Cognito |
 | **API host** *(Python/FastAPI — the only HTTP server)* | Synchronous interface: GraphQL for both audiences, the inbound ERP-webhook HTTP route, request authentication/authorization, and reads/writes via the domain. | Domain modules; PostgreSQL; Cognito; Secrets Manager |
 | **Worker host** *(Python process — not HTTP, not FastAPI)* | Asynchronous processing: order routing, ERP delivery, read-model projection, outbound webhook dispatch, outbox relay, and the reconciliation scheduler (polling fallback). Same codebase/composition root as the API, different entrypoint. | Message bus; Domain modules; PostgreSQL; ERP; Secrets Manager |
-| **Domain modules** (shared) | The business logic shared by API + Worker, grouped by subdomain (ADR-0017): **`sales/`** (`ordering` — the event-sourced core — plus `quoting`, `shipment`, `invoicing`, `payments`, `returns`), **`reference/`** (`catalog`, `connections`, `tenancy`), **`integration/`** (`erp` adapters + registry, inbound/outbound `webhooks`). | PostgreSQL (via hosts) |
+| **Domain modules** (shared) | The business logic shared by API + Worker, grouped by subdomain (ADR-0017): **`sales/`** (`ordering` — the event-sourced core — plus `quoting`, `shipment`, `invoicing`), **`reference/`** (`catalog`, `connections`, `tenancy`), **`integration/`** (`erp` adapters + registry, inbound/outbound `webhooks`). | PostgreSQL (via hosts) |
 | **PostgreSQL (Aurora)** | Single datastore: event store + outbox + snapshots, order projections (read models), and reference/CRUD data. | — (owned by the domain) |
 | **Message bus** | Async transport: SNS FIFO topic → SQS FIFO queues (+ DLQ). floci locally, AWS in prod. | — |
 | **AWS Cognito** | Identity provider (JWT); header-stub provider for local dev. | — |
@@ -79,7 +79,7 @@ Interacting parties and systems:
   event stream + outbox + snapshots, the order read models (projections), and reference
   data (catalog items, ERP connections, reseller bindings, quotes, subsidiaries,
   webhook endpoints/deliveries). The **transactional** aggregates are event-sourced —
-  `Order` plus the fulfillment family (`Shipment`/`Invoice`/`Payment`/`Return`), all on the
+  `Order` plus the fulfillment family (`Shipment`/`Invoice`), all on the
   one shared `events`/`outbox`/`snapshots` store, keyed by `aggregate_type` + `stream_id`
   (ADR-0014); reference/config data is plain CRUD.
 - **API** publishes order events (writes events + outbox); **Worker** consumes events and
@@ -97,8 +97,6 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 | `sales` | `ordering` *(event-sourced)* | `orders`, `order_status_history` (projections) | persists Order events via the kernel |
 | `sales` | `shipment` *(event-sourced)* | — | persists Shipment events via the kernel; `ShipmentRecorded` drives the `orders` fulfilled-quantity score asynchronously via the `order-fulfillment` saga consumer (ADR-0018) |
 | `sales` | `invoicing` *(event-sourced)* | — | persists Invoice events via the kernel; `InvoiceRecorded` drives the `orders` invoiced-quantity score asynchronously via the `order-fulfillment` saga consumer (ADR-0018) |
-| `sales` | `payments` *(event-sourced)* | — | persists Payment events via the kernel (standalone; not yet wired to the order) |
-| `sales` | `returns` *(event-sourced)* | — | persists Return events via the kernel (standalone; not yet wired to the order) |
 | `sales` | `quoting` | `quotes`, `subsidiaries` | — |
 | `reference` | `catalog` | `items` | — |
 | `reference` | `tenancy` | `tenant_connection_bindings` | — |

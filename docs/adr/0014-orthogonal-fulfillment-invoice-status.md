@@ -2,8 +2,14 @@
 
 | | |
 |---|---|
-| Status | Accepted — implemented |
-| Affects | `ordering`, new `fulfillment` module |
+| Status | Accepted — implemented. **Amended:** `Payment` and `Return` removed |
+| Affects | `ordering`, `shipment`, `invoicing` |
+
+> **Amendment:** `Payment` and `Return` (and `recordPayment` / `recordReturn`) were removed.
+> They saved a record and never moved `invoice_status` or `fulfillment_status`. What remains
+> is `Shipment` and `Invoice`: their events bump the order's quantity scores. Add a payment
+> or return module again only when there is a rule for what "paid" or a return does to those
+> scores.
 
 ## In one sentence
 `Order` gains `fulfillment_status`/`invoice_status` as **derived properties**, computed
@@ -47,9 +53,9 @@ from per-line shipped/invoiced quantities recorded by new event-sourced `Fulfill
 | ✅ | A real ERP's partial shipments are representable without touching the already-correct, already-tested `OrderState` machine |
 | ✅ | Event-sourcing is proven generic — a second and third aggregate type reuse the same kernel with zero kernel changes |
 | ⚠️ | `fulfillment_status`/`invoice_status` require loading the `Order` aggregate directly (not the projection) to read — `OperatorOrder`'s GraphQL resolver does one extra aggregate load per order today; acceptable at current volume, a projection field would avoid it if this becomes a hot path |
-| ⚠️ | `Payment`/`Return` don't yet feed back into `Order`'s status — a real, open gap, not hidden (each aggregate's docstring says so) |
+| ⚠️ | `Payment`/`Return` were removed rather than left as unused records. The open policy questions (what "paid" means; whether a return reopens fulfillment) are unchanged — there is just no module holding a placeholder for them |
 
 ## Revisit when
-`Payment` needs to drive `invoice_status` to `PAID` (needs a partial-payment/overpayment
-policy decision first), or `Return` needs to reopen `fulfillment_status` (needs a
-business-policy decision about whether a return undoes "fulfilled").
+A payment needs to drive `invoice_status` to `PAID` (needs a partial-payment/overpayment
+policy first), or a return needs to reopen `fulfillment_status` (needs a decision about
+whether a return undoes "fulfilled"). Until then, do not reintroduce the modules.

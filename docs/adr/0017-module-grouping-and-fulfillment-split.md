@@ -1,14 +1,16 @@
-# 0017 — Group modules by subdomain; split `fulfillment` into four aggregates
+# 0017 — Group modules by subdomain; split `fulfillment` into its own aggregates
 
-**Status:** Accepted
+**Status:** Accepted — **amended:** `payments` and `returns` removed
+
+> **Amendment:** the split below originally produced four modules. `payments` and `returns`
+> were later deleted. They never changed an order's status, so they were not an extraction
+> target worth keeping. `sales/` is now `ordering`, `quoting`, `shipment`, `invoicing`.
 
 ## In one sentence
 
 The flat `src/modules/*` list is regrouped into three subdomain folders — `sales/`
 (order lifecycle), `reference/` (master data), `integration/` (edges) — and the overloaded
-`fulfillment` module is split into four separate modules and aggregates (`shipment`,
-`invoicing`, `payments`, `returns`), so each future extraction target is already its own
-self-contained unit.
+`fulfillment` module is split so shipment and invoicing are their own modules.
 
 ## Why this needed a decision
 
@@ -23,12 +25,13 @@ self-contained unit.
 
 **Grouping** (`src/modules/<group>/<module>/`):
 
-- `sales/` — order lifecycle: `ordering`, `quoting`, `shipment`, `invoicing`, `payments`, `returns`
+- `sales/` — order lifecycle: `ordering`, `quoting`, `shipment`, `invoicing` (`payments` and `returns` were removed; see the amendment)
 - `reference/` — master data: `catalog`, `connections`, `tenancy`
 - `integration/` — edges: `erp` (ERP connectivity), `webhooks_inbound`, `webhooks_outbound`
 
-**Split** — `fulfillment` → `shipment` + `invoicing` + `payments` + `returns`, each its own
-module and event-sourced aggregate. The dispatch aggregate is named **`Shipment`**
+**Split** — `fulfillment` → `shipment` + `invoicing`, each its own module and event-sourced
+aggregate. (`payments` and `returns` were created in the same split and later removed.)
+The dispatch aggregate is named **`Shipment`**
 (`ShipmentRecorded` event, `recordShipment` mutation, `shipment_service` on the container).
 "Delivery" is deliberately *not* used as the aggregate name — it is a downstream status a
 carrier-tracking integration (e.g. AfterShip) would later drive, not the act of dispatch.
@@ -48,7 +51,7 @@ A new `import-linter` contract enforces that `reference` is a leaf (it must not 
 - **Leave `fulfillment` as one module** — rejected: it buries four unrelated lifecycles and
   blocks extracting any one of them cleanly.
 - **Group name `order/`** — rejected: `order/ordering` stutters. `sales/` reads cleanly and
-  covers quoting/shipment/invoicing/payments/returns too.
+  covers quoting, shipment, and invoicing too.
 - **Rename the aggregate `Delivery`** — rejected: delivery is a status, not the dispatch
   event; reserving the word avoids a second rename when carrier tracking arrives.
 - **Collapse `integration/erp` to `integration`** — rejected: keeping the `erp/` module (with

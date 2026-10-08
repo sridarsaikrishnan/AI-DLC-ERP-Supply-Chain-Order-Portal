@@ -50,7 +50,7 @@ flowchart LR
 ## Only where it earns its keep
 
 **Only the *transactional* aggregates are event-sourced** — `Order`, and the
-fulfillment family it spun off (`Shipment`, `Invoice`, `Payment`, `Return`), which reuse
+fulfillment family it spun off (`Shipment`, `Invoice`), which reuse
 the exact same kernel (ADR-0014). Reference/config data — connections, items, tenant
 bindings, quotes, subsidiaries — are plain rows, updated in place, like a normal
 app, because they don't have an interesting lifecycle worth replaying. This is a deliberate

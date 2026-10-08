@@ -6,10 +6,11 @@
 | Affects | `ordering` module, `src/shared/eventsourcing` |
 
 > **Amendment (ADR-0014):** this ADR's own "revisit when" condition later fired. The
-> transactional fulfillment-family aggregates — `Shipment`, `Invoice`, `Payment`, `Return`
-> — are now event-sourced too (they reuse the same kernel). The distinction this ADR drew
-> still holds in spirit: **transactional** aggregates with a history worth replaying are
-> event-sourced; **reference/config** data (`connections`, `items`, `tenant_connection_bindings`,
+> transactional fulfillment-family aggregates — `Shipment` and `Invoice` — are event-sourced
+> too (they reuse the same kernel). `Payment` and `Return` were event-sourced for a while
+> and then removed: they never changed an order's status. The distinction this ADR drew
+> still holds: **transactional** aggregates with a history worth replaying are
+> event-sourced; **reference/config** data (`connections`, `tenant_connection_bindings`,
 > `quotes`, `subsidiaries`, webhook endpoints) stays plain CRUD. Read "only `Order`"
 > below as "only transactional aggregates, which at the time was just `Order`".
 

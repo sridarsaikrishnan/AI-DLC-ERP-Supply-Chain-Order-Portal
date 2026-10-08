@@ -63,8 +63,6 @@ from src.modules.sales.ordering.domain.aggregate import Order
 from src.modules.sales.ordering.projections.postgres_store import PostgresOrderProjectionStore
 from src.modules.sales.ordering.projections.projector import OrderProjector
 from src.modules.sales.ordering.projections.store import OrderProjectionStore
-from src.modules.sales.payments.application.service import PaymentService
-from src.modules.sales.payments.domain.aggregate import Payment
 from src.modules.sales.quoting.application.service import QuoteService
 from src.modules.sales.quoting.infrastructure.memory import (
     InMemoryQuoteRepository,
@@ -76,8 +74,6 @@ from src.modules.sales.quoting.infrastructure.postgres import (
     PostgresSubsidiaryRepository,
     PostgresSubsidiaryRouteRepository,
 )
-from src.modules.sales.returns.application.service import ReturnService
-from src.modules.sales.returns.domain.aggregate import Return
 from src.modules.sales.shipment.application.service import ShipmentService
 from src.modules.sales.shipment.domain.aggregate import Shipment
 from src.shared.config import Settings, get_settings
@@ -202,8 +198,6 @@ class Container:
     facts: FactPublisher
     shipment_service: ShipmentService
     invoice_service: InvoiceService
-    payment_service: PaymentService
-    return_service: ReturnService
     # ordering side of the shipment/invoice saga (ADR-0018) — the `order-fulfillment`
     # consumer; exposed so the worker can wire it into an SqsConsumerRunner
     order_fulfillment_consumer: OrderFulfillmentConsumer
@@ -231,11 +225,9 @@ def _build_memory_container(settings: Settings) -> Container:
     # aggregate_type + stream_id, not a separate store per aggregate type.
     # Shipment/Invoice publish their events to the bus (ADR-0018); the ordering saga
     # consumer below reacts to them and bumps the order's quantity scores — no shared
-    # write transaction. Payment/Return drive nothing, so they don't publish.
+    # write transaction.
     shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment, publisher=bus))
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice, publisher=bus))
-    payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
-    return_service = ReturnService(EventSourcedRepository(event_store, Return))
     order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = InMemoryConnectionRepository()
@@ -314,8 +306,6 @@ def _build_memory_container(settings: Settings) -> Container:
         facts=BusFactPublisher(bus),
         shipment_service=shipment_service,
         invoice_service=invoice_service,
-        payment_service=payment_service,
-        return_service=return_service,
         order_fulfillment_consumer=order_fulfillment_consumer,
         orders=repo,
         quote_service=quote_service,
@@ -376,14 +366,12 @@ def _build_postgres_container(settings: Settings) -> Container:
     # twice (once here, once by the relay). outbox=None, publisher=None is deliberate.
     repo: EventSourcedRepository[Order] = EventSourcedRepository(event_store, Order)
     # Same reasoning as the memory profile: one `events` table, one store, differentiated
-    # by aggregate_type + stream_id — these 4 aren't a separate Postgres setup. Shipment/
-    # Invoice publish via the outbox (PostgresEventStore writes the outbox row); the relay
+    # by aggregate_type + stream_id. Shipment and Invoice publish via the outbox
+    # (PostgresEventStore writes the outbox row); the relay
     # delivers them to the `order-fulfillment` queue, whose consumer bumps the order's
     # scores (ADR-0018). No publisher here, same as the Order repo.
     shipment_service = ShipmentService(EventSourcedRepository(event_store, Shipment))
     invoice_service = InvoiceService(EventSourcedRepository(event_store, Invoice))
-    payment_service = PaymentService(EventSourcedRepository(event_store, Payment))
-    return_service = ReturnService(EventSourcedRepository(event_store, Return))
     order_fulfillment_consumer = OrderFulfillmentConsumer(repo)
 
     connections = PostgresConnectionRepository(session_factory)
@@ -460,8 +448,6 @@ def _build_postgres_container(settings: Settings) -> Container:
         facts=OutboxFactPublisher(session_factory),
         shipment_service=shipment_service,
         invoice_service=invoice_service,
-        payment_service=payment_service,
-        return_service=return_service,
         order_fulfillment_consumer=order_fulfillment_consumer,
         orders=repo,
         quote_service=quote_service,

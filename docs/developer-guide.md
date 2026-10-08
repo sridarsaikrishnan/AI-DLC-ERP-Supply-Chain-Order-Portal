@@ -20,7 +20,7 @@ New to event sourcing? Read [event-sourcing-explained.md](event-sourcing-explain
   - **worker** (`src/worker/main.py`) — no HTTP; runs the async consumers, the outbox relay,
     and the reconciliation scheduler. It does the ERP I/O and builds the read models.
 - **The transactional aggregates are event-sourced** — `Order`, and the fulfillment family
-  (`Shipment`, `Invoice`, `Payment`, `Return`), all on one shared `events`/`outbox`/`snapshots`
+  (`Shipment`, `Invoice`), all on one shared `events`/`outbox`/`snapshots`
   store keyed by `aggregate_type` + `stream_id` (ADR-0002, amended by ADR-0014). Their state
   is the replay of their events. Reference/config data (connections, items, bindings, quotes,
   subsidiaries, webhook endpoints) is ordinary rows.

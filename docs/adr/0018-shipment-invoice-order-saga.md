@@ -50,7 +50,7 @@ the consumer relies on the same `event_id` dedupe every other consumer uses (the
 
 | | |
 |---|---|
-| ✅ | `shipment`/`invoicing`/`payments`/`returns` are now extractable — no shared write transaction with `ordering`. |
+| ✅ | `shipment` and `invoicing` are extractable — no shared write transaction with `ordering`. (`payments` and `returns` were removed; they never joined this saga.) |
 | ✅ | `sales` no longer imports `integration` (`CanonicalStatus` moved to `shared`); both facts are machine-enforced by import-linter contracts. |
 | ✅ | Less machinery: the UoW port and the event store's thread-local ambient session are gone. |
 | ⚠️ | **Eventual consistency**: between saving a shipment and the order's score updating there is now a bus/queue hop. In the memory profile `drain()` closes it synchronously; in postgres it's as-fast-as-the-relay/queue. A reader can briefly see a shipment recorded but the order score not yet bumped. |

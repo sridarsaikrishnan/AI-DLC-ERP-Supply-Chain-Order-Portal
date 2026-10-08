@@ -126,9 +126,6 @@ surprise:
 - **Automatic shipment/invoice capture from the ERP.** Shipments and invoices are recorded
   by an operator today; nothing yet reads Odoo's own delivery/invoice records to fill them
   in automatically.
-- **Payments and returns affecting status.** Payments and returns (RMAs) can be recorded,
-  but they do not yet move the invoice or fulfillment scores — the business policy for that
-  (partial payments, overpayment, whether a return reopens fulfillment) hasn't been decided.
 - **A standalone Vendor Order document.** The vendor date exists; a separate purchase-order
   document with its own number does not.
 - **Richer tax/pricing**: multi-jurisdiction tax, promotional/volume discount codes.
