@@ -106,11 +106,6 @@ erDiagram
   the heavy lifting: a tenant has at most one binding per connection, and an ERP customer
   maps to at most one tenant — together these are what make routing an inbound webhook
   back to the right reseller unambiguous.
-- **`items`** — which connection "owns" a SKU. An order can only route to one connection,
-  so every line's item must resolve to the *same* owning connection or the order is
-  rejected (`mixed_erp`) before anything is sent anywhere. Also the price source: `unit_price`/
-  `currency` are resolved onto an order's lines at submission time, never trusted from the
-  reseller (ADR-0011) — both nullable, since not every item has a price set yet.
 
 ### Projections — the fast, read-only copy GraphQL actually queries
 - **`orders`** — one row per order, kept in sync by replaying events (see the projector
@@ -123,11 +118,9 @@ erDiagram
   Sent to ERP → Confirmed → …`). Consecutive duplicate labels are skipped (two internal
   states can share one reseller-facing label — see `ordering/projections/store.py`).
 
-### Not yet wired up
-- **`webhook_endpoints`** — for *outbound* webhooks (us pushing to a reseller), the
-  secondary/optional read path per the design. Table exists; nothing writes to it yet.
-- **`audit_log`** — generic before/after audit trail. Table exists; nothing writes to it
-  yet (Phase 3 item G/H territory — security hardening for the AWS deployment).
+### Outbound webhooks
+- **`webhook_endpoints`** — one reseller HTTP endpoint. Dispatch lists these by `tenant_id`.
+- **`webhook_deliveries`** — one row per attempted POST. The portal lists rows whose status is `DELIVERED`.
 
 ## Defense in depth: row-level security
 

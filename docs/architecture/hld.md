@@ -106,7 +106,6 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 | `integration` | `webhooks_outbound` | `webhook_endpoints`, `webhook_deliveries` | — |
 
 `processed_events` is also used by the Worker consumers to dedupe on `event_id`.
-`audit_log` exists in a migration but is **not written by any module yet** — reserved / **TBD**.
 
 ## Boundaries
 
