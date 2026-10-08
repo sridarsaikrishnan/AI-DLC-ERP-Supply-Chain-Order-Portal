@@ -16,6 +16,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # Browser for the portal database. Server is the compose service name `postgres`.
+  adminer:
+    image: adminer:4
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8088:8080"
+
   # AWS emulator (SNS/SQS/Secrets Manager/Cognito). Same boto3 code targets this
   # locally and real AWS in prod — only AWS_ENDPOINT_URL differs.
   # The docker socket lets Floci start its browser console at http://localhost:4566/_floci/ui.

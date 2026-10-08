@@ -389,7 +389,8 @@ order back over GraphQL.
 - Rich-vs-thin webhooks and multi-instance/tenant routing:
   [erp-integration-patterns.md](erp-integration-patterns.md).
 - Adding a new ERP (the adapter + registry + the four touch points):
-  [adding-an-erp.md](adding-an-erp.md); Odoo specifics in [erps/odoo.md](erps/odoo.md).
+  [adding-an-erp.md](adding-an-erp.md); Odoo specifics in [erps/odoo/](erps/odoo/README.md),
+  and the end-to-end clicks in [erps/odoo/supply-chain-check.md](erps/odoo/supply-chain-check.md).
 - The reasoning behind the big moving parts: the [ADR log](adr/README.md) — especially
   0002 (event-source Order only), 0014 (orthogonal scores), 0016 (price from quote),
   0017 (module grouping), 0018 (the fulfillment saga).

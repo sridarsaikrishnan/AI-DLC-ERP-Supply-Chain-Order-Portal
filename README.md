@@ -85,8 +85,8 @@ scripts/             # local.sh (start/stop), messaging_bootstrap.py, seed_demo.
                      # seed_cognito.py, odoo-boot.sh,
                      # dev_webhook_receiver.py (dev-only test aid, NOT part of the app)
 docs/                # local-setup.md, database-schema.md, event-sourcing-explained.md,
-                     # erp-integration-patterns.md, adding-an-erp.md, odoo-webhook-setup.md,
-                     # mapping/ (canonical<->ERP field tables), erps/ (per-ERP knowledge base)
+                     # erp-integration-patterns.md, adding-an-erp.md,
+                     # erps/<erp>/ (README.md, webhook.md, supply-chain-check.md)
                      # (architecture itself: aidlc-docs/.../target-architecture.md — one doc)
 ```
 
@@ -132,6 +132,7 @@ block sales.
 | Odoo inbound webhook (shared secret in the path) | http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo |
 | HMAC inbound webhook | http://127.0.0.1:8000/erp/webhook/{connection_id} |
 | Odoo | http://localhost:8069 |
+| Portal database (Adminer) | http://localhost:8088 |
 | Floci (AWS emulator) | http://localhost:4566 |
 | Floci health | http://localhost:4566/_floci/health |
 | Floci console | http://localhost:4566/_floci/ui |
@@ -153,9 +154,9 @@ app itself starts or depends on.
 
 ## Adding a new ERP
 `docs/adding-an-erp.md` — four touch points (a status mapper, an adapter, one registry
-line, one enum member), no changes anywhere else. `docs/erps/` is the knowledge base for
-each ERP once it's registered (auth quirks, API shape, gotchas found the hard way).
-`docs/odoo-webhook-setup.md` covers the optional inbound-webhook side specifically.
+line, one enum member), no changes anywhere else. `docs/erps/<erp>/` is that ERP's
+folder: adapter notes, the inbound webhook, and the supply-chain check. Odoo's
+click-through is `docs/erps/odoo/supply-chain-check.md`.
 
 ## Run tests
 Backend:

@@ -105,6 +105,7 @@ Local stack is up.
   Reseller GraphQL               http://127.0.0.1:8000/graphql/reseller
   Operator GraphQL               http://127.0.0.1:8000/graphql/operator
   Odoo                           http://localhost:8069
+  Portal database (Adminer)      http://localhost:8088
   Odoo webhook (demo secret)     http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo
   Floci                          http://localhost:4566
   Floci health                   http://localhost:4566/_floci/health

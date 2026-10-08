@@ -138,9 +138,8 @@ never assumed there was only one Odoo out there to begin with.
 
 ## Read next
 - `docs/adding-an-erp.md` — the checklist for registering a new ERP type.
-- `docs/erps/` — concrete, per-ERP facts (Odoo's specific quirks, auth, API shape) —
-  this doc covers patterns that apply across ERPs; that folder covers one ERP each.
-- `docs/odoo-webhook-setup.md` — Odoo's specific (thin-in-a-different-way: unsigned)
-  webhook constraint and how the shared-secret-in-path route works around it.
+- `docs/erps/` — one folder per ERP (`README.md`, `webhook.md`, `supply-chain-check.md`).
+  This doc covers patterns that apply across ERPs; that folder covers one ERP each.
+- `docs/erps/odoo/webhook.md` — Odoo's unsigned webhook, and how the shared secret in the path works.
 - `docs/database-schema.md` — the tables `erp_connections`/`tenant_connection_bindings`/
   `items` referenced throughout this doc.

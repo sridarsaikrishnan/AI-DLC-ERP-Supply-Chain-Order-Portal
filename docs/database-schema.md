@@ -91,6 +91,8 @@ erDiagram
 - **`processed_events`** — the flip side, on the *consuming* end: `(consumer, event_id)`
   pairs already handled, so a redelivered message (SQS is at-least-once) is a safe no-op
   instead of double-processing.
+- **`erp_event_inbox`** — one row per authenticated inbound ERP webhook (`0011_erp_event_inbox`).
+  `body` is the raw request bytes. The payload is not parsed into columns.
 
 ### Config / tenancy — which ERP, whose order, who's allowed
 - **`erp_connections`** — one row per ERP *instance* (e.g. one specific Odoo database —

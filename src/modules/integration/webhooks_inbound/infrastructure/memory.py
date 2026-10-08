@@ -8,6 +8,14 @@ if TYPE_CHECKING:
     from src.shared.types import ConnectionId, OrderId
 
 
+class InMemoryEventInbox:
+    def __init__(self) -> None:
+        self.rows: list[tuple[str, bytes]] = []
+
+    def append(self, connection_id: str, body: bytes) -> None:
+        self.rows.append((str(connection_id), body))
+
+
 class InMemoryDedupStore:
     def __init__(self) -> None:
         self._seen: set[str] = set()

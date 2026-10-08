@@ -18,6 +18,12 @@ class DedupStore(Protocol):
     def mark(self, key: str) -> None: ...
 
 
+class EventInbox(Protocol):
+    """Append-only raw body. Callers do not parse it."""
+
+    def append(self, connection_id: ConnectionId, body: bytes) -> None: ...
+
+
 class OrderLocator(Protocol):
     """Reverse routing: (connection, erp_order_id) -> our order id, or None."""
 

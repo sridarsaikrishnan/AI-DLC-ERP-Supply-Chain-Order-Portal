@@ -10,6 +10,7 @@ from src.modules.integration.webhooks_inbound.application.ingress import (
 from src.modules.integration.webhooks_inbound.domain.signature import compute_signature
 from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
+    InMemoryEventInbox,
     InMemoryOrderLocator,
 )
 from src.shared.types import ConnectionId, OrderId
@@ -32,10 +33,15 @@ class RecordingStatus:
         self.applied.append((order_id, status))
 
 
-def _service(locator: InMemoryOrderLocator, status: RecordingStatus) -> InboundWebhookService:
+def _service(
+    locator: InMemoryOrderLocator,
+    status: RecordingStatus,
+    inbox: InMemoryEventInbox | None = None,
+) -> InboundWebhookService:
     return InboundWebhookService(
         secrets=FakeSecrets(),
         dedup=InMemoryDedupStore(),
+        inbox=inbox if inbox is not None else InMemoryEventInbox(),
         locator=locator,
         order_status=status,
     )
@@ -62,6 +68,32 @@ def test_accepted_applies_status() -> None:
     outcome = _service(locator, status).handle(_webhook())
     assert outcome is IngressOutcome.ACCEPTED
     assert status.applied == [("ord_1", CanonicalStatus.CONFIRMED)]
+
+
+def test_authenticated_body_is_stored_raw_before_it_is_understood() -> None:
+    inbox = InMemoryEventInbox()
+    weird = b"\xff\xfe not json at all"
+    webhook = InboundWebhook(
+        connection_id=_CONN,
+        erp_type="ODOO",
+        erp_order_id="",
+        native_fields={},
+        event_ref="evt_raw",
+        raw_body=weird,
+        signature=compute_signature(_SECRET, weird),
+    )
+    outcome = _service(InMemoryOrderLocator(), RecordingStatus(), inbox).handle(webhook)
+    assert outcome is IngressOutcome.UNATTRIBUTABLE
+    assert inbox.rows == [(str(_CONN), weird)]
+
+
+def test_unauthorized_body_is_not_stored() -> None:
+    inbox = InMemoryEventInbox()
+    outcome = _service(InMemoryOrderLocator(), RecordingStatus(), inbox).handle(
+        _webhook(signature="deadbeef")
+    )
+    assert outcome is IngressOutcome.UNAUTHORIZED
+    assert inbox.rows == []
 
 
 def test_bad_signature_is_unauthorized() -> None:

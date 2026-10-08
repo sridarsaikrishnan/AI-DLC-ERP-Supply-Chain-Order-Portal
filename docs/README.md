@@ -22,8 +22,8 @@ reference material when you need it.
   - **[adding-an-erp.md](adding-an-erp.md)** — the checklist to onboard a new ERP type.
   - **[erp-integration-patterns.md](erp-integration-patterns.md)** — webhook shapes
     (rich vs. thin), and how multiple ERP instances/tenants stay untangled.
-  - **[erps/odoo.md](erps/odoo.md)** — Odoo-specific facts, auth, API shape, and known gaps.
-  - **[odoo-webhook-setup.md](odoo-webhook-setup.md)** — wiring Odoo's inbound status webhook.
+  - **[erps/](erps/README.md)** — one folder per ERP (`README.md`, `webhook.md`, `supply-chain-check.md`).
+  - **[erps/odoo/supply-chain-check.md](erps/odoo/supply-chain-check.md)** — Odoo clicks that prove one order end to end.
 - **Operations**
   - **[local-setup.md](local-setup.md)** — run the whole stack locally with no cloud account.
   - **[git-hooks.md](git-hooks.md)** — the pre-commit quality gate.

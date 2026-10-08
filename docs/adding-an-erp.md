@@ -88,7 +88,7 @@ registries above, not through per-ERP conditionals.
 
 Adding an ERP to the registry makes outbound delivery + the reconciliation sweeper (item
 C) work for it immediately. If it should also *push* status changes to us, that's
-`docs/odoo-webhook-setup.md`'s territory — either the HMAC route (if the ERP can sign
+`docs/erps/<erp>/webhook.md`'s territory — either the HMAC route (if the ERP can sign
 requests) or a shared-secret-in-path route like Odoo's (if it can't). Neither is
 required: every registered ERP gets reconciliation polling regardless.
 
@@ -104,8 +104,7 @@ automation rely on it. Adding it back is exactly the 4-step process described he
 - **`docs/erp-integration-patterns.md`** — webhook shapes (rich vs. thin/NetSuite-style)
   and how multiple instances of an ERP, and multiple tenants, get routed without
   tangling. Read this before writing a new adapter for an ERP with unusual webhooks.
-- **`docs/erps/`** — one file per registered ERP with everything specific to it (auth,
-  API shape, quirks discovered while building it). Add your new ERP's page there once
-  it's registered — that's where its knowledge lives, not scattered across code comments.
+- **`docs/erps/`** — one folder per ERP (`README.md`, `webhook.md`, `supply-chain-check.md`).
+  Copy `docs/erps/_template/` once the adapter is registered.
 - **`aidlc-docs/inception/application-design/target-architecture.md`** / **`docs/database-schema.md`**
   — the system this adapter plugs into.

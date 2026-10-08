@@ -1,38 +1,31 @@
 # ERP knowledge base
 
-One file per ERP this platform talks to — everything about *that specific ERP* in one
-place: how its API works, how our adapter drives it, what its status values mean, what
-we've learned the hard way, and where the rest of its documentation lives.
+One folder per ERP. The same three files every time, so a second ERP is a copy of `_template/` rather than a new shape.
 
-This folder is concrete facts about each ERP. It is deliberately **not** where the
-generic, ERP-agnostic process lives — that stays put, and these files link to it instead
-of repeating it:
+| File | What it is |
+|---|---|
+| `README.md` | How this ERP's API, login, and documents map onto the adapter. |
+| `webhook.md` | How it pushes a status change, and how to see the raw body in `erp_event_inbox`. |
+| `supply-chain-check.md` | The clicks a developer performs to follow one order from creation through delivery and invoice. |
 
-- **`docs/adding-an-erp.md`** — the 4-step checklist for registering any new ERP type.
-- **`docs/erp-integration-patterns.md`** — webhook shapes (rich vs. thin) and how
-  multiple instances/tenants get routed, as concepts that apply to every ERP.
+Generic steps that are the same for every ERP stay outside this folder:
 
-The canonical-field ↔ ERP-field mapping tables live **in each ERP's own page here** (e.g.
-`odoo.md`'s outbound/inbound tables), not in a separate `mapping/` folder.
+- [adding-an-erp.md](../adding-an-erp.md) — the four code touch points.
+- [erp-integration-patterns.md](../erp-integration-patterns.md) — webhook shapes and how instances and tenants stay apart.
+- [adr/0019-order-routing.md](../adr/0019-order-routing.md) — which data routes an order, and when it is read.
 
-## Files
+## Folders
 
-| ERP | Status | File |
+| ERP | Status | Folder |
 |---|---|---|
-| Odoo | Live, real adapter | [`odoo.md`](./odoo.md) |
-| ERPNext | Not registered (removed pending clean re-add — see `docs/adding-an-erp.md`) | — |
+| Odoo | Live | [odoo/](./odoo/supply-chain-check.md) |
 | NetSuite | Not registered | — |
+| SAP | Not registered | — |
 
-## Adding a new ERP's page
+## Adding an ERP's folder
 
-Copy `odoo.md`'s section headings. At minimum, cover:
-1. What the ERP is and how connections to it are configured (which fields on
-   `ErpConnection` map to what).
-2. How authentication works against its API.
-3. What our adapter actually does for `submit` / `fetch_status` / `cancel` — in plain
-   English, not just "see the code".
-4. The outbound/inbound field-mapping tables (canonical ↔ this ERP's fields).
-5. Every quirk, gap, or surprising behavior discovered while building or running it
-   against a real instance — this is the part that has no other home. If you find out
-   something the hard way, it belongs here so the next person doesn't re-discover it.
-6. Links out: the webhook setup doc (if any), local dev setup.
+1. Copy `_template/` to `<erp>/`.
+2. Fill the three files from that ERP's adapter and one real sandbox order.
+3. Add a row to the table above.
+
+`odoo.md` at the top of this folder is a pointer to `odoo/`. Do not add a new ERP as a single file.

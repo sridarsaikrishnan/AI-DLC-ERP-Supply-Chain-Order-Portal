@@ -8,12 +8,13 @@ maintains — so this is a read-only view onto that same column.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, MetaData, String, Table, select
+from sqlalchemy import Column, DateTime, LargeBinary, MetaData, String, Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.shared.types import ConnectionId, OrderId
+from src.shared.types import ConnectionId, OrderId, generate_id
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
@@ -35,7 +36,41 @@ orders_table = Table(
     Column("erp_order_id", String),
 )
 
+erp_event_inbox_table = Table(
+    "erp_event_inbox",
+    _metadata,
+    Column("inbox_id", String, primary_key=True),
+    Column("connection_id", String, nullable=False),
+    Column("received_at", DateTime(timezone=True), nullable=False),
+    Column("body", LargeBinary, nullable=False),
+)
+
 _CONSUMER = "webhooks_inbound"
+
+
+class PostgresEventInbox:
+    """One row per authenticated request. `body` is the raw bytes, unread."""
+
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def append(self, connection_id: ConnectionId, body: bytes) -> None:
+        session = self._session_factory()
+        try:
+            session.execute(
+                pg_insert(erp_event_inbox_table).values(
+                    inbox_id=generate_id("ein"),
+                    connection_id=str(connection_id),
+                    received_at=datetime.now(UTC),
+                    body=body,
+                )
+            )
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
 
 class PostgresDedupStore:

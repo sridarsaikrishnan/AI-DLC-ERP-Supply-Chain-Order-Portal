@@ -157,7 +157,8 @@ curl -u "$CLIENT_ID:$CLIENT_SECRET" \
 Odoo Community has no native "webhook" action, so this uses a dedicated
 shared-secret-in-path endpoint instead of the HMAC-signed one ERPNext gets — full setup
 (secret provisioning, the Automation Rule's Python code, payload shape, verification) is
-in **`docs/odoo-webhook-setup.md`**. Until a connection's webhook is configured, the
+in **`docs/erps/odoo/webhook.md`**. The full quotation → delivery → invoice walk is
+**`docs/erps/odoo/supply-chain-check.md`**. Until a connection's webhook is configured, the
 reconciliation sweeper polls status as the fallback — every connection gets that either
 way, the webhook only lowers latency.
 

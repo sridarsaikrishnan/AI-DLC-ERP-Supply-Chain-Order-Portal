@@ -11,6 +11,7 @@ from src.modules.integration.webhooks_inbound.application.ingress import (
 from src.modules.integration.webhooks_inbound.domain.signature import compute_signature
 from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
+    InMemoryEventInbox,
     InMemoryOrderLocator,
 )
 from src.modules.sales.ordering.application.adapters import StatusApplier
@@ -61,6 +62,7 @@ def test_observed_order_confirms_via_webhook() -> None:
     ingress = InboundWebhookService(
         secrets=FakeSecrets(),
         dedup=InMemoryDedupStore(),
+        inbox=InMemoryEventInbox(),
         locator=locator,
         order_status=StatusApplier(repo),
     )

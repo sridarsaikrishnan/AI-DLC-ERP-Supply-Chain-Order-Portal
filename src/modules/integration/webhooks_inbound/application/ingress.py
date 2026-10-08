@@ -13,7 +13,7 @@ from ..domain.signature import verify_shared_secret, verify_signature
 if TYPE_CHECKING:
     from src.shared.types import ConnectionId
 
-    from .ports import DedupStore, OrderLocator, OrderStatusPort, SecretResolver
+    from .ports import DedupStore, EventInbox, OrderLocator, OrderStatusPort, SecretResolver
 
 
 class IngressOutcome(str, Enum):
@@ -50,11 +50,13 @@ class InboundWebhookService:
         *,
         secrets: SecretResolver,
         dedup: DedupStore,
+        inbox: EventInbox,
         locator: OrderLocator,
         order_status: OrderStatusPort,
     ) -> None:
         self._secrets = secrets
         self._dedup = dedup
+        self._inbox = inbox
         self._locator = locator
         self._order_status = order_status
 
@@ -69,6 +71,9 @@ class InboundWebhookService:
             )
         if not authenticated:
             return IngressOutcome.UNAUTHORIZED
+
+        # The body is stored before it is parsed, mapped, or matched to an order.
+        self._inbox.append(webhook.connection_id, webhook.raw_body)
 
         # 2. dedupe
         dedup_key = f"{webhook.connection_id}:{webhook.event_ref}"

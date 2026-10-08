@@ -34,10 +34,12 @@ from src.modules.integration.erp.infrastructure.stub_adapter import StubErpAdapt
 from src.modules.integration.webhooks_inbound.application.ingress import InboundWebhookService
 from src.modules.integration.webhooks_inbound.infrastructure.memory import (
     InMemoryDedupStore,
+    InMemoryEventInbox,
     InMemoryOrderLocator,
 )
 from src.modules.integration.webhooks_inbound.infrastructure.postgres import (
     PostgresDedupStore,
+    PostgresEventInbox,
     PostgresOrderLocator,
 )
 from src.modules.integration.webhooks_outbound.application.dispatch import WebhookDispatchService
@@ -340,6 +342,7 @@ def _build_memory_container(settings: Settings) -> Container:
     ingress = InboundWebhookService(
         secrets=ConnectionWebhookSecretResolver(connections, secrets),
         dedup=InMemoryDedupStore(),
+        inbox=InMemoryEventInbox(),
         locator=locator,
         order_status=StatusApplier(repo),
     )
@@ -465,6 +468,7 @@ def _build_postgres_container(settings: Settings) -> Container:
     ingress = InboundWebhookService(
         secrets=ConnectionWebhookSecretResolver(connections, secrets),
         dedup=PostgresDedupStore(session_factory),
+        inbox=PostgresEventInbox(session_factory),
         locator=locator,
         order_status=status_applier,
     )
