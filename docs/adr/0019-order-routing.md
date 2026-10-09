@@ -15,7 +15,7 @@ A sales order already exists in an ERP. The connection says which instance we ar
 |---|---|
 | People create the quotation in the ERP | This product is a partner application. It does not issue quotes and it does not create purchase orders or sales orders. |
 | Several instances, several resellers | The right order has to land on the right reseller, and a later send (not built) has to pick the right instance and the right customer number inside it. |
-| A notification is a delivery | A status change with no webhook endpoint is not stored. The portal lists successful deliveries and opens the order. |
+| A notification is a delivery | A status change with no webhook endpoint is not stored. AdminOps lists every delivery and opens the order. |
 
 ## The decision
 
@@ -26,7 +26,7 @@ Two facts, used at different times.
 | Which instance | One `erp_connections` row | Which ERP database we log into |
 | Who the reseller is inside that instance | One verified `tenant_connection_bindings` row: `tenant_id` + `connection_id` + `erp_customer_id` | Whose orders to adopt, and which reseller owns them |
 
-The live path uses only the second fact, because the order is already inside a connection the worker is polling. The subsidiary route (`subsidiary_routes`: subsidiary → connection) is operator data for a future send. Adopt does not read it. An adopted order stores an empty subsidiary.
+The live path uses the second fact to choose the reseller, because the order is already inside a connection the worker is polling. The subsidiary is a third fact on the same document: `company_id` on the quotation. `subsidiary_routes.erp_company_id` says which subsidiary that company is. Adopt stores that subsidiary. A company id that matches no route is not adopted.
 
 `tenant` is the reseller. Login is Cognito `custom:tenant_id` (or the machine scope `erp-portal/tenant.<id>`). One login, one set of orders, one set of endpoints. Several machines are several webhook endpoints on that same tenant. Several ERPs are several bindings on that same tenant. There is no parent that owns several tenants.
 
@@ -46,8 +46,8 @@ The live path uses only the second fact, because the order is already inside a c
 | Later status, shipment, invoice | ERP, then the same sweep (`fetch_status`, `fetch_shipments`, `fetch_invoices`) or an inbound webhook for status. | After the order is known to the locator. | Confirm, close, cancel, reject, retry, `ShipmentRecorded`, and `InvoiceRecorded` are the events that can notify. |
 | `erp_event_inbox.body` | Written on every authenticated inbound webhook, before the body is parsed. | Not read by routing. | Raw request bytes for that connection. A failed secret is not a row. The body is not required to be JSON. |
 | Webhook endpoint (`url`, `secret_ref`, `event_types`, `is_active`) | The reseller, on their own tenant. The signing secret is shown once and stored as a ref. | When a dispatchable event for that `tenant_id` is published. | Every active endpoint that subscribes to the event type gets one POST. The body is `event`, `eventId`, `occurredAt`, and `order` (`id`, client reference, latest status). |
-| `webhook_deliveries` | Written only when a POST is attempted. One row per `(endpoint_id, event_id)`, with `order_id`. | The portal lists rows whose status is `DELIVERED`. A click opens that order. | No subscribed active endpoint means the handler returns and stores nothing. |
-| Subsidiary and `subsidiary_routes` | Operator. A subsidiary is the distributor's own company. The route row is `subsidiary_id → connection_id`. | Not on the live path. `QuoteService.issue_quote` still stamps `routed_to_connection_id` from the route, and nothing in the API calls it. | Kept for a future send: the subsidiary picks the connection, then the binding on that connection picks `erp_customer_id`. |
+| `webhook_deliveries` | Written only when a POST is attempted. One row per `(endpoint_id, event_id)`, with `order_id`. | AdminOps lists every row and shows which reseller it was sent to. A click opens that order. | No subscribed active endpoint means the handler returns and stores nothing. |
+| Subsidiary and `subsidiary_routes` | Operator. A subsidiary is the distributor's own company. The route row is `subsidiary_id → connection_id` plus `erp_company_id` (Odoo: `res.company` id). | At adopt, matched to `company_id` on the quotation. | The order stores that `subsidiary_id`. One connection belongs to one subsidiary. |
 
 ### What a sweep does, in order
 
@@ -70,7 +70,8 @@ Inbound webhooks locate an order that already exists (`connection_id` + ERP docu
 
 | | |
 |---|---|
-| ✅ | The right reseller is the binding's `tenant_id`. The right instance is the connection being read. Both are data. |
+| ✅ | The right reseller is the binding's `tenant_id`. The right instance is the connection being read. The distributor is the company on the quotation. All three are data. |
+| ⚠️ | A quotation whose company id matches no subsidiary is not adopted. |
 | ✅ | Odoo field names stay in `odoo_adapter.py`. A second ERP implements the same port calls, including `fetch_partner_orders`. |
 | ✅ | A customer number cannot be bound to two resellers on one connection, so two tenants cannot both adopt the same partner's orders. |
 | ⚠️ | Orders for a partner who is not on a verified binding are invisible here, even when they are visible in the ERP. |

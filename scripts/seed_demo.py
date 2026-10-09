@@ -4,8 +4,10 @@ One Odoo connection and a verified binding. Sales orders are read from Odoo for 
 partner; this app does not create them.
 
 The binding's erp_customer_id is Odoo's res.partner id (an integer). Partner 1 is the
-company record created with the database. A product line is followed only when its
-Internal Reference is set.
+contact created with the database. The subsidiary's erp_company_id is Odoo's res.company
+id. Company 1 is the company created with the database. A product line is followed only
+when its Internal Reference is set. A quotation whose company id is not recorded on a
+subsidiary is not adopted.
 
 Usage:
     DATABASE_URL=postgresql+psycopg2://portal:portal@localhost:5432/portal \\
@@ -58,9 +60,11 @@ _STATEMENTS = [
     ),
     text(
         """
-        INSERT INTO subsidiary_routes (subsidiary_id, connection_id)
-        VALUES ('sub_demo', 'conn_odoo_local')
-        ON CONFLICT (subsidiary_id) DO UPDATE SET connection_id = EXCLUDED.connection_id
+        INSERT INTO subsidiary_routes (subsidiary_id, connection_id, erp_company_id)
+        VALUES ('sub_demo', 'conn_odoo_local', '1')
+        ON CONFLICT (subsidiary_id) DO UPDATE SET
+            connection_id = EXCLUDED.connection_id,
+            erp_company_id = EXCLUDED.erp_company_id
         """
     ),
 ]

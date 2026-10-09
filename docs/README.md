@@ -6,6 +6,8 @@ reference material when you need it.
 | You are a… | Read | It answers |
 |---|---|---|
 | **Product owner / stakeholder** | [product-owner-guide.md](product-owner-guide.md) | What the product does, every feature it supports, the constraints, and what it deliberately does *not* do yet. |
+| **Business reader** | [business-case.md](business-case.md) | The whole flow in plain language: who is registered first, how a quotation reaches the reseller, and how a later purchase order would use the same records. |
+| **Scoping a demo** | [erp-scope-answers.md](erp-scope-answers.md) | Which ERP, which documents we follow, the fields those documents must carry, and whether the demo needs a UI. |
 | **Developer** | [developer-guide.md](developer-guide.md) | The whole data flow traced end to end — the exact order payload, every event, what changes at each step, status conversions, and the notifications sent out. |
 | **Architect** | [architecture-guide.md](architecture-guide.md) | How the system is shaped: modules, runtime, the consistency model, how to extend it to new ERPs, and why the big decisions were made. |
 

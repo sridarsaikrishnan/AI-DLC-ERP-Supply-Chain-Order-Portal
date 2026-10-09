@@ -120,7 +120,7 @@ erDiagram
 
 ### Outbound webhooks
 - **`webhook_endpoints`** — one reseller HTTP endpoint. Dispatch lists these by `tenant_id`.
-- **`webhook_deliveries`** — one row per attempted POST. The portal lists rows whose status is `DELIVERED`.
+- **`webhook_deliveries`** — one row per attempted POST. AdminOps lists every row, for every reseller.
 
 ## Defense in depth: row-level security
 

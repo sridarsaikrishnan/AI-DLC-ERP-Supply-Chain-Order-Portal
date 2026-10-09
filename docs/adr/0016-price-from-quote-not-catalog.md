@@ -2,7 +2,7 @@
 
 **Status**: Accepted for the unused quote model — superseded on the live path by [ADR-0019](0019-order-routing.md). Supersedes ADR-0011 and ADR-0013.
 
-> **Amendment (ADR-0019):** the portal no longer issues a quote or places an order against
+> **Amendment (ADR-0019):** AdminOps no longer issues a quote or places an order against
 > one. A followed sales order takes its lines and prices from the ERP document at adopt
 > time. `QuoteService.issue_quote` is still in the tree and nothing in the API calls it.
 

@@ -5,8 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg2://portal:portal@localhost:5432/portal}"
-export AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg2://portal:portal@127.0.0.1:5432/portal}"
+export AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-http://127.0.0.1:4566}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-test}"
 export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-test}"
@@ -72,7 +72,7 @@ wait_for() {
 up() {
   docker compose up -d
   wait_for "Postgres" docker compose exec -T postgres pg_isready -U portal
-  wait_for "Floci" curl -sf http://localhost:4566/_floci/health
+  wait_for "Floci" curl -sf http://127.0.0.1:4566/_floci/health
   "$PY" -m alembic upgrade head
   "$PY" -m scripts.messaging_bootstrap
   "$PY" -m scripts.seed_demo
@@ -98,20 +98,20 @@ up() {
   cat <<'EOF'
 
 Local stack is up.
-  Portal                         http://localhost:5173
+  AdminOps                       http://localhost:5173
                                  http://127.0.0.1:5173
   API liveness                   http://127.0.0.1:8000/livez
   API readiness                  http://127.0.0.1:8000/readyz
   Reseller GraphQL               http://127.0.0.1:8000/graphql/reseller
   Operator GraphQL               http://127.0.0.1:8000/graphql/operator
   Odoo                           http://localhost:8069
-  Portal database (Adminer)      http://localhost:8088
+  App database (Adminer)         http://localhost:8088
   Odoo webhook (demo secret)     http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo
   Floci                          http://localhost:4566
   Floci health                   http://localhost:4566/_floci/health
   Floci console                  http://localhost:4566/_floci/ui
 
-Sign in as demo-operator or demo-reseller, password DemoPass123!. Odoo is admin / admin.
+Sign in to AdminOps as demo-operator / DemoPass123!. Odoo is admin / admin.
 Orders are read from Odoo for partner 1 (the demo binding). Set Internal Reference on each product line.
 A sticky Odoo banner about the push service is the browser refusing desktop notifications. Dismiss it.
 Stop with: bash scripts/local.sh down

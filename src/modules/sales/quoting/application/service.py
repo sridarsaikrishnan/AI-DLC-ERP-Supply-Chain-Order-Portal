@@ -57,13 +57,26 @@ class QuoteService:
         return self._companies.list_all()
 
     # --- subsidiary -> ERP routing (Increment 7) ---
-    def set_erp_route(self, subsidiary_id: str, connection_id: str) -> None:
+    def set_erp_route(
+        self, subsidiary_id: str, connection_id: str, erp_company_id: str = ""
+    ) -> None:
         if self._companies.get(subsidiary_id) is None:
             raise ValueError(f"unknown subsidiary '{subsidiary_id}'")
-        self._routes.set_route(subsidiary_id, connection_id)
+        owner = self._routes.find_by_connection(connection_id)
+        if owner is not None and owner != subsidiary_id:
+            raise ValueError(
+                f"connection '{connection_id}' already belongs to subsidiary '{owner}'"
+            )
+        self._routes.set_route(subsidiary_id, connection_id, erp_company_id)
 
     def get_erp_route(self, subsidiary_id: str) -> str | None:
         return self._routes.get_route(subsidiary_id)
+
+    def get_erp_company_id(self, subsidiary_id: str) -> str:
+        return self._routes.get_company_id(subsidiary_id)
+
+    def find_subsidiary(self, connection_id: str, erp_company_id: str) -> str | None:
+        return self._routes.find_subsidiary(connection_id, erp_company_id)
 
     # --- quotes ---
     def issue_quote(

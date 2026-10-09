@@ -76,7 +76,7 @@ class OrderProjector:
                 parties=Parties(
                     end_customer_name="",
                     ship_to="",
-                    subsidiary_id="",
+                    subsidiary_id=str(payload.get("subsidiary_id", "")),
                     quote_id="",
                 ),
             )

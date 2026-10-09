@@ -48,6 +48,7 @@ subsidiary_routes_table = Table(
     _metadata,
     Column("subsidiary_id", String, primary_key=True),
     Column("connection_id", String, nullable=False),
+    Column("erp_company_id", String, nullable=False, server_default=""),
 )
 
 quotes_table = Table(
@@ -230,8 +231,12 @@ class PostgresSubsidiaryRouteRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
-    def set_route(self, subsidiary_id: str, connection_id: str) -> None:
-        values = {"subsidiary_id": subsidiary_id, "connection_id": connection_id}
+    def set_route(self, subsidiary_id: str, connection_id: str, erp_company_id: str = "") -> None:
+        values = {
+            "subsidiary_id": subsidiary_id,
+            "connection_id": connection_id,
+            "erp_company_id": erp_company_id,
+        }
         session = self._session_factory()
         try:
             stmt = pg_insert(subsidiary_routes_table).values(**values)
@@ -255,3 +260,42 @@ class PostgresSubsidiaryRouteRepository:
         finally:
             session.close()
         return row.connection_id if row is not None else None
+
+    def get_company_id(self, subsidiary_id: str) -> str:
+        session = self._session_factory()
+        try:
+            row = session.execute(
+                select(subsidiary_routes_table).where(
+                    subsidiary_routes_table.c.subsidiary_id == subsidiary_id
+                )
+            ).first()
+        finally:
+            session.close()
+        return row.erp_company_id if row is not None else ""
+
+    def find_by_connection(self, connection_id: str) -> str | None:
+        session = self._session_factory()
+        try:
+            row = session.execute(
+                select(subsidiary_routes_table).where(
+                    subsidiary_routes_table.c.connection_id == connection_id
+                )
+            ).first()
+        finally:
+            session.close()
+        return row.subsidiary_id if row is not None else None
+
+    def find_subsidiary(self, connection_id: str, erp_company_id: str) -> str | None:
+        if not erp_company_id:
+            return None
+        session = self._session_factory()
+        try:
+            row = session.execute(
+                select(subsidiary_routes_table).where(
+                    subsidiary_routes_table.c.connection_id == connection_id,
+                    subsidiary_routes_table.c.erp_company_id == erp_company_id,
+                )
+            ).first()
+        finally:
+            session.close()
+        return row.subsidiary_id if row is not None else None

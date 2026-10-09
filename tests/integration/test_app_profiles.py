@@ -98,6 +98,7 @@ def test_memory_profile_observes_order_and_reads_it() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
+        subsidiary_id="sub_demo",
     )
     app.state.container.drain()
 
@@ -136,6 +137,7 @@ def test_postgres_profile_observes_order_and_leaves_it_for_the_worker() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
+        subsidiary_id="sub_demo",
     )
 
     try:

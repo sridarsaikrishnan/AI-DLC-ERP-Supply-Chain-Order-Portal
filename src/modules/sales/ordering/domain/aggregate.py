@@ -125,6 +125,7 @@ class Order(Aggregate):
         lines: list[OrderLine],
         connection_id: str,
         erp_order_id: str,
+        subsidiary_id: str = "",
     ) -> Order:
         """Adopt a sales order that already exists in the ERP. Does not emit
         `OrderReadyForDelivery`, so nothing turns around and creates one."""
@@ -147,6 +148,7 @@ class Order(Aggregate):
                 product_keys=[line.product_key for line in lines],
                 routed_to_connection_id=connection_id,
                 erp_order_id=erp_order_id,
+                subsidiary_id=subsidiary_id,
             )
         )
         return order
@@ -343,6 +345,7 @@ class Order(Aggregate):
         self.product_keys = list(e.product_keys)
         self.owning_connection_id = ConnectionId(e.routed_to_connection_id)
         self.erp_order_id = e.erp_order_id
+        self.subsidiary_id = e.subsidiary_id
         self.state = OrderState.SENT_TO_ERP
 
     def _apply_OrderValidated(self, e: OrderValidated) -> None:

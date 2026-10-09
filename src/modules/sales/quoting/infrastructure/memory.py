@@ -46,10 +46,37 @@ class InMemorySubsidiaryRepository:
 
 class InMemorySubsidiaryRouteRepository:
     def __init__(self) -> None:
-        self._route_by_company: dict[str, str] = {}
+        self._route_by_company: dict[str, tuple[str, str]] = {}
 
-    def set_route(self, subsidiary_id: str, connection_id: str) -> None:
-        self._route_by_company[subsidiary_id] = connection_id
+    def set_route(self, subsidiary_id: str, connection_id: str, erp_company_id: str = "") -> None:
+        self._route_by_company[subsidiary_id] = (connection_id, erp_company_id)
 
     def get_route(self, subsidiary_id: str) -> str | None:
-        return self._route_by_company.get(subsidiary_id)
+        row = self._route_by_company.get(subsidiary_id)
+        return row[0] if row is not None else None
+
+    def get_company_id(self, subsidiary_id: str) -> str:
+        row = self._route_by_company.get(subsidiary_id)
+        return row[1] if row is not None else ""
+
+    def find_by_connection(self, connection_id: str) -> str | None:
+        matches = [
+            subsidiary_id
+            for subsidiary_id, (connection, _company) in self._route_by_company.items()
+            if connection == connection_id
+        ]
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
+    def find_subsidiary(self, connection_id: str, erp_company_id: str) -> str | None:
+        if not erp_company_id:
+            return None
+        matches = [
+            subsidiary_id
+            for subsidiary_id, (connection, company) in self._route_by_company.items()
+            if connection == connection_id and company == erp_company_id
+        ]
+        if len(matches) != 1:
+            return None
+        return matches[0]

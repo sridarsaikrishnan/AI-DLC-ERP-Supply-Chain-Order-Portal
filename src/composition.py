@@ -496,12 +496,24 @@ def _build_postgres_container(settings: Settings) -> Container:
                 )
                 continue
             for erp_order in found:
+                subsidiary_id = quote_service.find_subsidiary(
+                    str(connection_id), erp_order.erp_company_id
+                )
+                if not subsidiary_id:
+                    log.info(
+                        "skip ERP order connection=%s order=%s company=%s: no subsidiary",
+                        connection_id,
+                        erp_order.erp_order_id,
+                        erp_order.erp_company_id,
+                    )
+                    continue
                 adopted = order_service.observe_erp_order(
                     tenant_id=binding.tenant_id,
                     connection_id=str(connection_id),
                     erp_order_id=erp_order.erp_order_id,
                     client_reference=erp_order.client_reference,
                     lines=erp_order.lines,
+                    subsidiary_id=subsidiary_id,
                 )
                 if adopted is not None:
                     ids.append(erp_order.erp_order_id)

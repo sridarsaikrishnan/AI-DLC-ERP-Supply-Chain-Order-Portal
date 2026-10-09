@@ -8,6 +8,7 @@ import {
   CREATE_SUBSIDIARY_MUTATION,
   ERP_ROUTE_QUERY,
   SUBSIDIARIES_QUERY,
+  NOTIFICATIONS_QUERY,
   OPERATOR_ORDERS_QUERY,
   OPERATOR_ORDER_QUERY,
   PAUSE_CONNECTION_MUTATION,
@@ -20,6 +21,7 @@ import {
   type Binding,
   type Connection,
   type Subsidiary,
+  type NotificationDelivery,
   type OperatorOrder,
 } from "../api/queries/admin";
 import { useAuth } from "../auth/AuthContext";
@@ -28,6 +30,19 @@ import { useToast } from "../components/Toast";
 // Orders move on their own timeline (worker-driven) — poll so status changes show up
 // without a manual reload, which is most of what "the UI feels static" complaints were.
 const LIVE_REFETCH_MS = 5000;
+
+export function useNotifications() {
+  const { idToken, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () =>
+      graphqlRequest<{ notifications: NotificationDelivery[] }>("operator", NOTIFICATIONS_QUERY, {}, idToken).then(
+        (d) => d.notifications,
+      ),
+    enabled: isAuthenticated,
+    refetchInterval: LIVE_REFETCH_MS,
+  });
+}
 
 export function useConnections() {
   const { idToken, isAuthenticated } = useAuth();
@@ -52,7 +67,7 @@ export function useErpRoute(subsidiaryId: string) {
   return useQuery({
     queryKey: ["erpRoute", subsidiaryId],
     queryFn: () =>
-      graphqlRequest<{ erpRoute: string | null }, { subsidiaryId: string }>(
+      graphqlRequest<{ erpRoute: { connectionId: string; erpCompanyId: string } | null }, { subsidiaryId: string }>(
         "operator",
         ERP_ROUTE_QUERY,
         { subsidiaryId },
@@ -183,7 +198,7 @@ export function useSetErpRoute() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
-    mutationFn: (input: { subsidiaryId: string; connectionId: string }) =>
+    mutationFn: (input: { subsidiaryId: string; connectionId: string; erpCompanyId: string }) =>
       graphqlRequest("operator", SET_ERP_ROUTE_MUTATION, input, idToken),
     onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ["erpRoute", input.subsidiaryId] });

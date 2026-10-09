@@ -145,7 +145,7 @@ class OdooAdapter:
                 "sale.order",
                 "search_read",
                 [[["partner_id", "=", pid]]],
-                {"fields": ["name", "client_order_ref", "order_line", "currency_id"]},
+                {"fields": ["name", "client_order_ref", "order_line", "currency_id", "company_id"]},
             )
             found: list[ErpPartnerOrder] = []
             for order in orders:
@@ -181,6 +181,10 @@ class OdooAdapter:
                 currency_field = order.get("currency_id")
                 if isinstance(currency_field, list | tuple) and len(currency_field) > 1:
                     currency = str(currency_field[1]) or "USD"
+                company = ""
+                company_field = order.get("company_id")
+                if isinstance(company_field, list | tuple) and company_field:
+                    company = str(company_field[0])
                 lines: list[ErpPartnerOrderLine] = []
                 for line in raw_lines:
                     if not line.get("product_id") or line.get("display_type") not in (
@@ -209,6 +213,7 @@ class OdooAdapter:
                         erp_order_id=name,
                         client_reference=str(order.get("client_order_ref") or name),
                         lines=tuple(lines),
+                        erp_company_id=company,
                     )
                 )
             return found

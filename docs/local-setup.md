@@ -22,7 +22,7 @@ bash scripts/local.sh up
 bash scripts/local.sh down
 ```
 `up` starts Postgres, Floci, and Odoo, applies migrations, provisions queues, seeds the
-demo tenant, and starts the api, worker, and (if `ui/node_modules` exists) the portal.
+demo tenant, and starts the api, worker, and (if `ui/node_modules` exists) AdminOps.
 `down` stops those processes and the containers. Volumes stay, so the next `up` keeps
 the database and the Odoo install.
 
@@ -92,7 +92,7 @@ PY
 ```
 Both demo users land in the same tenant (`tnt_demo`) so they see the same seeded
 connection/binding/items from step 5 — `demo-operator` for the admin screens,
-`demo-reseller` for the order screens.
+Sign in to AdminOps as `demo-operator`. `demo-reseller` is a machine-role user, not a screen.
 Export those two values, restart `api` (step 6), then get a real token and use it:
 ```bash
 export COGNITO_USER_POOL_ID=...  COGNITO_CLIENT_ID=...

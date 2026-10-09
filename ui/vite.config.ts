@@ -13,7 +13,7 @@ export default defineConfig({
       // public InitiateAuth endpoint does support CORS, so this proxy only exists for
       // local dev against floci — set VITE_COGNITO_ENDPOINT_URL=/cognito-idp to use it.
       "/cognito-idp": {
-        target: "http://localhost:4566",
+        target: "http://127.0.0.1:4566",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/cognito-idp/, ""),
       },

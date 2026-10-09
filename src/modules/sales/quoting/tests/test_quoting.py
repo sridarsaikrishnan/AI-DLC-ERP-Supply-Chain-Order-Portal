@@ -122,12 +122,20 @@ def test_issue_quote_refuses_when_office_has_no_erp_route() -> None:
 
 def test_quote_stamps_the_offices_current_erp_route() -> None:
     svc = _service()
-    company = svc.create_subsidiary(name="Dist", country="US", language="en")
-    svc.set_erp_route(company.subsidiary_id, "conn_odoo_us")
     quote = _issue(svc, valid_from=date(2026, 1, 1), valid_until=date(2026, 12, 31))
     assert quote.routed_to_connection_id == "conn_odoo_us"
 
-    # switching the subsidiary's route doesn't retroactively change an already-issued quote
-    svc.set_erp_route(company.subsidiary_id, "conn_odoo_eu")
-    assert svc.get_erp_route(company.subsidiary_id) == "conn_odoo_eu"
+    svc.set_erp_route(quote.subsidiary_id, "conn_odoo_eu")
+    assert svc.get_erp_route(quote.subsidiary_id) == "conn_odoo_eu"
     assert quote.routed_to_connection_id == "conn_odoo_us"
+
+
+def test_one_odoo_belongs_to_one_subsidiary() -> None:
+    svc = _service()
+    company = svc.create_subsidiary(name="Dist", country="US", language="en")
+    other = svc.create_subsidiary(name="Other", country="DE", language="de")
+    svc.set_erp_route(company.subsidiary_id, "conn_odoo", "1")
+
+    assert svc.find_subsidiary("conn_odoo", "1") == company.subsidiary_id
+    with pytest.raises(ValueError, match="already belongs"):
+        svc.set_erp_route(other.subsidiary_id, "conn_odoo", "2")

@@ -113,6 +113,7 @@ def test_odoo_webhook_with_correct_shared_secret_updates_order_status() -> None:
             erp_order_id="S00042",
             client_reference="S00042",
             lines=[ErpPartnerOrderLine(product_key=sku, quantity="1", unit_price="10")],
+            subsidiary_id="sub_demo",
         )
         event_store = PostgresEventStore(_factory)
         for event in event_store.load(order_id):

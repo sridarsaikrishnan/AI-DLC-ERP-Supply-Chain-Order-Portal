@@ -50,6 +50,7 @@ class OrderObserved(DomainEvent):
     product_keys: list[str]
     routed_to_connection_id: str
     erp_order_id: str
+    subsidiary_id: str = ""
 
 
 @register_event

@@ -42,6 +42,7 @@ def test_container_observes_an_erp_order() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[ErpPartnerOrderLine(product_key="ANVIL", quantity="2", unit_price="19.99")],
+        subsidiary_id="sub_demo",
     )
     container.bus.run_until_empty()
 

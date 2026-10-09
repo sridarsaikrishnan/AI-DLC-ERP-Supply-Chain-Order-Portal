@@ -47,6 +47,7 @@ def test_observed_order_confirms_via_webhook() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[ErpPartnerOrderLine(product_key="ANVIL", quantity="3", unit_price="19.99")],
+        subsidiary_id="sub_demo",
     )
     bus.run_until_empty()
 

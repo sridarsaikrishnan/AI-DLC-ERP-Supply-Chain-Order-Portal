@@ -20,7 +20,9 @@ from src.shared.types import BindingId, ConnectionId, TenantId
 from .types import (
     BindingType,
     ConnectionType,
+    ErpRouteType,
     MoneyType,
+    NotificationType,
     OperatorOrder,
     OperatorOrderLineType,
     OperatorPartiesType,
@@ -153,6 +155,26 @@ class Query:
         ]
 
     @strawberry.field
+    def notifications(self, info: Info[GraphQLContext, None]) -> list[NotificationType]:
+        """Every webhook sent to a reseller, across every reseller."""
+        ctx = info.context
+        ctx.require_role("OPERATOR")
+        return [
+            NotificationType(
+                delivery_id=d.delivery_id,
+                tenant_id=str(d.tenant_id),
+                endpoint_id=str(d.endpoint_id),
+                order_id=d.order_id,
+                event_type=d.event_type,
+                occurred_at=d.occurred_at.isoformat(),
+                status=d.status.value,
+                attempts=d.attempts,
+                last_response=d.last_response,
+            )
+            for d in ctx.container.webhook_deliveries.list_all()
+        ]
+
+    @strawberry.field
     def connections(self, info: Info[GraphQLContext, None]) -> list[ConnectionType]:
         ctx = info.context
         ctx.require_role("OPERATOR")
@@ -171,10 +193,18 @@ class Query:
         return [_company_to_gql(c) for c in ctx.container.quote_service.list_subsidiaries()]
 
     @strawberry.field
-    def erp_route(self, info: Info[GraphQLContext, None], subsidiary_id: str) -> str | None:
+    def erp_route(
+        self, info: Info[GraphQLContext, None], subsidiary_id: str
+    ) -> ErpRouteType | None:
         ctx = info.context
         ctx.require_role("OPERATOR")
-        return ctx.container.quote_service.get_erp_route(subsidiary_id)
+        connection_id = ctx.container.quote_service.get_erp_route(subsidiary_id)
+        if connection_id is None:
+            return None
+        return ErpRouteType(
+            connection_id=connection_id,
+            erp_company_id=ctx.container.quote_service.get_erp_company_id(subsidiary_id),
+        )
 
 
 @strawberry.type
@@ -268,14 +298,17 @@ class Mutation:
 
     @strawberry.mutation
     def set_erp_route(
-        self, info: Info[GraphQLContext, None], subsidiary_id: str, connection_id: str
+        self,
+        info: Info[GraphQLContext, None],
+        subsidiary_id: str,
+        connection_id: str,
+        erp_company_id: str,
     ) -> SubsidiaryType:
-        """Which ERP connection this subsidiary's quotes route to (Increment 7) — replaces
-        whatever route it had before; quotes already issued keep the one they were
-        stamped with."""
+        """Which ERP connection this subsidiary uses, and which company id on that
+        connection is this subsidiary. The company id is read off the quotation."""
         ctx = info.context
         ctx.require_role("OPERATOR")
-        ctx.container.quote_service.set_erp_route(subsidiary_id, connection_id)
+        ctx.container.quote_service.set_erp_route(subsidiary_id, connection_id, erp_company_id)
         company = ctx.container.quote_service.get_subsidiary(subsidiary_id)
         assert company is not None
         return _company_to_gql(company)

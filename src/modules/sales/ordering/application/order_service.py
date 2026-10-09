@@ -41,18 +41,24 @@ class OrderService:
         erp_order_id: str,
         client_reference: str,
         lines: list[ObservedLine] | tuple[ObservedLine, ...],
+        subsidiary_id: str,
     ) -> OrderId | None:
         """Adopt `erp_order_id` if we have not already. The id is stable so a second poll
         is a no-op even before the projection has caught up.
 
-        Returns None when the ERP document has no product line we can follow.
+        Returns None when the company on the quotation is not a known subsidiary, or when
+        the document has no product line we can follow.
         """
         order_id = OrderId(f"ord_{connection_id}_{erp_order_id}")
         try:
             self._repository.get(str(order_id))
-            return order_id
         except AggregateNotFound:
             pass
+        else:
+            return order_id
+
+        if not subsidiary_id:
+            return None
 
         order_lines: list[OrderLine] = []
         for index, line in enumerate(lines, start=1):
@@ -82,6 +88,7 @@ class OrderService:
             lines=order_lines,
             connection_id=connection_id,
             erp_order_id=erp_order_id,
+            subsidiary_id=subsidiary_id,
         )
         self._repository.save(order)
         return order_id

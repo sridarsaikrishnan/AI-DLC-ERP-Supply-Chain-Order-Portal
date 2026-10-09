@@ -7,7 +7,7 @@ Same headings for every ERP. Odoo is the filled-in copy: [../odoo/supply-chain-c
 
 - The stack is up.
 - Which connection row, which binding, and which customer id in this ERP that binding uses.
-- Where to sign in: ERP UI, operator portal, reseller portal.
+- Where to sign in: ERP UI and AdminOps (`demo-operator`).
 
 ## One-time setup in the ERP
 

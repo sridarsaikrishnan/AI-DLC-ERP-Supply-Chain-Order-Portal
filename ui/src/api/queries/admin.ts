@@ -82,7 +82,7 @@ export const SUBSIDIARIES_QUERY = /* GraphQL */ `
 
 export const ERP_ROUTE_QUERY = /* GraphQL */ `
   query ErpRoute($subsidiaryId: String!) {
-    erpRoute(subsidiaryId: $subsidiaryId)
+    erpRoute(subsidiaryId: $subsidiaryId) { connectionId erpCompanyId }
   }
 `;
 
@@ -151,8 +151,8 @@ export const VERIFY_BINDING_MUTATION = /* GraphQL */ `
 `;
 
 export const SET_ERP_ROUTE_MUTATION = /* GraphQL */ `
-  mutation SetErpRoute($subsidiaryId: String!, $connectionId: String!) {
-    setErpRoute(subsidiaryId: $subsidiaryId, connectionId: $connectionId) {
+  mutation SetErpRoute($subsidiaryId: String!, $connectionId: String!, $erpCompanyId: String!) {
+    setErpRoute(subsidiaryId: $subsidiaryId, connectionId: $connectionId, erpCompanyId: $erpCompanyId) {
       subsidiaryId
     }
   }
@@ -180,6 +180,26 @@ export const CREATE_SUBSIDIARY_MUTATION = /* GraphQL */ `
   mutation CreateSubsidiary($name: String!, $country: String!, $language: String!) {
     createSubsidiary(name: $name, country: $country, language: $language) {
       subsidiaryId
+    }
+  }
+`;
+
+export interface NotificationDelivery {
+  deliveryId: string;
+  tenantId: string;
+  endpointId: string;
+  orderId: string;
+  eventType: string;
+  occurredAt: string;
+  status: string;
+  attempts: number;
+  lastResponse: string | null;
+}
+
+export const NOTIFICATIONS_QUERY = /* GraphQL */ `
+  query Notifications {
+    notifications {
+      deliveryId tenantId endpointId orderId eventType occurredAt status attempts lastResponse
     }
   }
 `;

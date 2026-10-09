@@ -6,6 +6,25 @@ import strawberry
 
 
 @strawberry.type
+class NotificationType:
+    delivery_id: str
+    tenant_id: str
+    endpoint_id: str
+    order_id: str
+    event_type: str
+    occurred_at: str
+    status: str
+    attempts: int
+    last_response: str | None
+
+
+@strawberry.type
+class ErpRouteType:
+    connection_id: str
+    erp_company_id: str
+
+
+@strawberry.type
 class MoneyType:
     # str, not float (known gap, architect review 2026-10-04): internal Money/TaxRate
     # are Decimal-exact; float can't represent 19.99 exactly, and a client doing its own

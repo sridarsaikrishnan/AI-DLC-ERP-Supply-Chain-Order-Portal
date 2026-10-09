@@ -15,32 +15,54 @@ import type { Connection, Subsidiary } from "../../api/queries/admin";
  * subsidiary's route doesn't refetch every row (Increment 7: routing is decided here,
  * at quote-issue time, not re-derived from order line items). */
 function RouteCell({ subsidiary, connections }: { subsidiary: Subsidiary; connections: Connection[] }) {
-  const { data: connectionId, isLoading } = useErpRoute(subsidiary.subsidiaryId);
+  const { data: route, isLoading } = useErpRoute(subsidiary.subsidiaryId);
   const setRoute = useSetErpRoute();
-  const [value, setValue] = useState("");
+  const [connectionDraft, setConnectionDraft] = useState<string | null>(null);
+  const [companyDraft, setCompanyDraft] = useState<string | null>(null);
+  const connectionId = connectionDraft ?? route?.connectionId ?? "";
+  const companyId = companyDraft ?? route?.erpCompanyId ?? "";
 
   if (isLoading) return <span className="muted">Loading…</span>;
 
-  async function handleChange(next: string) {
-    setValue(next);
-    if (!next) return;
-    await setRoute.mutateAsync({ subsidiaryId: subsidiary.subsidiaryId, connectionId: next });
+  async function save(nextConnection: string, nextCompany: string) {
+    if (!nextConnection) return;
+    await setRoute.mutateAsync({
+      subsidiaryId: subsidiary.subsidiaryId,
+      connectionId: nextConnection,
+      erpCompanyId: nextCompany.trim(),
+    });
   }
 
   return (
-    <select
-      className="input"
-      value={value || connectionId || ""}
-      onChange={(e) => handleChange(e.target.value)}
-      disabled={setRoute.isPending}
-    >
-      <option value="">{connectionId ? connectionId : "Not routed yet"}</option>
-      {connections.map((c) => (
-        <option key={c.connectionId} value={c.connectionId}>
-          {c.instanceLabel} ({c.connectionId})
-        </option>
-      ))}
-    </select>
+    <div className="actions">
+      <select
+        className="input"
+        value={connectionId}
+        onChange={(e) => {
+          const next = e.target.value;
+          if (!next) return;
+          setConnectionDraft(next);
+          void save(next, companyId);
+        }}
+        disabled={setRoute.isPending}
+      >
+        <option value="">Not routed yet</option>
+        {connections.map((c) => (
+          <option key={c.connectionId} value={c.connectionId}>
+            {c.instanceLabel} ({c.connectionId})
+          </option>
+        ))}
+      </select>
+      <input
+        className="input"
+        value={companyId}
+        placeholder="Odoo company id"
+        aria-label="Odoo company id"
+        onChange={(e) => setCompanyDraft(e.target.value)}
+        onBlur={() => void save(connectionId, companyId)}
+        disabled={setRoute.isPending || !connectionId}
+      />
+    </div>
   );
 }
 
@@ -77,7 +99,7 @@ export function SubsidiariesPage() {
         <div>
           <h1>Subsidiaries</h1>
           <p>
-            The company you are. Country and language live here <InfoTag text="So document numbers and emails have a home — the subsidiary record." />.
+            The company you are. The Odoo company id is the company on the quotation <InfoTag text="Adopt matches sale.order company_id to this id. A quotation for any other company is not adopted." />.
           </p>
         </div>
         <div className="actions">

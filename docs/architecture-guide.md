@@ -7,8 +7,8 @@ by step, see the [developer guide](developer-guide.md).
 
 ## 1. Context and intent
 
-A multi-tenant portal that fronts (eventually) several ERPs so resellers place and track
-orders without knowing which ERP a product lives in. One ERP is live (Odoo); the whole
+AdminOps fronts (eventually) several ERPs. Sales writes the order in the ERP; the
+distributor reads every order and every reseller notification in AdminOps. One ERP is live (Odoo); the whole
 design is organised around making the *next* ERP a small, contained change rather than a
 rewrite. The guiding posture: a modular monolith with clean seams, built so modules can be
 pulled into their own services when (and only when) there's a reason to.

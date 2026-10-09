@@ -71,6 +71,7 @@ class ErpPartnerOrder:
     erp_order_id: str
     client_reference: str
     lines: tuple[ErpPartnerOrderLine, ...]
+    erp_company_id: str = ""
 
 
 @dataclass(frozen=True)

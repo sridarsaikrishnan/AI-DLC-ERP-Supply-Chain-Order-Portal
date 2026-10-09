@@ -2,8 +2,8 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
 
-const RESELLER_NAV = [{ to: "/notifications", label: "Notifications" }];
-const OPERATOR_NAV = [
+const ADMIN_NAV = [
+  { to: "/admin/notifications", label: "Notifications" },
   { to: "/admin/orders", label: "Orders" },
   { to: "/admin/subsidiaries", label: "Subsidiaries" },
   { to: "/admin/connections", label: "ERP connections" },
@@ -14,28 +14,26 @@ const OPERATOR_NAV = [
 function crumbFor(pathname: string): string {
   if (/^\/orders\/[^/]+\/events$/.test(pathname)) return "Notifications / Order events";
   if (/^\/orders\/[^/]+$/.test(pathname)) return "Notifications / Order";
-  if (pathname.startsWith("/notifications")) return "Notifications";
-  if (pathname.startsWith("/admin/orders")) return "Operator / Orders";
-  if (pathname.startsWith("/admin/subsidiaries")) return "Operator / Subsidiaries";
-  if (pathname.startsWith("/admin/connections")) return "Operator / ERP connections";
-  if (pathname.startsWith("/admin/tenants")) return "Operator / Resellers";
-  if (pathname.startsWith("/admin/failed-messages")) return "Operator / Failed messages";
+  if (pathname.startsWith("/admin/notifications")) return "AdminOps / Notifications";
+  if (pathname.startsWith("/admin/orders")) return "AdminOps / Orders";
+  if (pathname.startsWith("/admin/subsidiaries")) return "AdminOps / Subsidiaries";
+  if (pathname.startsWith("/admin/connections")) return "AdminOps / ERP connections";
+  if (pathname.startsWith("/admin/tenants")) return "AdminOps / Resellers";
+  if (pathname.startsWith("/admin/failed-messages")) return "AdminOps / Failed messages";
   return "";
 }
 
 export function AppShell() {
   const { tenantId, roles, signOut } = useAuth();
   const location = useLocation();
-  const isOperator = roles.includes("OPERATOR");
-  const isReseller = roles.includes("RESELLER") || !isOperator;
-  const navItems = [...(isReseller ? RESELLER_NAV : []), ...(isOperator ? OPERATOR_NAV : [])];
+  const navItems = ADMIN_NAV;
 
   return (
     <div className="app">
       <aside className="side">
         <div>
-          <div className="brandmark">ERP Platform</div>
-          <div className="role">{isOperator ? "Operator admin" : "Reseller portal"}</div>
+          <div className="brandmark">AdminOps</div>
+          <div className="role">Distributor</div>
         </div>
         <nav className="nav" aria-label="Main">
           {navItems.map((n) => (

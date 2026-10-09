@@ -37,6 +37,15 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def _same_loopback(left: str, right: str) -> bool:
+    """`localhost` and `127.0.0.1` are the same machine. Windows often resets one of them."""
+
+    def norm(url: str) -> str:
+        return url.replace("://localhost", "://127.0.0.1")
+
+    return norm(left) == norm(right)
+
+
 def issuer_url(*, aws_endpoint_url: str | None, aws_region: str, user_pool_id: str) -> str:
     """floci and real AWS use the same path, different host — same pattern as every
     other AWS-backed port in this project (secrets, messaging)."""
@@ -58,7 +67,11 @@ class CognitoIdentityProvider:
         self._client_id = client_id
         self._issuer = issuer
         self._resource_server_id = resource_server_id
-        self._jwks = jwk_client or PyJWKClient(f"{issuer}/.well-known/jwks.json")
+        # `localhost` on Windows often resolves to IPv6 and the local emulator only
+        # accepts IPv4, which resets the JWKS fetch. The token's issuer string stays
+        # whatever Cognito minted.
+        jwks_url = f"{issuer}/.well-known/jwks.json".replace("://localhost:", "://127.0.0.1:")
+        self._jwks = jwk_client or PyJWKClient(jwks_url)
 
     def authenticate(self, headers: Mapping[str, str]) -> Principal | None:
         auth_header = headers.get("authorization", "")
@@ -72,11 +85,17 @@ class CognitoIdentityProvider:
             # client_id) — done manually below, per token_use. PyJWT otherwise auto-
             # rejects any token that HAS an `aud` claim when `audience=` isn't given
             # (its fail-safe default), so `verify_aud` must be turned off explicitly.
+            token_issuer = jwt.decode(token, options={"verify_signature": False}).get("iss", "")
+            issuer = (
+                token_issuer
+                if isinstance(token_issuer, str) and _same_loopback(token_issuer, self._issuer)
+                else self._issuer
+            )
             claims = jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
-                issuer=self._issuer,
+                issuer=issuer,
                 options={"verify_aud": False},
             )
         except jwt.PyJWTError as exc:

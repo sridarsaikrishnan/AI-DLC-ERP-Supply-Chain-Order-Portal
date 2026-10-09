@@ -1,17 +1,15 @@
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter, useParams } from "react-router-dom";
 
 import { AppShell } from "./App";
 import { useAuth } from "./auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
-import { OrderDetailPage } from "./features/orders/OrderDetailPage";
-import { NotificationsPage } from "./features/notifications/NotificationsPage";
+import { NotificationsPage } from "./features/admin/NotificationsPage";
 import { ConnectionsPage } from "./features/admin/ConnectionsPage";
 import { TenantsPage } from "./features/admin/TenantsPage";
 import { SubsidiariesPage } from "./features/admin/SubsidiariesPage";
 import { OrdersPage as OperatorOrdersPage } from "./features/admin/OrdersPage";
 import { OrderDetailPage as OperatorOrderDetailPage } from "./features/admin/OrderDetailPage";
 import { FailedMessagesPage } from "./features/admin/FailedMessagesPage";
-import { OrderEventsPage } from "./features/events/OrderEventsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -20,8 +18,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function HomeRedirect() {
-  const { roles } = useAuth();
-  return <Navigate to={roles.includes("RESELLER") || !roles.includes("OPERATOR") ? "/notifications" : "/admin/orders"} replace />;
+  return <Navigate to="/admin/orders" replace />;
+}
+
+function OrderRedirect() {
+  const { orderId } = useParams();
+  return <Navigate to={`/admin/orders/${orderId}`} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -35,9 +37,9 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
-      { path: "notifications", element: <NotificationsPage /> },
-      { path: "orders/:orderId", element: <OrderDetailPage /> },
-      { path: "orders/:orderId/events", element: <OrderEventsPage /> },
+      { path: "notifications", element: <Navigate to="/admin/notifications" replace /> },
+      { path: "orders/:orderId", element: <OrderRedirect /> },
+      { path: "admin/notifications", element: <NotificationsPage /> },
       { path: "admin/orders", element: <OperatorOrdersPage /> },
       { path: "admin/orders/:orderId", element: <OperatorOrderDetailPage /> },
       { path: "admin/subsidiaries", element: <SubsidiariesPage /> },

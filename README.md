@@ -1,6 +1,6 @@
-# ERP & Supply Chain Order Portal
+# AdminOps
 
-A multi-tenant portal that routes a reseller order to the ERP on the quote's subsidiary
+AdminOps reads a reseller order from the ERP on the quote's subsidiary
 (Odoo today; more via a small registration checklist — see `docs/adding-an-erp.md`), with
 event-sourced orders, a transactional-outbox/SNS/SQS async pipeline, and a GraphQL API
 split by audience (reseller vs. operator, so ERP identity never reaches a reseller — FR-19).
@@ -33,7 +33,7 @@ network failure modes) up front for a system that doesn't need it yet.
 |---|---|---|
 | **`api`** (FastAPI) | Serves GraphQL (`/graphql/reseller`, `/graphql/operator`) and inbound ERP webhooks. Handles reads and synchronous writes (place/cancel an order). | Postgres, Cognito (auth) |
 | **`worker`** | Five SQS consumers (order-processing, order-delivery, order-fulfillment, projections, webhook-dispatch), the outbox relay, and the reconciliation sweeper. Talking to the ERP, building read models, and sending webhooks happens here, not in `api`. | Postgres, SQS/SNS, the ERP (Odoo), reseller webhook endpoints |
-| **`ui`** (React SPA) | Reseller portal (notifications, then the order) and operator admin. Talks to `api` over GraphQL only. | `api` |
+| **`ui`** (React SPA) | AdminOps, the distributor's application. Talks to `api` over GraphQL only. | `api` |
 
 ```mermaid
 flowchart LR
@@ -104,17 +104,17 @@ cd ui && npm install && cd ..
 Then:
 
 ```bash
-bash scripts/local.sh up          # Postgres, Floci, Odoo, migrate, seed, api, worker, portal
+bash scripts/local.sh up          # Postgres, Floci, Odoo, migrate, seed, api, worker, AdminOps
 bash scripts/local.sh down        # stop those processes and containers; databases are kept
 ```
 
-`up` is safe to run again. It restarts api, worker, and the portal so they pick up the
+`up` is safe to run again. It restarts api, worker, and AdminOps so they pick up the
 current env, and it waits until `GET /livez` answers. Logs are `.local/api.log`,
 `.local/worker.log`, and `.local/ui.log`. The first Odoo boot installs modules and takes
 a few minutes. `down` does not delete Docker volumes.
 
-Sign in at the portal as `demo-operator` (operator admin) or `demo-reseller` (notifications
-only). Password for both: `DemoPass123!`. Odoo is `admin` / `admin`. The seeded quote is
+Sign in to AdminOps as `demo-operator` / `DemoPass123!`. That login sees every order and
+every notification sent to a reseller. Odoo is `admin` / `admin`. The seeded quote is
 `qte_demo` for tenant `tnt_demo`, SKU `DEMO-BOX`. Set that Internal Reference on a product
 in Odoo before a live submit will find it.
 
@@ -124,7 +124,7 @@ block sales.
 
 | What | URL |
 |---|---|
-| Reseller and operator portal | http://localhost:5173 and http://127.0.0.1:5173 |
+| AdminOps | http://localhost:5173 and http://127.0.0.1:5173 |
 | API liveness | http://127.0.0.1:8000/livez |
 | API readiness | http://127.0.0.1:8000/readyz |
 | Reseller GraphQL | http://127.0.0.1:8000/graphql/reseller |
@@ -132,13 +132,13 @@ block sales.
 | Odoo inbound webhook (shared secret in the path) | http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-demo |
 | HMAC inbound webhook | http://127.0.0.1:8000/erp/webhook/{connection_id} |
 | Odoo | http://localhost:8069 |
-| Portal database (Adminer) | http://localhost:8088 |
+| App database (Adminer) | http://localhost:8088 |
 | Floci (AWS emulator) | http://localhost:4566 |
 | Floci health | http://localhost:4566/_floci/health |
 | Floci console | http://localhost:4566/_floci/ui |
-| Portal Postgres | `localhost:5432`, database `portal`, user `portal`, password `portal` |
+| App Postgres | `localhost:5432`, database `portal`, user `portal`, password `portal` |
 
-The portal calls Floci Cognito through the Vite proxy at `/cognito-idp` (Floci does not
+AdminOps calls Floci Cognito through the Vite proxy at `/cognito-idp` (Floci does not
 send browser CORS headers). `scripts/local.sh` writes `ui/.env` with the pool and client
 ids. Do not copy `ui/.env.example` over that file after `up`.
 

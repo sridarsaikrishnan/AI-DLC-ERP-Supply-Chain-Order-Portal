@@ -1,6 +1,6 @@
 """Create the local Floci user pool and demo users, once.
 
-Writes `.local/cognito.env` for the api and `ui/.env` for the portal.
+Writes `.local/cognito.env` for the api and `ui/.env` for AdminOps.
 Users: demo-operator / DemoPass123! (OPERATOR), demo-reseller / DemoPass123! (reseller).
 Both are tenant tnt_demo.
 """
@@ -89,7 +89,7 @@ def main() -> None:
     Path("ui/.env").write_text(
         "\n".join(
             [
-                "VITE_GRAPHQL_URL=http://localhost:8000/graphql",
+                "VITE_GRAPHQL_URL=http://127.0.0.1:8000/graphql",
                 "VITE_COGNITO_ENDPOINT_URL=/cognito-idp",
                 "VITE_COGNITO_REGION=us-east-1",
                 f"VITE_COGNITO_USER_POOL_ID={pool_id}",

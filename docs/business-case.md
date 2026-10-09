@@ -1,234 +1,114 @@
-# Business case: the ERP & Supply Chain Order Portal
+# Business case: AdminOps
 
-How we connect resellers to the right ERP, and how one order makes it all the way
-through — with a real example.
+How a quotation written in the ERP reaches the right reseller, and how confirmation, delivery, and invoice follow it back.
 
----
+Odoo is the ERP we run today. A second Odoo database is another connection. A different ERP product uses the same records once its adapter exists.
 
 ## Where this product fits
 
 ```mermaid
 flowchart LR
     EC[End customer] -->|buys from| R[Reseller]
-    R -->|places order,<br/>tracks status| P[["Our portal"]]
-    P -->|sends the order<br/>directly to| ERP[(ERP system<br/>e.g. NetSuite)]
-    S[Subsidiary] -.tells the portal<br/>which ERP to use.-> P
-    ERP -.status flows back.-> P
-    P -.notifies.-> R
+    Sales[Sales team] -->|writes the quotation in| ERP[(Odoo instance)]
+    ERP -->|AdminOps reads the quotation| P[AdminOps]
+    P -->|notifies the reseller| R
+    Sub[Subsidiary] -.->|is that Odoo instance| ERP
 ```
 
-- **Subsidiary** — one of the distributor's own entities. It doesn't sit in the data
-  path at all — it's just how the portal knows *which* ERP to send an order to. That
-  decision is made once (when the quote is issued) and the portal talks to the ERP
-  directly from then on.
-- **Our portal** — the one thing a reseller ever deals with directly. It talks straight
-  to whichever ERP the subsidiary points at, and hides everything about that ERP from
-  the reseller.
-- **ERP system** — where the subsidiary's orders actually live and get fulfilled and
-  invoiced (NetSuite today).
+- **Subsidiary** — one of the distributor's own companies. One subsidiary is one ERP instance. NTT India is one Odoo database. NTT Germany is another.
+- **AdminOps** — the distributor's application. It reads the ERP, shows every order, and shows every notification sent to a reseller. There is no reseller screen. The reseller receives the webhook on their own system.
+- **ERP** — where sales writes the quotation, confirms it, delivers it, and invoices it. AdminOps does not create that quotation. Odoo itself is sometimes called a portal. This product is not that.
 
-## Supply chain flow in scope
+## What has to be registered first
+
+Three records exist before any quotation is picked up. The quotation has to match them. A company or a customer that was not registered stays in the ERP.
+
+| Record | What it says | Example |
+|---|---|---|
+| Connection | Which database we log into | `conn_odoo_in` → Odoo India |
+| Subsidiary route | That database is this subsidiary, and which company id inside it | NTT India → `conn_odoo_in`, company `1` |
+| Reseller binding | Inside that database, which customer is this reseller. Status must be verified | Acme in Odoo India is customer `42` |
+
+One database belongs to one subsidiary. A second subsidiary cannot use it. A reseller who buys from two subsidiaries has two bindings, each with that database's own customer id.
+
+| Reseller | Subsidiary | Database | Customer id there |
+|---|---|---|---|
+| Acme | NTT India | Odoo India | 42 |
+| Acme | NTT Germany | Odoo Germany | 77 |
+
+## The flow we run
 
 ```mermaid
 sequenceDiagram
-    participant R as Reseller
-    participant P as Our portal
-    participant E as ERP
+    actor Operator
+    participant AdminOps
+    participant Odoo
+    actor Reseller
 
-    Note over R,P: A quote already exists for this reseller
-    R->>P: Place an order against the quote
-    P->>E: Create the order in the ERP
-    E-->>P: Status updates (confirmed, shipped, invoiced)
-    P-->>R: Notify reseller of each update
+    Note over Operator,AdminOps: Registered before any quotation
+    Operator->>AdminOps: Subsidiary, company id, connection
+    Operator->>AdminOps: Verified binding to the Odoo customer
+
+    Note over Odoo,AdminOps: Sales writes the quotation in Odoo
+    AdminOps->>Odoo: Poll this customer's sales orders
+    Odoo-->>AdminOps: Company, customer, lines
+    AdminOps->>AdminOps: Company matches the subsidiary
+    AdminOps->>AdminOps: Customer matches the reseller
+    AdminOps->>AdminOps: Adopt the order. No notification yet.
+
+    Odoo-->>AdminOps: Quotation confirmed
+    AdminOps->>Reseller: Notification, Confirmed
+
+    Odoo-->>AdminOps: Delivery validated
+    AdminOps->>Reseller: Notification, Shipment recorded
+
+    Odoo-->>AdminOps: Customer invoice posted
+    AdminOps->>Reseller: Notification, Invoice recorded
+    AdminOps->>AdminOps: Order closed
 ```
 
-Quote → order submitted → order created in the ERP → status comes back → reseller is
-notified. That's the loop in scope today.
+Saving the quotation is enough for the distributor to see the order in AdminOps. The reseller's system is notified when it is confirmed, when a delivery is validated, and when the customer invoice is posted. Cancelling it in Odoo can notify as well. AdminOps lists those notifications.
 
-## How subsidiaries connect to resellers
+A quotation and a sales order are the same Odoo document. Confirming it is the step that changes status.
 
-Before any order can go anywhere, the system has to answer two separate questions —
-and it has to answer them separately, because the answer to one doesn't give you the
-other:
+### Acme, one quotation
 
-1. **Which ERP does this order belong to?** — decided by the subsidiary.
-2. **Inside that ERP, who is this reseller?** — decided separately, because the same
-   reseller can be a completely different customer number in every ERP they deal with.
+1. An operator has already registered NTT India on Odoo India, company `1`, and verified that Acme is customer `42` there.
+2. Sales, in Odoo India, saves a quotation for customer `42` on company `1`. The product line has an Internal Reference. The number looks like `S00042`.
+3. The next poll adopts it. AdminOps shows the order. Acme's system has not been notified yet.
+4. Sales confirms the quotation. Acme's system gets a Confirmed notification. AdminOps shows that notification.
+5. The warehouse validates the delivery. Acme gets a shipment notification. Shipped and delivered quantities move.
+6. Finance posts the customer invoice. Acme gets an invoice notification. The order closes.
 
-### Walking through one reseller, one subsidiary
+AdminOps shows when the notification was sent, which reseller it went to, which event it was, and the order behind it, including the Odoo order number.
 
-- NTT India runs its own ERP — call it **NetSuite – India**. That's one fact, set once:
-  *NTT India uses NetSuite – India.*
-- A reseller, **Acme Distribution LLC**, buys from NTT India. Before Acme's very first
-  order can go through, someone has to also tell the system a second fact: *inside
-  NetSuite – India, Acme is customer CUST-4521.*
-- From then on, every order Acme places under NTT India is sent to NetSuite – India, billed
-  as CUST-4521 — automatically, because both facts are already on file. The order
-  itself never has to say any of this; the system looks it up.
+A quotation for a different company, or for a customer with no verified binding, is left in Odoo.
 
-### Now add a second ERP
+## Both directions use the same records
 
-Acme *also* buys from **NTT Germany**, which runs its own, separate instance of
-NetSuite — call it **NetSuite – Germany**. Acme isn't CUST-4521 there. They're a
-different customer number entirely — say **DE-9981** — because that's a different
-instance with its own customer list, even though it's the same ERP software.
+**Odoo to the reseller.** The poll is already inside one database. The customer on the quotation picks the reseller. The company on the quotation picks the subsidiary.
 
-So the system needs to hold two separate facts about the same reseller, one per ERP
-they actually touch:
+**The reseller's subsidiary back to the right Odoo.** The subsidiary's route is the database. The binding on that database is the customer id. Acme buying from NTT India can only land in Odoo India, as customer `42`. Acme's German binding is a different row and is not used.
 
-| Reseller | In this ERP... | ...they're customer |
-|---|---|---|
-| Acme Distribution LLC | NetSuite – India | CUST-4521 |
-| Acme Distribution LLC | NetSuite – Germany | DE-9981 |
+## Later — creating a purchase order
 
-And one fact per subsidiary, saying which ERP it currently uses:
+The same two lookups aim a purchase order when we create one. That call is not built yet. The read flow above does not change when it is added.
 
-| Subsidiary | Uses this ERP |
-|---|---|
-| NTT India | NetSuite – India |
-| NTT Germany | NetSuite – Germany |
+```mermaid
+sequenceDiagram
+    participant AdminOps
+    participant Odoo
 
-Put an order from Acme in front of NTT India, and the system chains these two small
-facts together: *NTT India → NetSuite – India*, then *Acme in NetSuite – India → CUST-4521*.
-That's the whole mechanism. Adding a third subsidiary, or a third ERP, or a reseller
-who buys from five subsidiaries, is just more rows in these two lists — never a change
-to how the system works.
-
-## From order to ERP, and back — the actual lookup
-
-### 1. The lookup tables, as real records
-
-**Which ERP instance each subsidiary uses:**
-
-| subsidiary_id | connection_id |
-|---|---|
-| sub_ntt_in | conn_ns_in |
-| sub_ntt_de | conn_ns_de |
-
-**What each connection actually is:**
-
-| connection_id | instance | address |
-|---|---|---|
-| conn_ns_in | NetSuite – India | india.netsuite.example.com |
-| conn_ns_de | NetSuite – Germany | germany.netsuite.example.com |
-
-**Who Acme is, inside each instance:**
-
-| tenant_id (reseller) | connection_id | erp_customer_id | status |
-|---|---|---|---|
-| tnt_acme | conn_ns_in | CUST-4521 | VERIFIED |
-| tnt_acme | conn_ns_de | DE-9981 | VERIFIED |
-
-### 2. A sample quote — issued before any order exists
-
-**What the operator actually provides** — nothing here mentions a connection or an ERP
-at all:
-
-```json
-{
-  "quoteId": "qot_1042",
-  "tenantId": "tnt_acme",
-  "subsidiaryId": "sub_ntt_in",
-  "validFrom": "2026-01-01",
-  "validUntil": "2026-03-31",
-  "lines": [
-    { "productKey": "FW-APPLIANCE-200", "unitPrice": "1250.00", "currency": "USD" },
-    { "productKey": "SUPPORT-PLAN-GOLD", "unitPrice": "300.00", "currency": "USD" }
-  ]
-}
+    Note over AdminOps: Same records, other direction
+    AdminOps->>AdminOps: Subsidiary picks the database
+    AdminOps->>AdminOps: Binding picks the customer
+    AdminOps->>Odoo: Create the purchase order
+    Odoo-->>AdminOps: Purchase order number
 ```
 
-**What the system looks up and adds, right then** — table 1's lookup, run once:
-*NTT India (`sub_ntt_in`) → `conn_ns_in`*.
+## What this flow leaves out
 
-```json
-{
-  "routedToConnectionId": "conn_ns_in",
-  "status": "ISSUED"
-}
-```
-
-**The quote, as stored** — the two merged together. This is now permanent: even if NTT
-India's route later changes to a different connection, this quote keeps saying
-`conn_ns_in`, because that was the route *at the moment it was issued*:
-
-```json
-{
-  "quoteId": "qot_1042",
-  "tenantId": "tnt_acme",
-  "subsidiaryId": "sub_ntt_in",
-  "routedToConnectionId": "conn_ns_in",
-  "validFrom": "2026-01-01",
-  "validUntil": "2026-03-31",
-  "status": "ISSUED",
-  "lines": [
-    { "productKey": "FW-APPLIANCE-200", "unitPrice": "1250.00", "currency": "USD" },
-    { "productKey": "SUPPORT-PLAN-GOLD", "unitPrice": "300.00", "currency": "USD" }
-  ]
-}
-```
-
-### 3. A sample order (the PO) coming in from the reseller
-
-Acme places an order against that quote. The order itself never mentions an ERP,
-a connection, or an instance — it just names the quote:
-
-```json
-{
-  "tenantId": "tnt_acme",
-  "quoteId": "qot_1042",
-  "clientReference": "PO-2025-771",
-  "lines": [
-    { "productKey": "FW-APPLIANCE-200", "quantity": 4 },
-    { "productKey": "SUPPORT-PLAN-GOLD", "quantity": 1 }
-  ]
-}
-```
-
-### 4. How we look up the right instance and send the event
-
-1. Read the connection already stamped on the quote: `conn_ns_in`.
-2. Look that connection up in table 2: **NetSuite – India**, its address and login.
-3. Look up Acme's customer number for *that same connection* in table 3: **CUST-4521**.
-4. Build NetSuite's own order shape and send it to that instance:
-
-```json
-// Sent to NetSuite – India only
-{
-  "customerId": "CUST-4521",
-  "externalId": "ord_88c3a1",
-  "poNumber": "PO-2025-771",
-  "items": [
-    { "sku": "FW-APPLIANCE-200", "quantity": 4 },
-    { "sku": "SUPPORT-PLAN-GOLD", "quantity": 1 }
-  ]
-}
-```
-
-Three lookups, one send. Nothing here changes if Acme buys from five more subsidiaries
-tomorrow — these are the same three tables, just more rows.
-
-### 5. Getting the status back to the reseller — the same method, reversed
-
-NetSuite – India later reports a status change against *its own* order number,
-`NS-IN-55312`. The system runs the same kind of lookup backwards:
-
-| connection_id | erp_order_id | our order_id |
-|---|---|---|
-| conn_ns_in | NS-IN-55312 | ord_88c3a1 |
-
-`ord_88c3a1` belongs to `tnt_acme`, and Acme's own notification address is on file,
-the same way their customer number was. So:
-
-```json
-// Delivered to Acme's own system
-{
-  "event": "OrderConfirmed",
-  "orderReference": "PO-2025-771",
-  "status": "CONFIRMED"
-}
-```
-
-Acme never sees `NS-IN-55312`, `CUST-4521`, `conn_ns_in`, or even the word "NetSuite" —
-every ERP-side detail stays behind the two lookup tables. Same mechanism both
-directions: look it up, don't ask the reseller for it.
+- A second ERP product, until its adapter is written. Another Odoo database does not need one.
+- A screen for switching between instances. Orders are one list. The connection is a column on the operator's row.
+- Credit notes. A posted customer invoice counts. A refund does not reduce the invoiced quantity.
+- A vendor purchase-order number on the quotation. We do not read one.

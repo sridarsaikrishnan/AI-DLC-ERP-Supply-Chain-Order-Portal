@@ -1,10 +1,9 @@
-# High-Level Design — ERP & Supply Chain Order Portal
+# High-Level Design — AdminOps
 
 C4 **container-level** view. Diagram source: [`hld.drawio`](hld.drawio) (open in
-diagrams.net or the VS Code Draw.io extension). It has **three pages**: *(1) Container
-view*, *(2) Modules → tables (data ownership)*, and *(3) Known gaps* — a direct,
-code-verified list of real architectural gaps, not aspirational TBDs. Read page 3 before
-treating anything on pages 1–2 as fully closed.
+diagrams.net or the VS Code Draw.io extension). It has **two pages**: *(1) Container
+view* and *(2) Onboarding and ERP routing*. The known-gaps table is in this document,
+below.
 
 Scope: major components, their responsibilities, external dependencies, data stores,
 communication paths, and the significant flows and boundaries. It deliberately omits
@@ -13,65 +12,55 @@ established by the product is marked **TBD** rather than assumed.
 
 ## System context
 
-The portal lets **resellers** place orders with a distributor and track them, while the
-distributor's **operator** administers the catalog, pricing (quotes), reseller↔ERP
-customer links, and ERP connections. Orders are forwarded to the distributor's **ERP**
-(Odoo today) as the system of record; the ERP's status changes flow back to resellers.
-An order is always a reply to an **operator-issued quote** (prices, validity window,
-end customer, ship-to); the catalog says only *what a product is*.
+**AdminOps** is the distributor's application. Sales writes the quotation in the ERP
+(Odoo today). The worker reads that sales order, then confirmation, delivery, and
+invoice, and AdminOps shows every order and every notification sent to a reseller.
+There is no reseller screen. The reseller receives the webhook on their own system.
 
 Interacting parties and systems:
-- **Reseller** (human) — via the Reseller SPA.
-- **Operator / distributor admin** (human) — via the Operator SPA.
-- **ERP (Odoo)** — external; receives orders and pushes status back. Additional ERP
-  types: **TBD** (only Odoo is implemented and registered today).
-- **Reseller webhook endpoints** — external receivers the portal pushes status to.
+- **Distributor** (human) — via AdminOps.
+- **Reseller** — not a user of this app. Their system receives signed webhooks.
+- **ERP (Odoo)** — external system of record. Another Odoo database is another
+  connection. A different ERP product needs an adapter (only Odoo is registered today).
+- **Reseller webhook endpoints** — external receivers AdminOps's worker posts status to.
 - **AWS Cognito** (identity) and **AWS Secrets Manager** (credentials) — managed deps.
 
 ## Container / component overview
 
 | Component | Purpose / responsibility | Key dependencies |
 |---|---|---|
-| **Reseller portal (SPA)** | Browser app: a table of webhook notifications that were delivered, and the order behind each row. Never shows ERP identity (FR-19). | API host (GraphQL /reseller); Cognito (login) |
-| **Operator admin (SPA)** | Browser app: manage ERP connections, resellers/bindings, items, quotes, subsidiaries; view all orders and failures. | API host (GraphQL /operator); Cognito |
-| **API host** *(Python/FastAPI — the only HTTP server)* | Synchronous interface: GraphQL for both audiences, the inbound ERP-webhook HTTP route, request authentication/authorization, and reads/writes via the domain. | Domain modules; PostgreSQL; Cognito; Secrets Manager |
+| **AdminOps (SPA)** | The only browser app. Lists every order, every reseller notification, connections, subsidiaries, bindings, and failed messages. | API host (GraphQL /operator); Cognito |
+| **API host** *(Python/FastAPI — the only HTTP server)* | Synchronous interface: GraphQL for AdminOps, the inbound ERP-webhook HTTP route, request authentication/authorization, and reads/writes via the domain. A reseller GraphQL schema remains for machines; it is not a screen. | Domain modules; PostgreSQL; Cognito; Secrets Manager |
 | **Worker host** *(Python process — not HTTP, not FastAPI)* | Asynchronous processing: order routing, ERP delivery, read-model projection, outbound webhook dispatch, outbox relay, and the reconciliation scheduler (polling fallback). Same codebase/composition root as the API, different entrypoint. | Message bus; Domain modules; PostgreSQL; ERP; Secrets Manager |
 | **Domain modules** (shared) | The business logic shared by API + Worker, grouped by subdomain (ADR-0017): **`sales/`** (`ordering` — the event-sourced core — plus `quoting`, `shipment`, `invoicing`), **`reference/`** (`catalog`, `connections`, `tenancy`), **`integration/`** (`erp` adapters + registry, inbound/outbound `webhooks`). | PostgreSQL (via hosts) |
 | **PostgreSQL (Aurora)** | Single datastore: event store + outbox + snapshots, order projections (read models), and reference/CRUD data. | — (owned by the domain) |
 | **Message bus** | Async transport: SNS FIFO topic → SQS FIFO queues (+ DLQ). floci locally, AWS in prod. | — |
 | **AWS Cognito** | Identity provider (JWT); header-stub provider for local dev. | — |
 | **AWS Secrets Manager** | Stores ERP login and webhook signing secrets (never persisted in the DB). | — |
-| **ERP — Odoo** (external) | System of record for orders; accepts orders over JSON-RPC and emits status webhooks. | — |
+| **ERP — Odoo** (external) | System of record. Sales writes the quotation here. The worker reads it, then deliveries and invoices. | — |
 | **Reseller webhook endpoints** (external) | Reseller-operated receivers for signed status notifications. | — |
 
 ## Key flows
 
-1. **Place an order (reply to a quote) → ERP** *(sync entry, async fulfilment)*
-   Reseller SPA → API `placeOrder(quoteId, …)` → the Order aggregate's events + outbox
-   row are written to PostgreSQL in one transaction → outbox relay publishes to the bus →
-   `order-processing` routes by item ownership + verified binding → `order-delivery`
-   submits to the ERP adapter (customer = the binding's ERP customer id; idempotency key =
-   the platform order id).
+1. **Read the ERP sales order** *(scheduled)*
+   For each active connection and verified binding, the worker reads `sale.order` for
+   that customer. The quotation's company id must match the subsidiary registered on
+   that connection. A match appends `OrderObserved` and an outbox row in one
+   transaction. AdminOps lists the projected order.
 
-2. **ERP status → reseller** *(async in, async out)*
-   Odoo → API inbound webhook (authenticated, deduplicated) → status applied to the Order
-   → projections rebuild the reseller/operator read models → `webhook-dispatch` delivers a
-   signed notification to the reseller's endpoint.
+2. **Confirm, deliver, invoice → reseller** *(async)*
+   The same poll, or an authenticated inbound webhook, applies status, done deliveries,
+   and posted customer invoices. Projections update the AdminOps order.
+   `webhook-dispatch` posts a signed notification to the reseller's endpoint. AdminOps
+   lists every delivery, including which reseller it went to.
 
-3. **Operator administration** *(sync)*
-   Operator SPA → API `/operator` → issue quotes, create subsidiaries, register ERP
-   connections, link resellers to ERP customers, manage the catalog (including
-   box-vs-license item kind).
+3. **Distributor administration** *(sync)*
+   AdminOps → API `/operator` → register connections, subsidiaries (one connection, one
+   company id), and reseller bindings. The distributor signs in as the operator role.
 
-4. **Reconciliation fallback** *(async, scheduled)*
-   The Worker's reconciliation scheduler periodically polls the ERP for orders whose
-   webhook was missed, and applies status the same way as flow 2 — the safety net for
-   at-least-once/missed events.
-
-5. **Authentication** *(sync)*
-   SPAs obtain a JWT from Cognito; the API verifies it per request and scopes every
-   resolver to the caller's tenant/role (reseller data is tenant-isolated; operator role
-   required for the operator schema).
+4. **Authentication** *(sync)*
+   AdminOps obtains a JWT from Cognito. The operator schema requires the operator role
+   and returns every reseller's orders and notifications.
 
 ## Data ownership
 
@@ -84,7 +73,7 @@ Interacting parties and systems:
   (ADR-0014); reference/config data is plain CRUD.
 - **API** publishes order events (writes events + outbox); **Worker** consumes events and
   owns projection writes. **ERP (Odoo)** owns the authoritative order record on its side;
-  the portal mirrors status back via projections. Secrets are owned by **Secrets
+  AdminOps mirrors status back via projections. Secrets are owned by **Secrets
   Manager**, identities by **Cognito**.
 
 ### Module → table ownership (see diagram page 2)
@@ -109,12 +98,13 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 
 ## Boundaries
 
-- **Browser (untrusted) vs. trusted server zone** — SPAs run on user devices; all
+- **Browser (untrusted) vs. trusted server zone** — AdminOps runs in the browser; all
   authority lives server-side (API/Worker/DB). Every request is authenticated and
-  tenant/role-scoped.
-- **Reseller vs. operator data boundary** — reseller surfaces must never expose ERP
-  identity (name, instance, ERP record id); only operator surfaces may (FR-19).
-- **Product boundary** — the SPAs, API, Worker, and domain.
+  role-scoped.
+- **Reseller machine vs. AdminOps** — the reseller GraphQL schema hides ERP identity
+  (FR-19). AdminOps is the distributor view and shows it, including which reseller a
+  notification was sent to.
+- **Product boundary** — AdminOps, API, Worker, and domain.
 - **Cloud (AWS) boundary** — Cognito, Secrets Manager, SNS/SQS, Aurora, and the Fargate
   runtimes are AWS-managed.
 - **External boundary** — the ERP and reseller webhook endpoints are third-party controlled.
@@ -131,7 +121,7 @@ Modules are grouped by subdomain (ADR-0017): `sales/`, `reference/`, `integratio
 ## Known gaps (honest review, 2026-10-04)
 
 Verified directly against the current code, not carried forward from an earlier pass.
-Full detail (file/line, failure scenario, fix trigger) is on diagram **page 3**.
+The diagram no longer carries a separate gaps page. The table below is the list.
 
 | # | Gap | Status |
 |---|---|---|
@@ -156,7 +146,7 @@ Full detail (file/line, failure scenario, fix trigger) is on diagram **page 3**.
 - **Scalability** — stateless API/Worker scale horizontally; async work absorbs ERP
   latency/outages via the queue; single Postgres today (read-model/replica scaling: TBD).
 - **Observability** — structured logging across API/Worker; delivery log + failed-message
-  views for operators. Metrics/tracing stack: **TBD**.
+  views in AdminOps. Metrics/tracing stack: **TBD**.
 - **Availability / DR** — managed AWS services (Aurora, SQS, Cognito). Multi-AZ/region
   topology, RPO/RTO targets, and backup/restore policy: **TBD**.
 - **Performance** — reads served from projections (CQRS) rather than replaying events;

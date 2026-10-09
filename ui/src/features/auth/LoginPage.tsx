@@ -18,7 +18,7 @@ export function LoginPage() {
   return (
     <div className="authscreen">
       <section className="panel" aria-label="Sign in">
-        <div className="brandmark">ERP Platform</div>
+        <div className="brandmark">AdminOps</div>
         <form className="stack" onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="username">Username</label>

@@ -6,29 +6,27 @@ of this is implemented, the [developer guide](developer-guide.md) traces it end 
 
 ## What it is
 
-A portal that shows a distributor's **resellers** the notifications delivered to them, while the
-distributor's **operators** run the catalog, pricing, customer links and ERP connections.
-Orders are forwarded to the distributor's **ERP** (Odoo today) as the system of record, and
-the ERP's status changes flow back to the reseller. The portal is the one front door in
-front of (eventually) several ERPs, so a reseller never needs to know which ERP a product
-actually lives in.
+**AdminOps** is the distributor's application. Sales writes the quotation in the **ERP**
+(Odoo today). AdminOps reads that sales order, then confirmation, delivery, and invoice,
+and lists every order and every notification sent to a reseller. There is no reseller
+screen. The reseller receives the webhook on their own system. Odoo itself is sometimes
+called a portal. This product is not that.
 
 ## Who uses it
 
-- **Reseller** — a customer of the distributor. The portal lists webhook notifications that
-  were actually delivered, and opens the order behind each one. Sees only their own data,
-  and never sees any ERP identity (which ERP, which instance, the ERP's own order/customer IDs).
-- **Operator** (distributor admin) — links resellers to their ERP customer records and
-  registers ERP connections. Sales orders are created in the ERP. Sees across all resellers,
-  including ERP identity.
+- **Distributor** — signs in to AdminOps. Sees every reseller's orders, every ERP id, and
+  every notification that was sent, including which reseller it went to.
+- **Reseller** — a customer of the distributor. Not a user of AdminOps. Their own system
+  receives the signed webhook.
 
 ## The core workflow
 
 ```
-ERP sales order for a bound customer  ──▶  portal adopts it
+ERP sales order for a bound customer  ──▶  AdminOps adopts it
                                               │
-reseller sees status + scores  ◀──  ERP status flows back (webhook / polling) ◀┘
-ERP deliveries and invoices  ──▶  reseller sees shipped / delivered / invoiced
+AdminOps shows status + scores  ◀──  ERP status flows back (webhook / polling) ◀┘
+ERP deliveries and invoices  ──▶  AdminOps shows shipped / delivered / invoiced
+                                      and lists the notification sent to the reseller
 ```
 
 An order is always a reply to a quote. The quote carries the prices, how long they hold,
@@ -36,32 +34,23 @@ the end customer and where the goods go. The catalog only says *what a product i
 
 ## Features supported today
 
-### Quoting (the price list a reseller orders against)
-- An operator issues a quote to a specific reseller: the subsidiary issuing it, the
-  end customer (name + ship-to), currency, a validity window (`valid_from`/`valid_until`),
-  and priced lines (unit price, unit of measure, optional tax rate and per-unit discount).
-- Prices live **only** on the quote. A reseller can never set or override a price.
+### Quoting
+Sales writes the quotation in the ERP. In Odoo that quotation and the sales order are the
+same `sale.order`. AdminOps does not issue the quotation.
 
 ### Ordering
-- A reseller places an order by referencing a quote and listing SKUs + quantities only — no
-  price, no unit of measure (both come from the quote).
-- The order is **refused** if: a line isn't on the quote, or the quote is missing, not in
-  `ISSUED` status, or outside its validity window. (No price on file → no order.)
-- Each order line gets its own stable ID, so two lines of the same SKU are tracked
-  separately through shipping and invoicing.
-- A reseller can cancel an order before it has been confirmed/closed by the ERP.
+The worker reads each verified reseller's sales orders from that ERP. A line needs an
+Internal Reference, a quantity above zero, and a price. The order is kept only when the
+quotation's company id matches the subsidiary registered on that connection. Each line
+keeps its own id through shipping and invoicing.
 
-### Routing to the right ERP
-- Which ERP an order goes to is decided by **which connection owns the items**, not by the
-  reseller. Every line in one order must be owned by the same connection (an order spanning
-  two ERPs is refused — one order, one ERP).
-- The reseller must have a **verified binding** to that connection, else the order is
-  refused. The order is sent to the ERP as the reseller's own customer record in that ERP
-  (never a name-based guess).
-- One reseller can be bound to several connections; several connections can be the same ERP
-  type (e.g. an EU Odoo and a US Odoo) or different types — all at once.
+### Routing
+One ERP instance is one connection, and one connection belongs to one subsidiary. A
+reseller who buys from two instances has two bindings, each with that instance's own
+customer id. The same records are what a later purchase order would use, in the other
+direction. That create call is not built yet.
 
-### Order lifecycle (what the reseller sees as "status")
+### Order lifecycle (what AdminOps shows as "status")
 `Submitted → Validated → Accepted → Sent to ERP → Confirmed → Closed`, plus `Rejected`,
 `Retrying`, and `Cancelled`. See the [glossary](#glossary-statuses) for what each means.
 
@@ -79,37 +68,37 @@ invoice (partial quantities included). The scores move accordingly and are addit
 repeat poll of the same ERP document does not add the quantity again.
 
 ### Vendor date ("scheduled")
-When purchasing actually buys a line from the maker, an operator records a vendor date on
-that line. That date is what "scheduled" means to the reseller.
+When purchasing buys a line from the maker, the distributor records a vendor date on
+that line in AdminOps. That date is what "scheduled" means.
 
 ### Status feedback from the ERP
-- **Primary**: the ERP calls an inbound webhook when an order's status changes
-  (near-real-time). Odoo uses a shared-secret URL; other ERPs can use a signed webhook.
-- **Fallback**: a reconciliation sweep polls each ERP on a schedule for open orders, so
-  status still converges even if a webhook is missed or an ERP can't send one.
+- **How an order arrives**: a reconciliation sweep polls each ERP. That is the live path.
+- **Status after that**: the same sweep reads confirmation, done deliveries, and posted
+  customer invoices. An inbound webhook can apply a status change as well. Odoo uses a
+  shared-secret URL.
 
 ### Outbound notifications (optional, per reseller)
 - A reseller can register one or more webhook endpoints to be notified of order status
   changes. A notification is recorded, with its order, only once that delivery succeeds.
-  The portal lists those. A status change with no endpoint is not a notification.
+  AdminOps lists those, for every reseller. A status change with no endpoint is not a notification.
 - Those deliveries cover lifecycle changes (sent to ERP, confirmed, closed, rejected,
   retrying, cancelled) and a recorded shipment or invoice.
 
-### Operator administration
-- Register / pause / resume ERP connections (with generic, per-ERP credential parameters).
-- Link a reseller to their ERP customer id (the binding), and verify it.
-- Manage the catalog: each SKU is owned by one connection and marked as a **box** or a
-  **license**.
-- Create subsidiaries (name, country, language).
-- View every reseller's orders, the full timeline, and a cross-tenant failed-messages view.
+### What AdminOps shows
+- **Notifications** — every webhook sent to a reseller, with that reseller's id. Open a row to see the order.
+- **Orders** — every reseller's orders, ERP ids included, and the timeline on each order.
+- **Subsidiaries** — name, country, language, the one connection that subsidiary uses, and the ERP company id.
+- **ERP connections** — register, pause, and resume an instance.
+- **Resellers** — the binding to a connection and that instance's customer id, and whether it is verified.
+- **Failed messages** — deliveries and other work that did not succeed, across every reseller.
 
 ## Rules & assumptions worth knowing
 
 - **No price without a quote.** This is the rule that makes the product a distributor tool.
-- **Resellers never see ERP identity** (which ERP/instance, ERP order/customer IDs). This is
-  a hard boundary, not a display preference.
-- **Status is eventually consistent.** After the ERP changes a delivery or an invoice, the
-  reseller's view updates within the time it takes a background worker to
+- **AdminOps shows ERP identity** (which instance, which order, which customer). The
+  reseller's own webhook receiver is a different surface and does not get that identity.
+- **Status is eventually consistent.** After the ERP changes a delivery or an invoice,
+  AdminOps updates within the time it takes a background worker to
   process the event (sub-second locally; as fast as the queue in production) — not in the
   same instant. This is a deliberate design trade for reliability and scale.
 - **Money is exact** (no floating-point drift) and single-currency per order/quote.

@@ -13,10 +13,10 @@ bash scripts/local.sh up
 | | |
 |---|---|
 | Odoo | http://localhost:8069 — `admin` / `admin` |
-| Operator portal | http://localhost:5173 — `demo-operator` / `DemoPass123!` |
-| Reseller portal | http://localhost:5173 — `demo-reseller` / `DemoPass123!` |
+| AdminOps | http://localhost:5173 — `demo-operator` / `DemoPass123!` |
 | Connection | `conn_odoo_local` |
 | Binding | `tnt_demo` → Odoo partner id **`1`** |
+| Distributor | `sub_demo` → Odoo company id **`1`**. A quotation for any other company is not adopted. |
 | Webhook secret | `odoo-webhook-demo` |
 
 The sweep runs every 30 seconds. An Access Error on Sales Orders means the Odoo process started before the Sales group was granted: `docker compose restart odoo`.
@@ -72,9 +72,9 @@ curl -i -X POST "http://127.0.0.1:8000/erp/webhook/conn_odoo_local/odoo-webhook-
 
 Use the real quotation number. `200` and a new inbox row means the secret and the table are fine. `401` means the secret did not match. `202` means the secret was fine and no adopted order has that number yet.
 
-**Operator.** `demo-operator` → **Orders** → the row. Status goes `SENT_TO_ERP`, then `CONFIRMED`, then `CLOSED` once the invoice is posted. Delivered and invoiced quantities are on that order.
+**AdminOps.** `demo-operator` → **Orders** → the row. Status goes `SENT_TO_ERP`, then `CONFIRMED`, then `CLOSED` once the invoice is posted. Delivered and invoiced quantities are on that order.
 
-**Reseller.** `demo-reseller` → **Notifications**. A row appears only when a webhook was delivered to an endpoint for `tnt_demo`. Saving the quotation does not create one. Confirm, delivery, and invoice can. With no endpoint, this page stays empty even though the operator order is moving.
+**Notifications.** Same sign-in → **Notifications**. A row appears only when a webhook was delivered to an endpoint for a reseller. Saving the quotation does not create one. Confirm, delivery, and invoice can. With no endpoint, this page stays empty even though the order is moving. The row names the reseller.
 
 ## Done when
 

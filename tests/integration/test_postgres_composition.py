@@ -100,6 +100,7 @@ def test_postgres_profile_places_and_routes_an_order() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[ErpPartnerOrderLine(product_key=sku, quantity="2", unit_price="19.99")],
+        subsidiary_id="sub_demo",
     )
     try:
         event_store = PostgresEventStore(_factory)
@@ -146,6 +147,7 @@ def test_postgres_profile_observes_the_same_erp_order_once() -> None:
         erp_order_id="S00042",
         client_reference="S00042",
         lines=[line],
+        subsidiary_id="sub_demo",
     )
     try:
         again = container.order_service.observe_erp_order(
@@ -154,6 +156,7 @@ def test_postgres_profile_observes_the_same_erp_order_once() -> None:
             erp_order_id="S00042",
             client_reference="S00042",
             lines=[line],
+            subsidiary_id="sub_demo",
         )
         assert again == order_id
         event_store = PostgresEventStore(_factory)
