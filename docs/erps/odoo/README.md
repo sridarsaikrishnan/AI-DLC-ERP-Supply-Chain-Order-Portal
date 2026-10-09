@@ -1,6 +1,6 @@
 # Odoo
 
-To watch one order go quotation → delivery → invoice, and see the raw webhook land: [supply-chain-check.md](./supply-chain-check.md).
+To watch one order go quotation → delivery → invoice: [test-the-flow.md](./test-the-flow.md). Short checklist: [supply-chain-check.md](./supply-chain-check.md).
 
 Status: **live, real adapter** (`src/modules/integration/erp/infrastructure/odoo_adapter.py`).
 The only ERP actually registered today (`ErpType.ODOO`). This page is sourced from the

@@ -2,6 +2,8 @@
 
 Do this once on the local stack. When it passes, one Odoo sales order has been followed from quotation through delivery and invoice, and the raw webhook is in `erp_event_inbox`.
 
+The click-by-click version, with this database’s customer and product filled in: [test-the-flow.md](./test-the-flow.md).
+
 Adapter facts: [README.md](./README.md). Webhook wiring: [webhook.md](./webhook.md).
 
 ## Before you start
